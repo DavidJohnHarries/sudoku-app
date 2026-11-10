@@ -167,8 +167,8 @@ function selCage(){if(!sel.size)return -1;const ks=cagesOf[[...sel][0]];for(cons
 function renderSel(){
  const one=sel.size===1?valAt([...sel][0]):0;
  for(let i=0;i<81;i++){cells[i].classList.toggle('sel',sel.has(i));cells[i].classList.toggle('same',!!one&&valAt(i)===one)}
- if(editing){$('#infoTxt').textContent=sel.size?`${sel.size} cell${sel.size>1?'s':''} selected`:'Drag across cells to make a cage';$('#bCalc').classList.add('hidden');return}
- $('#bCalc').classList.toggle('hidden',!FEATURES.calculator);
+ if(editing){$('#bPick').classList.add('hidden');$('#infoTxt').textContent=sel.size?`${sel.size} cell${sel.size>1?'s':''} selected`:'Drag across cells to make a cage';$('#bCalc').classList.add('hidden');return}
+ $('#bCalc').classList.toggle('hidden',!FEATURES.calculator||mode==='k');$('#bPick').classList.toggle('hidden',mode!=='k');
  const k=selCage();
  if(k<0){$('#infoTxt').textContent=sel.size?'No cage selected':'Tap a cell to select';$('#bCalc').disabled=true}
  else{const c=P.cages[k];$('#infoTxt').textContent=`Cage ${c.sum} · ${c.cells.length} cell${c.cells.length>1?'s':''}`;$('#bCalc').disabled=false}
@@ -207,7 +207,7 @@ function renderWarn(){const {w,caged,total}=cageWarnings();
 // ---------- Actions ----------
 const editable=()=>[...sel].filter(i=>!P.givens[i]);
 function nudge(el){el.classList.remove('nudge');void el.offsetWidth;el.classList.add('nudge')}
-function toast(m){const d=document.createElement('div');d.className='toast';d.textContent=m;document.body.appendChild(d);setTimeout(()=>d.remove(),1600)}
+function toast(m){$$('.toast').forEach(x=>x.remove());const d=document.createElement('div');d.className='toast';d.textContent=m;document.body.appendChild(d);setTimeout(()=>d.remove(),1600)}
 function pressDigit(d,el){
  const cs=editable();if(!cs.length){if(el)nudge(el);return}
  act(()=>{
@@ -224,25 +224,59 @@ function erase(){const cs=editable();if(mode==='k'){clearColours();return}
 function clearColours(){act(()=>[...sel].forEach(i=>P.col[i]=[]))}
 function checkSolved(){if(P.solved||editing)return;for(let i=0;i<81;i++)if(!valAt(i))return;if(bad.size||cageBad.size)return;P.solved=true;save();toast('Solved! 🎉 '+fmtT(P.time))}
 
-// ---------- Grid pointer: tap / drag select ----------
-let gp=null;
+// ---------- Grid pointer: tap / drag select, double/triple tap, multi-select ----------
+// Single tap acts instantly; a 2nd tap on the same cell within 350ms upgrades to the cage (or box if no cage),
+// a 3rd upgrades to the 3x3 box. In Multi mode taps toggle cells and double/triple taps ADD the group.
+let gp=null,multi=false,tapSeq={cell:-1,t:0,n:0,base:null};
+const BOXCELLS=i=>HOUSES[BOX(i)*3+2];
 function cellAt(x,y){const r=grid.getBoundingClientRect();const c=Math.floor((x-r.left)/r.width*9),w=Math.floor((y-r.top)/r.height*9);return c<0||c>8||w<0||w>8?-1:w*9+c}
 grid.addEventListener('pointerdown',e=>{const i=cellAt(e.clientX,e.clientY);if(i<0)return;e.preventDefault();
- const add=e.shiftKey||e.metaKey||e.ctrlKey;gp={id:e.pointerId,start:i,moved:false,wasOnly:sel.size===1&&sel.has(i),add};
+ const add=multi||e.shiftKey||e.metaKey||e.ctrlKey;const now=Date.now();
+ const rep=!editing&&tapSeq.cell===i&&now-tapSeq.t<350;
+ if(!rep)tapSeq={cell:i,t:now,n:0,base:new Set(sel)};
+ gp={id:e.pointerId,start:i,moved:false,wasOnly:sel.size===1&&sel.has(i),wasSel:sel.has(i),add,rep};
  try{grid.setPointerCapture(e.pointerId)}catch(_){}
+ if(rep)return; // upgrade happens on pointerup
  if(!add)sel=new Set();sel.add(i);renderSel()});
-grid.addEventListener('pointermove',e=>{if(!gp||e.pointerId!==gp.id)return;const i=cellAt(e.clientX,e.clientY);if(i<0||sel.has(i)&&i===gp.last)return;gp.last=i;if(i!==gp.start)gp.moved=true;if(!sel.has(i)){sel.add(i);renderSel()}});
+grid.addEventListener('pointermove',e=>{if(!gp||e.pointerId!==gp.id)return;const i=cellAt(e.clientX,e.clientY);if(i<0||i===gp.last)return;gp.last=i;if(i!==gp.start){gp.moved=true;tapSeq.cell=-1}if(!sel.has(i)){sel.add(i);renderSel()}});
 function endGP(e){if(!gp||(e&&e.pointerId!=null&&e.pointerId!==gp.id))return;const g=gp;gp=null;
- if(!g.moved&&!g.add){
-  if(editing&&etab==='cage'){const ks=cagesOf[g.start];if(ks.length){const k=ks[0];editCage=k;sel=new Set(P.cages[k].cells);sumBuf=String(P.cages[k].sum);renderLines();renderSel();renderControls();return}}
-  if(g.wasOnly)sel.clear()}
+ if(g.moved){if(editing&&editCage>=0){editCage=-1;sumBuf='';renderLines();renderControls()}renderSel();return}
+ if(g.rep){tapSeq.n++;tapSeq.t=Date.now();const i=g.start,ks=cagesOf[i];let grp,label;
+  if(tapSeq.n===1&&ks.length){grp=P.cages[ks[0]].cells;label='Cage '+P.cages[ks[0]].sum}else{grp=BOXCELLS(i);label='Box '+(BOX(i)+1)}
+  sel=new Set([...(multi?tapSeq.base:[]),...grp]);toast(label);renderSel();return}
+ tapSeq.t=Date.now();
+ if(editing&&etab==='cage'&&!g.add){const ks=cagesOf[g.start];if(ks.length){const k=ks[0];editCage=k;sel=new Set(P.cages[k].cells);sumBuf=String(P.cages[k].sum);renderLines();renderSel();renderControls();return}}
+ if(g.add){if(g.wasSel)sel.delete(g.start)}else if(g.wasOnly)sel.clear();
  if(editing&&editCage>=0){editCage=-1;sumBuf='';renderLines();renderControls()}
  renderSel()}
 ['pointerup','pointercancel','lostpointercapture'].forEach(t=>grid.addEventListener(t,endGP));
+// iOS: block pinch/double-tap zoom everywhere (Safari ignores user-scalable=no)
+grid.addEventListener('touchstart',e=>e.preventDefault(),{passive:false});
+['gesturestart','gesturechange','gestureend'].forEach(t=>document.addEventListener(t,e=>e.preventDefault(),{passive:false}));
+document.addEventListener('dblclick',e=>e.preventDefault(),{passive:false});
+document.addEventListener('touchmove',e=>{if(e.touches.length>1)e.preventDefault()},{passive:false});
+let lastTE=0;document.addEventListener('touchend',e=>{const now=Date.now();
+ if(now-lastTE<400&&!e.target.closest('textarea,input')){e.preventDefault();const b=e.target.closest('button,.combo');if(b&&!b.disabled&&!b.dataset.lp)b.click()}
+ lastTE=now},{passive:false});
+
+// ---------- Multi-select + select-by-colour ----------
+function setMulti(on){multi=on;const b=$('#bMulti');b.classList.toggle('on',on);b.textContent=on?'☑ Multi':'☐ Multi'}
+$('#bMulti').onclick=()=>setMulti(!multi);
+let pickColour=false;
+function setPick(on){pickColour=on;$('#bPick').classList.toggle('on',on);$('#bPick').textContent=on?'Tap a colour…':'◎ Select colour';pad.classList.toggle('picking',on)}
+$('#bPick').onclick=()=>setPick(!pickColour);
+const CNAMES=['red','orange','yellow','green','teal','blue','purple','pink','grey'];
+function selectColour(d){const hit=[];for(let i=0;i<81;i++)if(P.col[i].includes(d))hit.push(i);
+ sel=new Set([...(multi?sel:[]),...hit]);setPick(false);toast(hit.length?`${hit.length} ${CNAMES[d-1]} cell${hit.length>1?'s':''} selected`:`No ${CNAMES[d-1]} cells`);renderSel()}
+// long-press a colour key (Colour mode) = select all cells with that colour
+padBtns.forEach(b=>{let t=null;
+ b.addEventListener('pointerdown',()=>{delete b.dataset.lp;if(mode!=='k')return;t=setTimeout(()=>{t=null;b.dataset.lp='1';selectColour(+b.dataset.d)},500)});
+ const cancel=()=>{if(t){clearTimeout(t);t=null}};['pointerup','pointercancel','pointerleave'].forEach(x=>b.addEventListener(x,cancel));
+ b.addEventListener('contextmenu',e=>e.preventDefault())});
 
 // ---------- Controls ----------
-$$('.modes button').forEach(b=>b.onclick=()=>{mode=b.dataset.m;renderControls()});
-padBtns.forEach(b=>b.onclick=()=>pressDigit(+b.dataset.d,b));
+$$('.modes button').forEach(b=>b.onclick=()=>{mode=b.dataset.m;if(mode!=='k')setPick(false);renderControls();renderSel()});
+padBtns.forEach(b=>b.onclick=()=>{if(b.dataset.lp){delete b.dataset.lp;return}if(mode==='k'&&pickColour){selectColour(+b.dataset.d);return}pressDigit(+b.dataset.d,b)});
 actBtn.onclick=()=>mode==='k'?clearColours():erase();
 $('#bErase').onclick=erase;$('#bUndo').onclick=$('#eUndo').onclick=undo;$('#bRedo').onclick=$('#eRedo').onclick=redo;
 $('#bEdit').onclick=()=>setEditing(!editing);$('#bDone').onclick=()=>setEditing(false);
@@ -322,7 +356,7 @@ document.addEventListener('keydown',e=>{if(!$('#modal').classList.contains('hidd
  if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='z'){e.preventDefault();e.shiftKey?redo():undo();return}
  if(/^[1-9]$/.test(e.key)&&!editing){pressDigit(+e.key);return}
  if((e.key==='Backspace'||e.key==='Delete')&&!editing){erase();return}
- const m={z:'v',x:'c',c:'m',v:'k'}[e.key];if(m&&!editing){mode=m;renderControls();return}
+ const m={z:'v',x:'c',c:'m',v:'k'}[e.key];if(m&&!editing){mode=m;if(m!=='k')setPick(false);renderControls();renderSel();return}
  const mv={ArrowUp:-9,ArrowDown:9,ArrowLeft:-1,ArrowRight:1}[e.key];if(mv&&sel.size){e.preventDefault();let i=[...sel].pop()+mv;if(i<0||i>80)return;sel=new Set([i]);renderSel()}});
 
 if('serviceWorker' in navigator)navigator.serviceWorker.register('./sw.js',{scope:'./'});

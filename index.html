@@ -3,11 +3,11 @@
 <meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#f3f4f6"><title>Sudoku</title>
 <link rel="manifest" href="manifest.json"><link rel="apple-touch-icon" href="icon-180.png">
-<link rel="stylesheet" href="style.css?v=1">
+<link rel="stylesheet" href="style.css?v=2">
 </head><body>
 <div id="game">
  <header><button id="bList" class="hb" aria-label="Puzzles">☰</button><div id="pname"></div><button id="timer" class="hb tm">0:00</button><button id="bEdit" class="hb" aria-label="Edit puzzle">✎</button></header>
- <div id="info"><span id="infoTxt">No cage selected</span><button id="bCalc" class="calc" disabled>Σ Combos</button></div>
+ <div id="info"><span id="infoTxt">No cage selected</span><span class="ib"><button id="bPick" class="calc pick hidden">◎ Select colour</button><button id="bCalc" class="calc" disabled>Σ Combos</button></span></div>
  <div id="gridWrap"><div id="grid"></div><svg id="lines" viewBox="0 0 900 900" preserveAspectRatio="none"></svg></div>
  <div id="play">
   <div class="modes">
@@ -17,7 +17,7 @@
    <button data-m="k"><span class="mk"></span><small>Colour</small></button>
   </div>
   <div class="pad" id="pad"></div>
-  <div class="tools"><button id="bUndo">↶ Undo</button><button id="bRedo">↷ Redo</button><button id="bErase">⌫ Erase</button></div>
+  <div class="tools"><button id="bUndo">↶ Undo</button><button id="bRedo">↷ Redo</button><button id="bMulti" class="multi">☐ Multi</button><button id="bErase">⌫ Erase</button></div>
  </div>
  <div id="edit" class="hidden">
   <div class="tabs"><button data-t="cage" class="on">Cages</button><button data-t="giv">Givens</button></div>
@@ -36,4 +36,4 @@
  <div id="items"></div>
 </div>
 <div id="modal" class="hidden"><div class="box" id="mbox"></div></div>
-<script src="app.js?v=1"></script></body></html>
+<script src="app.js?v=2"></script></body></html>
