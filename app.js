@@ -1,0 +1,329 @@
+'use strict';
+// ===== Sudoku (killer) solving tool — plain JS, localStorage, no build step =====
+const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
+const LS=k=>{try{return JSON.parse(localStorage.getItem(k)||'null')}catch(e){return null}},SV=(k,v)=>localStorage.setItem(k,JSON.stringify(v));
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[c]);
+const RC=i=>`r${Math.floor(i/9)+1}c${i%9+1}`;
+const COLOURS=['#fca5a5','#fdba74','#fde047','#86efac','#5eead4','#93c5fd','#c4b5fd','#f9a8d4','#cbd5e1'];
+const MAXCOL=3;
+// Feature flags / hooks for later variants (thermometers, arrows, kropki...): add a parser section + a draw layer.
+const FEATURES={calculator:true};
+const SAMPLE=`SUDOKU v1
+name Sample killer
+givens .................................................................................
+cage 19 r1c1 r2c1 r3c1
+cage 15 r1c2 r1c3 r2c2 r3c2
+cage 20 r1c4 r2c3 r2c4
+cage 12 r1c5 r1c6 r2c6
+cage 8 r1c7 r2c7
+cage 12 r1c8 r1c9 r2c8
+cage 5 r2c5
+cage 8 r2c9
+cage 11 r3c3 r3c4 r4c3
+cage 10 r3c5 r4c5
+cage 6 r3c6
+cage 23 r3c7 r4c7 r5c7 r6c6 r6c7
+cage 12 r3c8 r4c8
+cage 20 r3c9 r4c9 r5c8 r5c9
+cage 17 r4c1 r4c2
+cage 2 r4c4
+cage 14 r4c6 r5c5 r5c6
+cage 15 r5c1 r6c1 r6c2
+cage 4 r5c2
+cage 8 r5c3 r6c3
+cage 15 r5c4 r6c4
+cage 4 r6c5
+cage 9 r6c8 r7c8
+cage 10 r6c9 r7c9
+cage 20 r7c1 r7c2 r8c2
+cage 23 r7c3 r7c4 r8c3 r8c4
+cage 18 r7c5 r8c5 r9c4 r9c5
+cage 10 r7c6 r7c7
+cage 6 r8c1 r9c1 r9c2
+cage 7 r8c6
+cage 30 r8c7 r8c8 r9c6 r9c7 r9c8
+cage 8 r8c9 r9c9
+cage 4 r9c3`;
+
+// ---------- Puzzle format (see README) ----------
+function blankPuzzle(name){return {id:uid(),name:name||'Untitled',givens:Array(81).fill(0),cages:[],v:Array(81).fill(0),cn:Array(81).fill(''),mn:Array(81).fill(''),col:Array.from({length:81},()=>[]),time:0,solved:false,extra:[],updated:Date.now()}}
+function parseCell(t){const m=/^r([1-9])c([1-9])$/i.exec(t);return m?(m[1]-1)*9+(m[2]-1):-1}
+function parseGrid81(s){s=s.replace(/[\s|]/g,'');if(s.length!==81||/[^.0-9]/.test(s))return null;return [...s].map(ch=>ch==='.'?0:+ch)}
+function parsePuzzle(text){
+ const lines=text.replace(/\r/g,'').split('\n');const errs=[],p=blankPuzzle();let i=0;
+ while(i<lines.length&&!lines[i].trim())i++;
+ const hdr=(lines[i]||'').trim().split(/\s+/);
+ if(hdr[0].toUpperCase()!=='SUDOKU'||!/^v\d+$/i.test(hdr[1]||''))return {errs:['First line must be "SUDOKU v1"']};
+ const ver=+hdr[1].slice(1);if(ver>1)errs.push(`Note: format v${ver} is newer than this app (v1); unknown lines are kept but ignored.`);
+ const cageByAnchor={},pend=[];
+ for(i++;i<lines.length;i++){
+  let raw=lines[i];const ln=i+1;const line=raw.replace(/#.*$/,'').trim();if(!line)continue;
+  const sp=line.indexOf(' ');const kw=(sp<0?line:line.slice(0,sp)).toLowerCase(),rest=sp<0?'':line.slice(sp+1).trim();
+  const toks=rest.split(/\s+/).filter(Boolean);
+  const grabGrid=()=>{let s=rest;while(s.replace(/[\s|]/g,'').length<81&&i+1<lines.length&&/^[\s.0-9|]+$/.test(lines[i+1])&&lines[i+1].trim()){i++;s+=lines[i]}return parseGrid81(s)};
+  if(kw==='name')p.name=rest||p.name;
+  else if(kw==='givens'||kw==='values'){const g=grabGrid();if(!g){errs.push(`Line ${ln}: ${kw} needs 81 characters of 1-9 or . (0 also = empty)`);continue}if(kw==='givens')p.givens=g;else p.v=g}
+  else if(kw==='cage'){const sum=+toks[0];const cells=toks.slice(1).map(parseCell);
+   if(!Number.isInteger(sum)||sum<1||sum>45||!cells.length||cells.some(c=>c<0)){errs.push(`Line ${ln}: expected "cage SUM r1c1 r1c2 ..."`);continue}
+   const cg={sum,cells:[...new Set(cells)].sort((a,b)=>a-b),elim:[]};p.cages.push(cg);cageByAnchor[cg.cells[0]]=cg}
+  else if(kw==='corner'||kw==='centre'||kw==='center'||kw==='colour'||kw==='color'){const c=parseCell(toks[0]||''),d=(toks.slice(1).join('')).replace(/[^1-9]/g,'');
+   if(c<0){errs.push(`Line ${ln}: expected "${kw} r1c1 DIGITS"`);continue}
+   const u=[...new Set(d)];if(kw==='corner')p.cn[c]=u.sort().join('');else if(kw[0]==='c'&&kw[1]==='e')p.mn[c]=u.sort().join('');else p.col[c]=u.slice(0,MAXCOL).map(Number)}
+  else if(kw==='elim')pend.push([ln,toks]);
+  else if(kw==='time'){p.time=Math.max(0,parseInt(toks[0])||0)}
+  else if(kw==='solved')p.solved=true;
+  else {p.extra.push(raw.trim());if(!errs.some(e=>e.includes(`"${kw}"`)))errs.push(`Note: "${kw}" lines aren't supported yet; kept and ignored.`)}
+ }
+ for(const [ln,toks] of pend){const c=parseCell(toks[0]||'');const cg=cageByAnchor[c];if(!cg){errs.push(`Line ${ln}: elim must name a cage's top-left cell`);continue}cg.elim=toks.slice(1).filter(t=>/^[1-9]+$/.test(t))}
+ for(let k=0;k<81;k++)if(p.givens[k])p.v[k]=0;
+ return {p,errs};
+}
+function gridStr(a){let s='';for(let r=0;r<9;r++)s+=(r?' ':'')+a.slice(r*9,r*9+9).map(x=>x||'.').join('');return s}
+function exportPuzzle(p,state){
+ const L=['SUDOKU v1','name '+p.name,'givens '+gridStr(p.givens)];
+ for(const c of p.cages)L.push(`cage ${c.sum} `+c.cells.map(RC).join(' '));
+ L.push(...p.extra);
+ if(state){
+  if(p.v.some(x=>x))L.push('values '+gridStr(p.v));
+  for(let i=0;i<81;i++){if(p.cn[i])L.push(`corner ${RC(i)} ${p.cn[i]}`);if(p.mn[i])L.push(`centre ${RC(i)} ${p.mn[i]}`);if(p.col[i].length)L.push(`colour ${RC(i)} ${p.col[i].join('')}`)}
+  for(const c of p.cages)if(c.elim&&c.elim.length)L.push(`elim ${RC(c.cells[0])} ${c.elim.join(' ')}`);
+  L.push('time '+Math.floor(p.time));if(p.solved)L.push('solved');
+ }
+ return L.join('\n')+'\n';
+}
+
+// ---------- Storage ----------
+let DB=LS('sdk_puzzles')||{};let curId=LS('sdk_cur');
+if(!Object.keys(DB).length){const {p}=parsePuzzle(SAMPLE);DB[p.id]=p;curId=p.id}
+for(const p of Object.values(DB)){p.extra=p.extra||[];p.cages.forEach(c=>c.elim=c.elim||[])}
+if(!DB[curId])curId=Object.values(DB).sort((a,b)=>b.updated-a.updated)[0].id;
+let P=DB[curId];
+let saveT=null;const saveNow=()=>{clearTimeout(saveT);saveT=null;SV('sdk_puzzles',DB);SV('sdk_cur',curId)};
+const save=()=>{P.updated=Date.now();saveNow()};
+
+// ---------- Geometry / peers ----------
+const ROW=i=>Math.floor(i/9),COL=i=>i%9,BOX=i=>Math.floor(ROW(i)/3)*3+Math.floor(COL(i)/3);
+const HOUSES=[];for(let k=0;k<9;k++){HOUSES.push([...Array(9)].map((_,j)=>k*9+j));HOUSES.push([...Array(9)].map((_,j)=>j*9+k));HOUSES.push([...Array(9)].map((_,j)=>(Math.floor(k/3)*3+Math.floor(j/3))*9+(k%3)*3+j%3))}
+let cagesOf=[];function indexCages(){cagesOf=Array.from({length:81},()=>[]);P.cages.forEach((c,k)=>c.cells.forEach(i=>cagesOf[i].push(k)))}
+function peers(i){const s=new Set();for(let j=0;j<81;j++)if(j!==i&&(ROW(j)===ROW(i)||COL(j)===COL(i)||BOX(j)===BOX(i)))s.add(j);for(const k of cagesOf[i])for(const j of P.cages[k].cells)if(j!==i)s.add(j);return s}
+const valAt=i=>P.givens[i]||P.v[i];
+
+// ---------- UI state ----------
+let sel=new Set(),mode='v',editing=false,etab='cage',sumBuf='',editCage=-1,paused=false;
+let undoS=[],redoS=[];
+const snap=()=>JSON.stringify({g:P.givens,c:P.cages,v:P.v,cn:P.cn,mn:P.mn,col:P.col,s:P.solved});
+function restore(s){const o=JSON.parse(s);Object.assign(P,{givens:o.g,cages:o.c,v:o.v,cn:o.cn,mn:o.mn,col:o.col,solved:o.s})}
+function act(fn){const before=snap();fn();const after=snap();if(after!==before){undoS.push(before);if(undoS.length>500)undoS.shift();redoS=[];save()}render()}
+function undo(){if(!undoS.length)return;redoS.push(snap());restore(undoS.pop());save();editCage=-1;render()}
+function redo(){if(!redoS.length)return;undoS.push(snap());restore(redoS.pop());save();editCage=-1;render()}
+
+// ---------- Build static DOM (never rebuilt mid-tap) ----------
+const grid=$('#grid'),cells=[];
+for(let i=0;i<81;i++){const d=document.createElement('div');d.className='cell';cells.push(d);grid.appendChild(d)}
+const pad=$('#pad');const padBtns=[];
+for(let d=1;d<=9;d++){const b=document.createElement('button');b.dataset.d=d;b.innerHTML=`<span class="sw"></span><span class="n">${d}</span>`;pad.appendChild(b);padBtns.push(b)}
+const actBtn=document.createElement('button');actBtn.className='act';actBtn.id='bAct';pad.appendChild(actBtn);
+const sumPad=$('#sumPad');[1,2,3,4,5,6,7,8,9,0].forEach(d=>{const b=document.createElement('button');b.dataset.s=d;b.textContent=d;sumPad.appendChild(b)});
+const sb=document.createElement('button');sb.dataset.s='bk';sb.textContent='⌫';sumPad.appendChild(sb);sumPad.style.gridTemplateColumns='repeat(6,1fr)';
+const givPad=$('#givPad');for(let d=1;d<=9;d++){const b=document.createElement('button');b.dataset.g=d;b.textContent=d;givPad.appendChild(b)}
+{const b=document.createElement('button');b.dataset.g=0;b.className='act';b.textContent='⌫ Clear';givPad.appendChild(b)}
+
+// ---------- Rendering ----------
+function pie(cs){if(cs.length===1)return COLOURS[cs[0]-1];const n=cs.length;return 'conic-gradient('+cs.map((c,k)=>`${COLOURS[c-1]} ${k*100/n}% ${(k+1)*100/n}%`).join(',')+')'}
+let bad=new Set(),cageBad=new Set();
+function computeConflicts(){bad=new Set();cageBad=new Set();
+ const units=HOUSES.concat(P.cages.map(c=>c.cells));
+ for(const u of units){const m={};for(const i of u){const v=valAt(i);if(v)(m[v]=m[v]||[]).push(i)}for(const k in m)if(m[k].length>1)m[k].forEach(i=>bad.add(i))}
+ P.cages.forEach((c,k)=>{let s=0,f=0;for(const i of c.cells){const v=valAt(i);if(v){s+=v;f++}}if(s>c.sum||(f===c.cells.length&&s!==c.sum))cageBad.add(k)})}
+function cellHTML(i){
+ let h='';const v=valAt(i);
+ if(P.col[i].length)h+=`<div class="bg" style="background:${pie(P.col[i])}"></div>`;
+ const anc=cagesOf[i].find(k=>P.cages[k].cells[0]===i);
+ if(anc!==undefined)h+=`<span class="sum${cageBad.has(anc)?' bad':''}">${P.cages[anc].sum}</span>`;
+ if(v)h+=`<span class="val">${v}</span>`;
+ else{
+  if(P.cn[i]){const d=[...P.cn[i]],t=Math.ceil(d.length/2),sp=a=>a.map(x=>`<span>${x}</span>`).join('');
+   h+=`<div class="cn${anc!==undefined?' a':''}"><div>${sp(d.slice(0,t))}</div><div>${sp(d.slice(t))}</div></div>`}
+  if(P.mn[i])h+=`<span class="mn m${P.mn[i].length}">${P.mn[i]}</span>`;
+ }
+ return h}
+let cellCache=Array(81).fill(null);
+function renderCells(){computeConflicts();for(let i=0;i<81;i++){const h=cellHTML(i);if(cellCache[i]!==h){cells[i].innerHTML=h;cellCache[i]=h}cells[i].classList.toggle('given',!!P.givens[i]);cells[i].classList.toggle('bad',bad.has(i))}}
+function renderLines(){
+ const S=100,d=7;let g='';
+ P.cages.forEach((c,k)=>{const set=new Set(c.cells);const IN=(r,cc)=>r>=0&&r<9&&cc>=0&&cc<9&&set.has(r*9+cc);let p='';
+  for(const i of c.cells){const r=ROW(i),cc=COL(i),x0=cc*S,y0=r*S;
+   if(!IN(r-1,cc)){const xs=IN(r,cc-1)?(IN(r-1,cc-1)?x0-d:x0):x0+d,xe=IN(r,cc+1)?(IN(r-1,cc+1)?x0+S+d:x0+S):x0+S-d;p+=`M${xs} ${y0+d}H${xe}`}
+   if(!IN(r+1,cc)){const xs=IN(r,cc-1)?(IN(r+1,cc-1)?x0-d:x0):x0+d,xe=IN(r,cc+1)?(IN(r+1,cc+1)?x0+S+d:x0+S):x0+S-d;p+=`M${xs} ${y0+S-d}H${xe}`}
+   if(!IN(r,cc-1)){const ys=IN(r-1,cc)?(IN(r-1,cc-1)?y0-d:y0):y0+d,ye=IN(r+1,cc)?(IN(r+1,cc-1)?y0+S+d:y0+S):y0+S-d;p+=`M${x0+d} ${ys}V${ye}`}
+   if(!IN(r,cc+1)){const ys=IN(r-1,cc)?(IN(r-1,cc+1)?y0-d:y0):y0+d,ye=IN(r+1,cc)?(IN(r+1,cc+1)?y0+S+d:y0+S):y0+S-d;p+=`M${x0+S-d} ${ys}V${ye}`}}
+  const hot=editing&&k===editCage,badc=cageBad.has(k);
+  g+=`<path d="${p}" fill="none" stroke="${hot?'#2563eb':badc?'#dc2626':'#374151'}" stroke-width="${hot?5:2.6}" stroke-dasharray="${hot?'':'7 6'}"/>`});
+ for(let k=1;k<9;k++){const w=k%3?1.5:5,c=k%3?'#9ca3af':'#111827';g+=`<path d="M${k*S} 0V900M0 ${k*S}H900" stroke="${c}" stroke-width="${w}"/>`}
+ g+='<rect x="2.5" y="2.5" width="895" height="895" fill="none" stroke="#111827" stroke-width="5"/>';
+ $('#lines').innerHTML=g}
+function selCage(){if(!sel.size)return -1;const ks=cagesOf[[...sel][0]];for(const k of ks)if([...sel].every(i=>cagesOf[i].includes(k)))return k;return -1}
+function renderSel(){
+ const one=sel.size===1?valAt([...sel][0]):0;
+ for(let i=0;i<81;i++){cells[i].classList.toggle('sel',sel.has(i));cells[i].classList.toggle('same',!!one&&valAt(i)===one)}
+ if(editing){$('#infoTxt').textContent=sel.size?`${sel.size} cell${sel.size>1?'s':''} selected`:'Drag across cells to make a cage';$('#bCalc').classList.add('hidden');return}
+ $('#bCalc').classList.toggle('hidden',!FEATURES.calculator);
+ const k=selCage();
+ if(k<0){$('#infoTxt').textContent=sel.size?'No cage selected':'Tap a cell to select';$('#bCalc').disabled=true}
+ else{const c=P.cages[k];$('#infoTxt').textContent=`Cage ${c.sum} · ${c.cells.length} cell${c.cells.length>1?'s':''}`;$('#bCalc').disabled=false}
+}
+function renderControls(){
+ $$('.modes button').forEach(b=>b.classList.toggle('on',b.dataset.m===mode));
+ pad.classList.toggle('cmode',mode==='k');pad.classList.toggle('nmode',mode==='c'||mode==='m');
+ padBtns.forEach((b,k)=>{b.querySelector('.sw').style.background=mode==='k'?COLOURS[k]:'transparent'});
+ actBtn.textContent=mode==='k'?'Clear colours':'⌫';
+ $('#play').classList.toggle('hidden',editing);$('#edit').classList.toggle('hidden',!editing);
+ $('#bEdit').textContent=editing?'✓':'✎';
+ $$('.tabs button').forEach(b=>b.classList.toggle('on',b.dataset.t===etab));
+ $('#eCage').classList.toggle('hidden',etab!=='cage');$('#eGiv').classList.toggle('hidden',etab!=='giv');
+ $('#sumBuf').textContent=sumBuf||'–';
+ $('#bCreate').textContent=editCage>=0?'Update cage':'Create cage';$('#bDelCage').classList.toggle('hidden',editCage<0);
+ $('#bUndo').disabled=$('#eUndo').disabled=!undoS.length;$('#bRedo').disabled=$('#eRedo').disabled=!redoS.length;
+ $('#pname').textContent=P.name;
+}
+function render(){indexCages();renderCells();renderLines();renderSel();renderControls();if(editing)renderWarn();checkSolved()}
+
+// ---------- Cage validation ----------
+const minSum=n=>n*(n+1)/2,maxSum=n=>n*(19-n)/2;
+function contiguous(cs){const s=new Set(cs),seen=new Set([cs[0]]),q=[cs[0]];while(q.length){const i=q.pop();for(const j of [i-9,i+9,COL(i)?i-1:-1,COL(i)<8?i+1:-1])if(s.has(j)&&!seen.has(j)){seen.add(j);q.push(j)}}return seen.size===s.size}
+function cageWarnings(){const w=[];let caged=0,total=0;
+ const over=[];for(let i=0;i<81;i++){if(cagesOf[i].length)caged++;if(cagesOf[i].length>1)over.push(RC(i))}
+ if(over.length)w.push(`Cells in two cages: ${over.join(' ')}`);
+ P.cages.forEach(c=>{total+=c.sum;const n=c.cells.length,a=RC(c.cells[0]);
+  if(!contiguous(c.cells))w.push(`Cage ${c.sum} at ${a} isn't joined up`);
+  if(n>9)w.push(`Cage at ${a} has ${n} cells (max 9)`);else if(c.sum<minSum(n)||c.sum>maxSum(n))w.push(`Cage at ${a}: ${n} cells can't make ${c.sum} (range ${minSum(n)}–${maxSum(n)})`);
+  const gv=c.cells.map(i=>P.givens[i]).filter(Boolean);if(new Set(gv).size<gv.length)w.push(`Cage ${c.sum} at ${a} repeats a given`)});
+ if(caged===81&&!over.length&&total!==405)w.push(`Cage sums total ${total}, should be 405`);
+ return {w,caged,total}}
+function renderWarn(){const {w,caged,total}=cageWarnings();
+ $('#warn').innerHTML=w.map(x=>`<div>⚠️ ${esc(x)}</div>`).join('')+`<div class="${caged===81&&!w.length?'ok':'muted'}">${P.cages.length} cages · ${caged}/81 cells caged · sums total ${total}${caged===81&&!w.length?' ✓':''}</div>`}
+
+// ---------- Actions ----------
+const editable=()=>[...sel].filter(i=>!P.givens[i]);
+function nudge(el){el.classList.remove('nudge');void el.offsetWidth;el.classList.add('nudge')}
+function toast(m){const d=document.createElement('div');d.className='toast';d.textContent=m;document.body.appendChild(d);setTimeout(()=>d.remove(),1600)}
+function pressDigit(d,el){
+ const cs=editable();if(!cs.length){if(el)nudge(el);return}
+ act(()=>{
+  if(mode==='v'){const all=cs.every(i=>P.v[i]===d);
+   for(const i of cs){if(all)P.v[i]=0;else{P.v[i]=d;for(const j of peers(i)){P.cn[j]=P.cn[j].replace(String(d),'');P.mn[j]=P.mn[j].replace(String(d),'')}}}}
+  else if(mode==='c'||mode==='m'){const A=mode==='c'?P.cn:P.mn,t=cs.filter(i=>!P.v[i]);if(!t.length)return;const all=t.every(i=>A[i].includes(d));
+   for(const i of t){const s=new Set(A[i]);all?s.delete(String(d)):s.add(String(d));A[i]=[...s].sort().join('')}}
+  else if(mode==='k'){const all=[...sel].every(i=>P.col[i].includes(d));let full=0;
+   for(const i of sel){const c=P.col[i];if(all)P.col[i]=c.filter(x=>x!==d);else if(!c.includes(d)){if(c.length>=MAXCOL)full++;else c.push(d)}}
+   if(full)toast(`Max ${MAXCOL} colours per cell`)}
+ })}
+function erase(){const cs=editable();if(mode==='k'){clearColours();return}
+ act(()=>{if(cs.some(i=>P.v[i]))cs.forEach(i=>P.v[i]=0);else if(cs.some(i=>P.cn[i]||P.mn[i]))cs.forEach(i=>{P.cn[i]='';P.mn[i]=''});else [...sel].forEach(i=>P.col[i]=[])})}
+function clearColours(){act(()=>[...sel].forEach(i=>P.col[i]=[]))}
+function checkSolved(){if(P.solved||editing)return;for(let i=0;i<81;i++)if(!valAt(i))return;if(bad.size||cageBad.size)return;P.solved=true;save();toast('Solved! 🎉 '+fmtT(P.time))}
+
+// ---------- Grid pointer: tap / drag select ----------
+let gp=null;
+function cellAt(x,y){const r=grid.getBoundingClientRect();const c=Math.floor((x-r.left)/r.width*9),w=Math.floor((y-r.top)/r.height*9);return c<0||c>8||w<0||w>8?-1:w*9+c}
+grid.addEventListener('pointerdown',e=>{const i=cellAt(e.clientX,e.clientY);if(i<0)return;e.preventDefault();
+ const add=e.shiftKey||e.metaKey||e.ctrlKey;gp={id:e.pointerId,start:i,moved:false,wasOnly:sel.size===1&&sel.has(i),add};
+ try{grid.setPointerCapture(e.pointerId)}catch(_){}
+ if(!add)sel=new Set();sel.add(i);renderSel()});
+grid.addEventListener('pointermove',e=>{if(!gp||e.pointerId!==gp.id)return;const i=cellAt(e.clientX,e.clientY);if(i<0||sel.has(i)&&i===gp.last)return;gp.last=i;if(i!==gp.start)gp.moved=true;if(!sel.has(i)){sel.add(i);renderSel()}});
+function endGP(e){if(!gp||(e&&e.pointerId!=null&&e.pointerId!==gp.id))return;const g=gp;gp=null;
+ if(!g.moved&&!g.add){
+  if(editing&&etab==='cage'){const ks=cagesOf[g.start];if(ks.length){const k=ks[0];editCage=k;sel=new Set(P.cages[k].cells);sumBuf=String(P.cages[k].sum);renderLines();renderSel();renderControls();return}}
+  if(g.wasOnly)sel.clear()}
+ if(editing&&editCage>=0){editCage=-1;sumBuf='';renderLines();renderControls()}
+ renderSel()}
+['pointerup','pointercancel','lostpointercapture'].forEach(t=>grid.addEventListener(t,endGP));
+
+// ---------- Controls ----------
+$$('.modes button').forEach(b=>b.onclick=()=>{mode=b.dataset.m;renderControls()});
+padBtns.forEach(b=>b.onclick=()=>pressDigit(+b.dataset.d,b));
+actBtn.onclick=()=>mode==='k'?clearColours():erase();
+$('#bErase').onclick=erase;$('#bUndo').onclick=$('#eUndo').onclick=undo;$('#bRedo').onclick=$('#eRedo').onclick=redo;
+$('#bEdit').onclick=()=>setEditing(!editing);$('#bDone').onclick=()=>setEditing(false);
+function setEditing(on){editing=on;editCage=-1;sumBuf='';if(on)sel.clear();render()}
+$$('.tabs button').forEach(b=>b.onclick=()=>{etab=b.dataset.t;editCage=-1;sumBuf='';render()});
+sumPad.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;const s=b.dataset.s;
+ if(s==='bk')sumBuf=sumBuf.slice(0,-1);else if(sumBuf.length<2&&!(sumBuf===''&&s==='0'))sumBuf+=s;else nudge(b);renderControls()});
+$('#bCreate').onclick=()=>{const n=+sumBuf;if(!sel.size||!n||n>45){nudge($('#bCreate'));toast(!sel.size?'Select cells first':'Enter a sum (1–45)');return}
+ const cellsSel=[...sel].sort((a,b)=>a-b);
+ act(()=>{if(editCage>=0){const c=P.cages[editCage];c.sum=n;if(c.cells.join()!==cellsSel.join()){c.cells=cellsSel;c.elim=[]}}else P.cages.push({sum:n,cells:cellsSel,elim:[]});P.cages.sort((a,b)=>a.cells[0]-b.cells[0])});
+ sel.clear();sumBuf='';editCage=-1;render()};
+$('#bDelCage').onclick=()=>{if(editCage<0)return;const k=editCage;act(()=>P.cages.splice(k,1));editCage=-1;sel.clear();sumBuf='';render()};
+givPad.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;const d=+b.dataset.g;if(!sel.size){nudge(b);return}
+ act(()=>{const all=d&&[...sel].every(i=>P.givens[i]===d);for(const i of sel){P.givens[i]=all?0:d;P.v[i]=0}P.solved=false})});
+
+// ---------- Cage-sum calculator ----------
+function combos(n,sum){const out=[];(function rec(start,left,acc,s){if(left===0){if(s===sum)out.push(acc.join(''));return}for(let d=start;d<=9;d++){if(s+d>sum)break;rec(d+1,left-1,[...acc,d],s+d)}})(1,n,[],0);return out}
+function openCalculator(k){const c=P.cages[k];if(!c)return;
+ const placed=[...new Set(c.cells.map(valAt).filter(Boolean))];
+ const list=combos(c.cells.length,c.sum);
+ const draw=()=>{const live=list.filter(x=>!c.elim.includes(x)&&placed.every(d=>x.includes(String(d)))).length;
+  $('#mbox').innerHTML=`<h2>SUM: ${c.sum}</h2><div class="muted">${c.cells.length} cells · ${list.length} combination${list.length===1?'':'s'}${list.length?` · ${live} still possible`:''}</div>`+
+  (list.length?list.map(x=>{const imp=!placed.every(d=>x.includes(String(d)));return `<button class="combo${c.elim.includes(x)?' off':''}${imp?' imp':''}" data-x="${x}">${[...x].map(d=>`<span>${d}</span>`).join('')}</button>`}).join(''):'<p class="err">No combination of different digits makes this sum.</p>')+
+  `<p class="muted" style="font-size:13px">Tap a row to rule it out (tap again to bring it back). Greyed rows can't include the digits already placed.</p><div class="r"><button class="btn" id="mClose">Close</button></div>`;
+  $('#mClose').onclick=closeModal};
+ draw();showModal();
+ $('#mbox').onclick=e=>{const b=e.target.closest('.combo');if(!b)return;const x=b.dataset.x;
+  const before=snap();c.elim.includes(x)?c.elim.splice(c.elim.indexOf(x),1):c.elim.push(x);undoS.push(before);redoS=[];save();
+  b.classList.toggle('off');const live=list.filter(y=>!c.elim.includes(y)&&placed.every(d=>y.includes(String(d)))).length;
+  $('#mbox .muted').textContent=`${c.cells.length} cells · ${list.length} combinations · ${live} still possible`;renderControls()}}
+$('#bCalc').onclick=()=>{const k=selCage();if(k>=0)openCalculator(k)};
+function showModal(){$('#modal').classList.remove('hidden')}
+function closeModal(){$('#modal').classList.add('hidden');$('#mbox').onclick=null;$('#mbox').innerHTML=''}
+$('#modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal()});
+
+// ---------- Timer ----------
+const fmtT=s=>{s=Math.floor(s);const h=Math.floor(s/3600),m=Math.floor(s/60)%60,x=s%60;return (h?h+':'+String(m).padStart(2,'0'):m)+':'+String(x).padStart(2,'0')};
+let lastTick=Date.now();
+setInterval(()=>{const now=Date.now(),dt=(now-lastTick)/1000;lastTick=now;
+ if(!document.hidden&&!paused&&!P.solved&&!editing&&$('#list').classList.contains('hidden')&&dt<5){P.time+=dt;if(!saveT)saveT=setTimeout(saveNow,5000)}
+ $('#timer').textContent=paused?'⏸ '+fmtT(P.time):fmtT(P.time);$('#timer').classList.toggle('paused',paused)},1000);
+$('#timer').onclick=()=>{paused=!paused;$('#timer').classList.toggle('paused',paused);$('#timer').textContent=paused?'⏸ '+fmtT(P.time):fmtT(P.time)};
+document.addEventListener('visibilitychange',()=>{if(document.hidden)saveNow();lastTick=Date.now()});
+
+// ---------- Puzzle list, import / export ----------
+function openPuzzle(id){saveNow();curId=id;P=DB[id];undoS=[];redoS=[];sel.clear();editing=false;editCage=-1;paused=false;cellCache=Array(81).fill(null);SV('sdk_cur',curId);showGame();render()}
+function showGame(){$('#list').classList.add('hidden');$('#game').classList.remove('hidden')}
+function progress(p){let f=0,g=0;for(let i=0;i<81;i++){if(p.givens[i])g++;else if(p.v[i])f++}return Math.round(100*(f+g)/81)}
+function showList(){saveNow();$('#game').classList.add('hidden');$('#list').classList.remove('hidden');
+ const ps=Object.values(DB).sort((a,b)=>b.updated-a.updated);
+ $('#items').innerHTML=ps.map(p=>`<div class="item${p.id===curId?' cur':''}" data-id="${p.id}"><div class="t">${esc(p.name)}</div><div class="s">${p.solved?'Solved ✓':progress(p)+'% filled'} · ${fmtT(p.time)} · ${p.cages.length} cages · ${new Date(p.updated).toLocaleDateString('en-US',{month:'short',day:'numeric'})}</div>
+ <div class="r"><button class="open" data-a="open">Open</button><button data-a="copy">Copy</button><button data-a="ren">Rename</button><button data-a="restart">Restart</button><button class="del" data-a="del">Delete</button></div></div>`).join('')}
+$('#items').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;const id=b.closest('.item').dataset.id,p=DB[id],a=b.dataset.a;
+ if(a==='open')openPuzzle(id);
+ else if(a==='copy')exportDialog(p);
+ else if(a==='ren'){const n=prompt('Puzzle name',p.name);if(n&&n.trim()){p.name=n.trim();saveNow();showList()}}
+ else if(a==='restart'){if(confirm(`Restart "${p.name}"? Your digits, notes, colours, ruled-out combos and time will be cleared.`)){Object.assign(p,{v:Array(81).fill(0),cn:Array(81).fill(''),mn:Array(81).fill(''),col:Array.from({length:81},()=>[]),time:0,solved:false});p.cages.forEach(c=>c.elim=[]);if(id===curId){undoS=[];redoS=[];cellCache=Array(81).fill(null)}saveNow();showList()}}
+ else if(a==='del'){if(confirm(`Delete "${p.name}"? This can't be undone.`)){delete DB[id];if(!Object.keys(DB).length){const n=blankPuzzle('Untitled');DB[n.id]=n}if(id===curId){curId=Object.values(DB).sort((a,b)=>b.updated-a.updated)[0].id;P=DB[curId];undoS=[];redoS=[];cellCache=Array(81).fill(null)}saveNow();showList()}}});
+$('#bList').onclick=showList;$('#bBack').onclick=()=>{showGame();render()};
+$('#bNew').onclick=()=>{const n=prompt('Name for the new puzzle','Puzzle '+(Object.keys(DB).length+1));if(n===null)return;const p=blankPuzzle(n.trim()||'Untitled');DB[p.id]=p;openPuzzle(p.id);setEditing(true)};
+$('#bPaste').onclick=()=>{
+ $('#mbox').innerHTML=`<h2>Paste puzzle</h2><p class="muted" style="font-size:14px;margin:4px 0 8px">Paste the code Dev gave you (starts with <b>SUDOKU v1</b>).</p><textarea id="pIn" placeholder="SUDOKU v1\nname ...\ngivens ...\ncage 21 r1c1 r1c2 ..."></textarea><div id="pErr" class="err"></div>
+ <div class="r"><button class="btn sec" id="pClip">Paste from clipboard</button><button class="btn" id="pGo">Import</button></div><div class="r"><button class="btn sec" id="pX">Cancel</button></div>`;
+ showModal();$('#pX').onclick=closeModal;
+ $('#pClip').onclick=async()=>{try{$('#pIn').value=await navigator.clipboard.readText()}catch(e){$('#pErr').textContent='Clipboard not available — long-press in the box and choose Paste.'}};
+ $('#pGo').onclick=()=>{const r=parsePuzzle($('#pIn').value);if(!r.p){$('#pErr').textContent=r.errs.join('\n');return}
+  const hard=r.errs.filter(x=>!x.startsWith('Note:'));if(hard.length&&!confirm('Some lines had problems:\n\n'+hard.join('\n')+'\n\nImport anyway?'))return;
+  DB[r.p.id]=r.p;closeModal();openPuzzle(r.p.id);const notes=r.errs.filter(x=>x.startsWith('Note:'));if(notes.length)toast(notes[0].slice(6))}};
+function exportDialog(p){
+ $('#mbox').innerHTML=`<h2>Copy “${esc(p.name)}”</h2><div class="r"><button class="btn" id="xP">Copy puzzle</button><button class="btn" id="xS">Copy with progress</button></div><textarea id="xOut" readonly></textarea><div class="r"><button class="btn sec" id="xX">Close</button></div>`;
+ showModal();$('#xX').onclick=closeModal;
+ const go=async st=>{const t=exportPuzzle(p,st);$('#xOut').value=t;try{await navigator.clipboard.writeText(t);toast('Copied')}catch(e){$('#xOut').select();toast('Select all and copy')}};
+ $('#xP').onclick=()=>go(false);$('#xS').onclick=()=>go(true);$('#xOut').value=exportPuzzle(p,false)}
+
+// ---------- Keyboard (handy on a Mac/iPad keyboard) ----------
+document.addEventListener('keydown',e=>{if(!$('#modal').classList.contains('hidden')||!$('#list').classList.contains('hidden'))return;
+ if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='z'){e.preventDefault();e.shiftKey?redo():undo();return}
+ if(/^[1-9]$/.test(e.key)&&!editing){pressDigit(+e.key);return}
+ if((e.key==='Backspace'||e.key==='Delete')&&!editing){erase();return}
+ const m={z:'v',x:'c',c:'m',v:'k'}[e.key];if(m&&!editing){mode=m;renderControls();return}
+ const mv={ArrowUp:-9,ArrowDown:9,ArrowLeft:-1,ArrowRight:1}[e.key];if(mv&&sel.size){e.preventDefault();let i=[...sel].pop()+mv;if(i<0||i>80)return;sel=new Set([i]);renderSel()}});
+
+if('serviceWorker' in navigator)navigator.serviceWorker.register('./sw.js',{scope:'./'});
+render();

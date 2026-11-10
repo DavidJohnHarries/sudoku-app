@@ -1,0 +1,39 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#f3f4f6"><title>Sudoku</title>
+<link rel="manifest" href="manifest.json"><link rel="apple-touch-icon" href="icon-180.png">
+<link rel="stylesheet" href="style.css?v=1">
+</head><body>
+<div id="game">
+ <header><button id="bList" class="hb" aria-label="Puzzles">☰</button><div id="pname"></div><button id="timer" class="hb tm">0:00</button><button id="bEdit" class="hb" aria-label="Edit puzzle">✎</button></header>
+ <div id="info"><span id="infoTxt">No cage selected</span><button id="bCalc" class="calc" disabled>Σ Combos</button></div>
+ <div id="gridWrap"><div id="grid"></div><svg id="lines" viewBox="0 0 900 900" preserveAspectRatio="none"></svg></div>
+ <div id="play">
+  <div class="modes">
+   <button data-m="v" class="on"><b>1</b><small>Digit</small></button>
+   <button data-m="c"><span class="mc">1 2<br>3</span><small>Corner</small></button>
+   <button data-m="m"><span class="mm">12</span><small>Centre</small></button>
+   <button data-m="k"><span class="mk"></span><small>Colour</small></button>
+  </div>
+  <div class="pad" id="pad"></div>
+  <div class="tools"><button id="bUndo">↶ Undo</button><button id="bRedo">↷ Redo</button><button id="bErase">⌫ Erase</button></div>
+ </div>
+ <div id="edit" class="hidden">
+  <div class="tabs"><button data-t="cage" class="on">Cages</button><button data-t="giv">Givens</button></div>
+  <div id="eCage">
+   <div class="sumrow"><span class="muted">Sum</span><div id="sumBuf">–</div><button id="bCreate" class="btn">Create cage</button><button id="bDelCage" class="btn danger hidden">Delete</button></div>
+   <div class="pad sumpad" id="sumPad"></div>
+  </div>
+  <div id="eGiv" class="hidden"><div class="pad" id="givPad"></div></div>
+  <div id="warn"></div>
+  <div class="tools"><button id="eUndo">↶ Undo</button><button id="eRedo">↷ Redo</button><button id="bDone" class="btn">Done editing</button></div>
+ </div>
+</div>
+<div id="list" class="hidden">
+ <header><span class="lt">Puzzles</span><button id="bBack" class="hb">Back ›</button></header>
+ <div class="lbtns"><button id="bPaste" class="btn">Paste puzzle</button><button id="bNew" class="btn sec">New blank</button></div>
+ <div id="items"></div>
+</div>
+<div id="modal" class="hidden"><div class="box" id="mbox"></div></div>
+<script src="app.js?v=1"></script></body></html>
