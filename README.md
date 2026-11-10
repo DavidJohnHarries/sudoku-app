@@ -29,6 +29,8 @@ corner r1c3 125                # corner (edge) notes
 centre r3c3 246                # centre notes ("center" also accepted)
 colour r5c5 14                 # colour numbers 1-9, up to 3, in order (pie slices)
 elim r3c7 12479 12389          # ruled-out combos for the cage whose top-left cell is r3c7
+elim box5 1259                 # ruled-out combos for box 5's uncaged cells
+groupsum box5 23               # typed sum for box 5's uncaged cells (only when it can't be worked out)
 time 754                       # seconds on the clock
 solved
 ```
@@ -45,3 +47,10 @@ Palette: 1 red · 2 orange · 3 yellow · 4 green · 5 teal · 6 blue · 7 purpl
 - **☐ Multi** (toolbar): when on (blue), taps add/remove single cells, drag adds, and double/triple taps add the cage/box to the selection.
 - **Select by colour** (Colour mode): tap **◎ Select colour**, then a colour; or long-press a colour key. Selects every cell containing that colour (cells with that colour among others are included). In Multi mode it adds to the selection.
 - Zoom is blocked everywhere (pinch and double-tap).
+
+## Uncaged groups (v3)
+Double-tap a cell with no cage → selects the uncaged cells of its 3x3 box; **Σ Combos** works on that group.
+- Sum = 45 − the box's cage sums when every cage touching the box lies entirely inside it.
+- If a cage crosses the box edge, the sum can't be worked out: type it in the calculator header (remembered).
+- Ruled-out combos and typed sums are saved per box (`box1`–`box9`) and reset automatically if cage edits change that group's cells (or its worked-out sum).
+- The combos list uses 1–3 columns so the worst case (12 combos: 4 cells/20 or 5 cells/25) fits on an iPhone SE screen; it still scrolls if ever needed.

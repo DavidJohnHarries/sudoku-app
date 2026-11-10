@@ -47,7 +47,7 @@ cage 8 r8c9 r9c9
 cage 4 r9c3`;
 
 // ---------- Puzzle format (see README) ----------
-function blankPuzzle(name){return {id:uid(),name:name||'Untitled',givens:Array(81).fill(0),cages:[],v:Array(81).fill(0),cn:Array(81).fill(''),mn:Array(81).fill(''),col:Array.from({length:81},()=>[]),time:0,solved:false,extra:[],updated:Date.now()}}
+function blankPuzzle(name){return {id:uid(),name:name||'Untitled',givens:Array(81).fill(0),cages:[],v:Array(81).fill(0),cn:Array(81).fill(''),mn:Array(81).fill(''),col:Array.from({length:81},()=>[]),time:0,solved:false,extra:[],groups:{},updated:Date.now()}}
 function parseCell(t){const m=/^r([1-9])c([1-9])$/i.exec(t);return m?(m[1]-1)*9+(m[2]-1):-1}
 function parseGrid81(s){s=s.replace(/[\s|]/g,'');if(s.length!==81||/[^.0-9]/.test(s))return null;return [...s].map(ch=>ch==='.'?0:+ch)}
 function parsePuzzle(text){
@@ -70,12 +70,16 @@ function parsePuzzle(text){
   else if(kw==='corner'||kw==='centre'||kw==='center'||kw==='colour'||kw==='color'){const c=parseCell(toks[0]||''),d=(toks.slice(1).join('')).replace(/[^1-9]/g,'');
    if(c<0){errs.push(`Line ${ln}: expected "${kw} r1c1 DIGITS"`);continue}
    const u=[...new Set(d)];if(kw==='corner')p.cn[c]=u.sort().join('');else if(kw[0]==='c'&&kw[1]==='e')p.mn[c]=u.sort().join('');else p.col[c]=u.slice(0,MAXCOL).map(Number)}
-  else if(kw==='elim')pend.push([ln,toks]);
+  else if(kw==='elim'||kw==='groupsum')pend.push([ln,toks,kw]);
   else if(kw==='time'){p.time=Math.max(0,parseInt(toks[0])||0)}
   else if(kw==='solved')p.solved=true;
   else {p.extra.push(raw.trim());if(!errs.some(e=>e.includes(`"${kw}"`)))errs.push(`Note: "${kw}" lines aren't supported yet; kept and ignored.`)}
  }
- for(const [ln,toks] of pend){const c=parseCell(toks[0]||'');const cg=cageByAnchor[c];if(!cg){errs.push(`Line ${ln}: elim must name a cage's top-left cell`);continue}cg.elim=toks.slice(1).filter(t=>/^[1-9]+$/.test(t))}
+ for(const [ln,toks,kw] of pend){const bm=/^box([1-9])$/i.exec(toks[0]||'');
+  if(bm){const G=groupOf(p,bm[1]-1);if(!G){errs.push(`Line ${ln}: box${bm[1]} has no uncaged cells`);continue}const g=ensureGroup(p,G);
+   if(kw==='groupsum'){const n=parseInt(toks[1]);if(n>=1&&n<=45&&!G.derived)g.sum=n}else g.elim=toks.slice(1).filter(t=>/^[1-9]+$/.test(t));continue}
+  if(kw==='groupsum'){errs.push(`Line ${ln}: expected "groupsum boxN SUM"`);continue}
+  const c=parseCell(toks[0]||'');const cg=cageByAnchor[c];if(!cg){errs.push(`Line ${ln}: elim must name a cage's top-left cell`);continue}cg.elim=toks.slice(1).filter(t=>/^[1-9]+$/.test(t))}
  for(let k=0;k<81;k++)if(p.givens[k])p.v[k]=0;
  return {p,errs};
 }
@@ -88,15 +92,29 @@ function exportPuzzle(p,state){
   if(p.v.some(x=>x))L.push('values '+gridStr(p.v));
   for(let i=0;i<81;i++){if(p.cn[i])L.push(`corner ${RC(i)} ${p.cn[i]}`);if(p.mn[i])L.push(`centre ${RC(i)} ${p.mn[i]}`);if(p.col[i].length)L.push(`colour ${RC(i)} ${p.col[i].join('')}`)}
   for(const c of p.cages)if(c.elim&&c.elim.length)L.push(`elim ${RC(c.cells[0])} ${c.elim.join(' ')}`);
+  for(let b=0;b<9;b++){const G=groupOf(p,b);if(!G||!G.stored)continue;if(!G.derived&&G.sum)L.push(`groupsum ${G.key} ${G.sum}`);if(G.elim.length)L.push(`elim ${G.key} ${G.elim.join(' ')}`)}
   L.push('time '+Math.floor(p.time));if(p.solved)L.push('solved');
  }
  return L.join('\n')+'\n';
 }
 
+// ---------- Uncaged groups (uncaged cells of a 3x3 box) ----------
+// Sum is 45 minus the box's cages when every cage touching the box lies inside it; otherwise typed by the user.
+// Memory (typed sum, ruled-out combos) is kept per box in p.groups[boxN] and reset if the group's cells or derived sum change.
+function boxCellsOf(b){const r0=Math.floor(b/3)*3,c0=(b%3)*3,o=[];for(let r=0;r<3;r++)for(let c=0;c<3;c++)o.push((r0+r)*9+c0+c);return o}
+function groupOf(p,b){const bc=boxCellsOf(b),cnt=Array(81).fill(0),touch=new Set();
+ p.cages.forEach((c,k)=>c.cells.forEach(i=>{cnt[i]++;if(bc.includes(i))touch.add(k)}));
+ const cells=bc.filter(i=>!cnt[i]);if(!cells.length)return null;
+ let derived=!bc.some(i=>cnt[i]>1),s=0;for(const k of touch){const c=p.cages[k];s+=c.sum;if(!c.cells.every(i=>bc.includes(i)))derived=false}
+ const key='box'+(b+1),ck=cells.join(','),dsum=derived?45-s:null,g=p.groups&&p.groups[key];
+ const stored=!!g&&g.cells===ck&&g.dsum===dsum;
+ return {key,b,cells,ck,dsum,derived,stored,sum:derived?dsum:(stored?g.sum:null),elim:stored?g.elim:[]}}
+function ensureGroup(p,G){p.groups=p.groups||{};let g=p.groups[G.key];if(!g||g.cells!==G.ck||g.dsum!==G.dsum)g=p.groups[G.key]={cells:G.ck,dsum:G.dsum,sum:null,elim:[]};return g}
+
 // ---------- Storage ----------
 let DB=LS('sdk_puzzles')||{};let curId=LS('sdk_cur');
 if(!Object.keys(DB).length){const {p}=parsePuzzle(SAMPLE);DB[p.id]=p;curId=p.id}
-for(const p of Object.values(DB)){p.extra=p.extra||[];p.cages.forEach(c=>c.elim=c.elim||[])}
+for(const p of Object.values(DB)){p.extra=p.extra||[];p.groups=p.groups||{};p.cages.forEach(c=>c.elim=c.elim||[])}
 if(!DB[curId])curId=Object.values(DB).sort((a,b)=>b.updated-a.updated)[0].id;
 let P=DB[curId];
 let saveT=null;const saveNow=()=>{clearTimeout(saveT);saveT=null;SV('sdk_puzzles',DB);SV('sdk_cur',curId)};
@@ -112,8 +130,8 @@ const valAt=i=>P.givens[i]||P.v[i];
 // ---------- UI state ----------
 let sel=new Set(),mode='v',editing=false,etab='cage',sumBuf='',editCage=-1,paused=false;
 let undoS=[],redoS=[];
-const snap=()=>JSON.stringify({g:P.givens,c:P.cages,v:P.v,cn:P.cn,mn:P.mn,col:P.col,s:P.solved});
-function restore(s){const o=JSON.parse(s);Object.assign(P,{givens:o.g,cages:o.c,v:o.v,cn:o.cn,mn:o.mn,col:o.col,solved:o.s})}
+const snap=()=>JSON.stringify({gr:P.groups,g:P.givens,c:P.cages,v:P.v,cn:P.cn,mn:P.mn,col:P.col,s:P.solved});
+function restore(s){const o=JSON.parse(s);Object.assign(P,{groups:o.gr||{},givens:o.g,cages:o.c,v:o.v,cn:o.cn,mn:o.mn,col:o.col,solved:o.s})}
 function act(fn){const before=snap();fn();const after=snap();if(after!==before){undoS.push(before);if(undoS.length>500)undoS.shift();redoS=[];save()}render()}
 function undo(){if(!undoS.length)return;redoS.push(snap());restore(undoS.pop());save();editCage=-1;render()}
 function redo(){if(!redoS.length)return;undoS.push(snap());restore(redoS.pop());save();editCage=-1;render()}
@@ -163,14 +181,16 @@ function renderLines(){
  for(let k=1;k<9;k++){const w=k%3?1.5:5,c=k%3?'#9ca3af':'#111827';g+=`<path d="M${k*S} 0V900M0 ${k*S}H900" stroke="${c}" stroke-width="${w}"/>`}
  g+='<rect x="2.5" y="2.5" width="895" height="895" fill="none" stroke="#111827" stroke-width="5"/>';
  $('#lines').innerHTML=g}
+function selGroup(){if(!sel.size)return null;const b=BOX([...sel][0]);const G=groupOf(P,b);if(!G||G.cells.length!==sel.size||!G.cells.every(i=>sel.has(i)))return null;return G}
 function selCage(){if(!sel.size)return -1;const ks=cagesOf[[...sel][0]];for(const k of ks)if([...sel].every(i=>cagesOf[i].includes(k)))return k;return -1}
 function renderSel(){
  const one=sel.size===1?valAt([...sel][0]):0;
  for(let i=0;i<81;i++){cells[i].classList.toggle('sel',sel.has(i));cells[i].classList.toggle('same',!!one&&valAt(i)===one)}
  if(editing){$('#bPick').classList.add('hidden');$('#infoTxt').textContent=sel.size?`${sel.size} cell${sel.size>1?'s':''} selected`:'Drag across cells to make a cage';$('#bCalc').classList.add('hidden');return}
  $('#bCalc').classList.toggle('hidden',!FEATURES.calculator||mode==='k');$('#bPick').classList.toggle('hidden',mode!=='k');
- const k=selCage();
- if(k<0){$('#infoTxt').textContent=sel.size?'No cage selected':'Tap a cell to select';$('#bCalc').disabled=true}
+ const k=selCage(),G=k<0?selGroup():null;
+ if(G){$('#infoTxt').textContent=`Box ${G.b+1} uncaged · ${G.cells.length} cell${G.cells.length>1?'s':''} · sum ${G.sum||'?'}`;$('#bCalc').disabled=false}
+ else if(k<0){$('#infoTxt').textContent=sel.size?'No cage selected':'Tap a cell to select';$('#bCalc').disabled=true}
  else{const c=P.cages[k];$('#infoTxt').textContent=`Cage ${c.sum} · ${c.cells.length} cell${c.cells.length>1?'s':''}`;$('#bCalc').disabled=false}
 }
 function renderControls(){
@@ -243,7 +263,7 @@ function endGP(e){if(!gp||(e&&e.pointerId!=null&&e.pointerId!==gp.id))return;con
  if(g.moved){if(editing&&editCage>=0){editCage=-1;sumBuf='';renderLines();renderControls()}renderSel();return}
  if(g.rep){tapSeq.n++;tapSeq.t=Date.now();const i=g.start,ks=cagesOf[i];let grp,label;
   if(tapSeq.n===1&&ks.length){grp=P.cages[ks[0]].cells;label='Cage '+P.cages[ks[0]].sum}else if(tapSeq.n===1){grp=BOXCELLS(i).filter(j=>!cagesOf[j].length);label='Box '+(BOX(i)+1)+(grp.length<9?' uncaged':'')}else{grp=BOXCELLS(i);label='Box '+(BOX(i)+1)}
-  sel=new Set([...(multi?tapSeq.base:[]),...grp]);toast(label);renderSel();return}
+  sel=new Set([...(multi?tapSeq.base:[]),...grp]);renderSel();return}
  tapSeq.t=Date.now();
  if(editing&&etab==='cage'&&!g.add){const ks=cagesOf[g.start];if(ks.length){const k=ks[0];editCage=k;sel=new Set(P.cages[k].cells);sumBuf=String(P.cages[k].sum);renderLines();renderSel();renderControls();return}}
  if(g.add){if(g.wasSel)sel.delete(g.start)}else if(g.wasOnly)sel.clear();
@@ -267,7 +287,7 @@ function setPick(on){pickColour=on;$('#bPick').classList.toggle('on',on);$('#bPi
 $('#bPick').onclick=()=>setPick(!pickColour);
 const CNAMES=['red','orange','yellow','green','teal','blue','purple','pink','grey'];
 function selectColour(d){const hit=[];for(let i=0;i<81;i++)if(P.col[i].includes(d))hit.push(i);
- sel=new Set([...(multi?sel:[]),...hit]);setPick(false);toast(hit.length?`${hit.length} ${CNAMES[d-1]} cell${hit.length>1?'s':''} selected`:`No ${CNAMES[d-1]} cells`);renderSel()}
+ sel=new Set([...(multi?sel:[]),...hit]);setPick(false);if(!hit.length)toast(`No ${CNAMES[d-1]} cells`);renderSel()}
 // long-press a colour key (Colour mode) = select all cells with that colour
 padBtns.forEach(b=>{let t=null;
  b.addEventListener('pointerdown',()=>{delete b.dataset.lp;if(mode!=='k')return;t=setTimeout(()=>{t=null;b.dataset.lp='1';selectColour(+b.dataset.d)},500)});
@@ -294,22 +314,30 @@ givPad.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)ret
 
 // ---------- Cage-sum calculator ----------
 function combos(n,sum){const out=[];(function rec(start,left,acc,s){if(left===0){if(s===sum)out.push(acc.join(''));return}for(let d=start;d<=9;d++){if(s+d>sum)break;rec(d+1,left-1,[...acc,d],s+d)}})(1,n,[],0);return out}
+// spec: {cells, sum (null = unknown), editable, elim(), toggle(x), setSum(n)}
+function openCalc(spec){
+ const placed=[...new Set(spec.cells.map(valAt).filter(Boolean))],n=spec.cells.length;
+ const ok=x=>placed.every(d=>x.includes(String(d)));
+ $('#mbox').innerHTML=`<h2 class="ch">SUM: ${spec.editable?`<input id="cSum" inputmode="numeric" pattern="[0-9]*" maxlength="2" value="${spec.sum||''}" placeholder="?">`:spec.sum}</h2><div class="muted" id="cMeta"></div><div id="cList"></div>
+ <p class="muted cnote">Tap to rule out (tap again to restore). Grey = can't contain the digits already placed.${spec.editable?' Type the sum above — a cage crosses this box, so it can\'t be worked out.':''}</p><div class="r"><button class="btn" id="mClose">Close</button></div>`;
+ const draw=()=>{const sum=spec.sum,list=sum?combos(n,sum):[],el=spec.elim();
+  const live=list.filter(x=>!el.includes(x)&&ok(x)).length;
+  $('#cMeta').textContent=`${n} cell${n>1?'s':''}`+(sum?` · ${list.length} combination${list.length===1?'':'s'}${list.length?` · ${live} still possible`:''}`:'');
+  const cols=list.length<=5||n>=7?1:list.length<=10||n>=6?2:3;
+  $('#cList').className='clist c'+cols;
+  $('#cList').innerHTML=!sum?'<p class="muted">Enter the sum to see combinations.</p>':list.length?list.map(x=>`<button class="combo${el.includes(x)?' off':''}${ok(x)?'':' imp'}" data-x="${x}">${[...x].map(d=>`<span>${d}</span>`).join('')}</button>`).join(''):'<p class="err">No combination of different digits makes this sum.</p>'};
+ draw();showModal();$('#mClose').onclick=closeModal;
+ const inp=$('#cSum');if(inp)inp.addEventListener('input',()=>{const v=parseInt(inp.value);const nv=v>=1&&v<=45?v:null;if(nv===spec.sum)return;const before=snap();spec.setSum(nv);undoS.push(before);redoS=[];save();draw();renderSel();renderControls()});
+ $('#cList').onclick=e=>{const b=e.target.closest('.combo');if(!b)return;const before=snap();spec.toggle(b.dataset.x);undoS.push(before);redoS=[];save();draw();renderControls()}}
 function openCalculator(k){const c=P.cages[k];if(!c)return;
- const placed=[...new Set(c.cells.map(valAt).filter(Boolean))];
- const list=combos(c.cells.length,c.sum);
- const draw=()=>{const live=list.filter(x=>!c.elim.includes(x)&&placed.every(d=>x.includes(String(d)))).length;
-  $('#mbox').innerHTML=`<h2>SUM: ${c.sum}</h2><div class="muted">${c.cells.length} cells · ${list.length} combination${list.length===1?'':'s'}${list.length?` · ${live} still possible`:''}</div>`+
-  (list.length?list.map(x=>{const imp=!placed.every(d=>x.includes(String(d)));return `<button class="combo${c.elim.includes(x)?' off':''}${imp?' imp':''}" data-x="${x}">${[...x].map(d=>`<span>${d}</span>`).join('')}</button>`}).join(''):'<p class="err">No combination of different digits makes this sum.</p>')+
-  `<p class="muted" style="font-size:13px">Tap a row to rule it out (tap again to bring it back). Greyed rows can't include the digits already placed.</p><div class="r"><button class="btn" id="mClose">Close</button></div>`;
-  $('#mClose').onclick=closeModal};
- draw();showModal();
- $('#mbox').onclick=e=>{const b=e.target.closest('.combo');if(!b)return;const x=b.dataset.x;
-  const before=snap();c.elim.includes(x)?c.elim.splice(c.elim.indexOf(x),1):c.elim.push(x);undoS.push(before);redoS=[];save();
-  b.classList.toggle('off');const live=list.filter(y=>!c.elim.includes(y)&&placed.every(d=>y.includes(String(d)))).length;
-  $('#mbox .muted').textContent=`${c.cells.length} cells · ${list.length} combinations · ${live} still possible`;renderControls()}}
-$('#bCalc').onclick=()=>{const k=selCage();if(k>=0)openCalculator(k)};
+ openCalc({cells:c.cells,sum:c.sum,editable:false,elim:()=>c.elim,toggle:x=>{c.elim.includes(x)?c.elim.splice(c.elim.indexOf(x),1):c.elim.push(x)}})}
+function openGroupCalc(G){const spec={cells:G.cells,sum:G.sum,editable:!G.derived,
+ elim:()=>{const g=P.groups[G.key];return g&&g.cells===G.ck&&g.dsum===G.dsum?g.elim:[]},
+ toggle:x=>{const g=ensureGroup(P,G);g.elim.includes(x)?g.elim.splice(g.elim.indexOf(x),1):g.elim.push(x)},
+ setSum:nv=>{const g=ensureGroup(P,G);if(g.sum!==nv){g.sum=nv;g.elim=[]}spec.sum=nv}};openCalc(spec)}
+$('#bCalc').onclick=()=>{const k=selCage();if(k>=0)return openCalculator(k);const G=selGroup();if(G)openGroupCalc(G)};
 function showModal(){$('#modal').classList.remove('hidden')}
-function closeModal(){$('#modal').classList.add('hidden');$('#mbox').onclick=null;$('#mbox').innerHTML=''}
+function closeModal(){if(document.activeElement)document.activeElement.blur();$('#modal').classList.add('hidden');$('#mbox').onclick=null;$('#mbox').innerHTML=''}
 $('#modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal()});
 
 // ---------- Timer ----------
@@ -333,7 +361,7 @@ $('#items').addEventListener('click',e=>{const b=e.target.closest('button');if(!
  if(a==='open')openPuzzle(id);
  else if(a==='copy')exportDialog(p);
  else if(a==='ren'){const n=prompt('Puzzle name',p.name);if(n&&n.trim()){p.name=n.trim();saveNow();showList()}}
- else if(a==='restart'){if(confirm(`Restart "${p.name}"? Your digits, notes, colours, ruled-out combos and time will be cleared.`)){Object.assign(p,{v:Array(81).fill(0),cn:Array(81).fill(''),mn:Array(81).fill(''),col:Array.from({length:81},()=>[]),time:0,solved:false});p.cages.forEach(c=>c.elim=[]);if(id===curId){undoS=[];redoS=[];cellCache=Array(81).fill(null)}saveNow();showList()}}
+ else if(a==='restart'){if(confirm(`Restart "${p.name}"? Your digits, notes, colours, ruled-out combos and time will be cleared.`)){Object.assign(p,{v:Array(81).fill(0),cn:Array(81).fill(''),mn:Array(81).fill(''),col:Array.from({length:81},()=>[]),time:0,solved:false});p.cages.forEach(c=>c.elim=[]);p.groups={};if(id===curId){undoS=[];redoS=[];cellCache=Array(81).fill(null)}saveNow();showList()}}
  else if(a==='del'){if(confirm(`Delete "${p.name}"? This can't be undone.`)){delete DB[id];if(!Object.keys(DB).length){const n=blankPuzzle('Untitled');DB[n.id]=n}if(id===curId){curId=Object.values(DB).sort((a,b)=>b.updated-a.updated)[0].id;P=DB[curId];undoS=[];redoS=[];cellCache=Array(81).fill(null)}saveNow();showList()}}});
 $('#bList').onclick=showList;$('#bBack').onclick=()=>{showGame();render()};
 $('#bNew').onclick=()=>{const n=prompt('Name for the new puzzle','Puzzle '+(Object.keys(DB).length+1));if(n===null)return;const p=blankPuzzle(n.trim()||'Untitled');DB[p.id]=p;openPuzzle(p.id);setEditing(true)};
