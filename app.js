@@ -242,7 +242,7 @@ grid.addEventListener('pointermove',e=>{if(!gp||e.pointerId!==gp.id)return;const
 function endGP(e){if(!gp||(e&&e.pointerId!=null&&e.pointerId!==gp.id))return;const g=gp;gp=null;
  if(g.moved){if(editing&&editCage>=0){editCage=-1;sumBuf='';renderLines();renderControls()}renderSel();return}
  if(g.rep){tapSeq.n++;tapSeq.t=Date.now();const i=g.start,ks=cagesOf[i];let grp,label;
-  if(tapSeq.n===1&&ks.length){grp=P.cages[ks[0]].cells;label='Cage '+P.cages[ks[0]].sum}else{grp=BOXCELLS(i);label='Box '+(BOX(i)+1)}
+  if(tapSeq.n===1&&ks.length){grp=P.cages[ks[0]].cells;label='Cage '+P.cages[ks[0]].sum}else if(tapSeq.n===1){grp=BOXCELLS(i).filter(j=>!cagesOf[j].length);label='Box '+(BOX(i)+1)+(grp.length<9?' uncaged':'')}else{grp=BOXCELLS(i);label='Box '+(BOX(i)+1)}
   sel=new Set([...(multi?tapSeq.base:[]),...grp]);toast(label);renderSel();return}
  tapSeq.t=Date.now();
  if(editing&&etab==='cage'&&!g.add){const ks=cagesOf[g.start];if(ks.length){const k=ks[0];editCage=k;sel=new Set(P.cages[k].cells);sumBuf=String(P.cages[k].sum);renderLines();renderSel();renderControls();return}}

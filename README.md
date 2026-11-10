@@ -41,7 +41,7 @@ Palette: 1 red · 2 orange · 3 yellow · 4 green · 5 teal · 6 blue · 7 purpl
 `tools/gen_killer.py` generated the sample puzzle (random cages, checked for a unique solution).
 
 ## Selecting (v2)
-- Double-tap a cell: selects its cage (or its 3x3 box if it has no cage). Triple-tap: its 3x3 box. A short message names what was selected.
+- Double-tap a cell: selects its cage; on a cell with no cage, selects all uncaged cells in its 3x3 box (the whole box if it has no cages). Triple-tap: its 3x3 box. A short message names what was selected.
 - **☐ Multi** (toolbar): when on (blue), taps add/remove single cells, drag adds, and double/triple taps add the cage/box to the selection.
 - **Select by colour** (Colour mode): tap **◎ Select colour**, then a colour; or long-press a colour key. Selects every cell containing that colour (cells with that colour among others are included). In Multi mode it adds to the selection.
 - Zoom is blocked everywhere (pinch and double-tap).
