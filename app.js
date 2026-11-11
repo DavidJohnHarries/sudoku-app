@@ -184,6 +184,29 @@ function renderLines(){
  $('#lines').innerHTML=g}
 function selGroup(){if(!sel.size)return null;const b=BOX([...sel][0]);const G=groupOf(P,b);if(!G||G.cells.length!==sel.size||!G.cells.every(i=>sel.has(i)))return null;return G}
 function selCage(){if(!sel.size)return -1;const ks=cagesOf[[...sel][0]];for(const k of ks)if([...sel].every(i=>cagesOf[i].includes(k)))return k;return -1}
+// Total is known only when every selected cell is accounted for:
+//  • each fully-selected cage contributes its cage sum
+//  • each fully-selected uncaged group with a known sum (derived or typed) contributes that sum
+//  • any leftover selected cell (partial cage, or uncaged without a group total) contributes its placed digit
+function selTotal(){
+ const n=sel.size;if(!n)return {n:0,sum:null,known:false};
+ const covered=new Set();let sum=0;
+ for(const c of P.cages)if(c.cells.every(i=>sel.has(i))){sum+=c.sum;c.cells.forEach(i=>covered.add(i))}
+ for(let b=0;b<9;b++){const G=groupOf(P,b);if(!G||G.sum==null||!G.cells.every(i=>sel.has(i)))continue;
+  if(G.cells.some(i=>covered.has(i)))continue;sum+=G.sum;G.cells.forEach(i=>covered.add(i))}
+ for(const i of sel){if(covered.has(i))continue;const v=valAt(i);if(!v)return {n,sum:null,known:false};sum+=v}
+ return {n,sum,known:true}}
+function near45(sum){
+ if(sum%45===0)return sum===45?'= 45':`= ${sum/45}×45`;
+ if(sum<45)return `45−${45-sum}`;
+ const lo=Math.floor(sum/45)*45,hi=lo+45;
+ return `${lo}+${sum-lo} · ${hi}−${hi-sum}`}
+function selInfoText(){
+ if(!sel.size)return numSel?`Number ${numSel} — tap ${numSel} again to clear`:'Tap a cell to select';
+ const t=selTotal();
+ if(!t.known)return `${t.n} cell${t.n>1?'s':''}`;
+ return `Total ${t.sum} (${t.n} cell${t.n>1?'s':''})  ${near45(t.sum)}`}
+function fitInfo(){const el=$('#infoTxt');el.style.fontSize='';let fs=15;while(el.scrollWidth>el.clientWidth&&fs>11){fs--;el.style.fontSize=fs+'px'}}
 // Number selection (digit highlight): numSel is 1–9 or 0.
 // A single selected cell that has a placed digit (given or user) sets numSel to that digit.
 // Multi-select or a single empty cell clears it. An empty selection leaves it alone, so
@@ -207,9 +230,9 @@ function renderSel(){
  if(editing){$('#bPick').classList.add('hidden');$('#infoTxt').textContent=sel.size?`${sel.size} cell${sel.size>1?'s':''} selected`:'Drag across cells to make a cage';$('#bCalc').classList.add('hidden');return}
  $('#bCalc').classList.toggle('hidden',!FEATURES.calculator||mode==='k');$('#bPick').classList.toggle('hidden',mode!=='k');
  const k=selCage(),G=k<0?selGroup():null;
- if(G){$('#infoTxt').textContent=`Box ${G.b+1} uncaged · ${G.cells.length} cell${G.cells.length>1?'s':''} · sum ${G.sum||'?'}`;$('#bCalc').disabled=false}
- else if(k<0){$('#infoTxt').textContent=sel.size?'No cage selected':(numSel?`Number ${numSel} — tap ${numSel} again to clear`:'Tap a cell to select');$('#bCalc').disabled=true}
- else{const c=P.cages[k];$('#infoTxt').textContent=`Cage ${c.sum} · ${c.cells.length} cell${c.cells.length>1?'s':''}`;$('#bCalc').disabled=false}
+ $('#infoTxt').textContent=selInfoText();
+ $('#bCalc').disabled=!(G||k>=0);
+ fitInfo();
 }
 function renderControls(){
  $$('.modes button').forEach(b=>b.classList.toggle('on',b.dataset.m===mode));
@@ -266,7 +289,8 @@ function checkSolved(){if(P.solved||editing)return;for(let i=0;i<81;i++)if(!valA
 
 // ---------- Grid pointer: tap / drag select, double/triple tap, multi-select ----------
 // Single tap acts instantly; a 2nd tap on the same cell within 350ms upgrades to the cage (or box if no cage),
-// a 3rd upgrades to the 3x3 box. In Multi mode taps toggle cells and double/triple taps ADD the group.
+// a 3rd upgrades to the 3x3 box. In Multi mode taps toggle cells; double/triple taps add the group — unless
+// the double-tapped cell was already selected *before* the first tap, in which case the cage/uncaged group is removed.
 let gp=null,multi=false,tapSeq={cell:-1,t:0,n:0,base:null};
 const BOXCELLS=i=>HOUSES[BOX(i)*3+2];
 function cellAt(x,y){const r=grid.getBoundingClientRect();const c=Math.floor((x-r.left)/r.width*9),w=Math.floor((y-r.top)/r.height*9);return c<0||c>8||w<0||w>8?-1:w*9+c}
@@ -281,9 +305,12 @@ grid.addEventListener('pointerdown',e=>{const i=cellAt(e.clientX,e.clientY);if(i
 grid.addEventListener('pointermove',e=>{if(!gp||e.pointerId!==gp.id)return;const i=cellAt(e.clientX,e.clientY);if(i<0||i===gp.last)return;gp.last=i;if(i!==gp.start){gp.moved=true;tapSeq.cell=-1}if(!sel.has(i)){sel.add(i);renderSel()}});
 function endGP(e){if(!gp||(e&&e.pointerId!=null&&e.pointerId!==gp.id))return;const g=gp;gp=null;
  if(g.moved){if(editing&&editCage>=0){editCage=-1;sumBuf='';renderLines();renderControls()}renderSel();return}
- if(g.rep){tapSeq.n++;tapSeq.t=Date.now();const i=g.start,ks=cagesOf[i];let grp,label;
-  if(tapSeq.n===1&&ks.length){grp=P.cages[ks[0]].cells;label='Cage '+P.cages[ks[0]].sum}else if(tapSeq.n===1){grp=BOXCELLS(i).filter(j=>!cagesOf[j].length);label='Box '+(BOX(i)+1)+(grp.length<9?' uncaged':'')}else{grp=BOXCELLS(i);label='Box '+(BOX(i)+1)}
-  sel=new Set([...(multi?tapSeq.base:[]),...grp]);renderSel();return}
+ if(g.rep){tapSeq.n++;tapSeq.t=Date.now();const i=g.start,ks=cagesOf[i];let grp;
+  if(tapSeq.n===1&&ks.length)grp=P.cages[ks[0]].cells;else if(tapSeq.n===1)grp=BOXCELLS(i).filter(j=>!cagesOf[j].length);else grp=BOXCELLS(i);
+  // Use tapSeq.base (selection before the first tap): the first tap of a double-tap may already have toggled the cell.
+  if(multi&&tapSeq.n===1&&tapSeq.base.has(i)){sel=new Set(tapSeq.base);for(const j of grp)sel.delete(j)}
+  else sel=new Set([...(multi?tapSeq.base:[]),...grp]);
+  renderSel();return}
  tapSeq.t=Date.now();
  if(editing&&etab==='cage'&&!g.add){const ks=cagesOf[g.start];if(ks.length){const k=ks[0];editCage=k;sel=new Set(P.cages[k].cells);sumBuf=String(P.cages[k].sum);renderLines();renderSel();renderControls();return}}
  if(g.add){if(g.wasSel)sel.delete(g.start)}else if(g.wasOnly)sel.clear();
