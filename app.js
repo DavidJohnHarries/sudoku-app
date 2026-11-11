@@ -9,6 +9,26 @@ const COLOURS=['#fca5a5','#fdba74','#fde047','#86efac','#5eead4','#93c5fd','#c4b
 const MAXCOL=3;
 // Feature flags / hooks for later variants (thermometers, arrows, kropki...): add a parser section + a draw layer.
 const FEATURES={calculator:true};
+// Colours: up to 3 per cell, drawn in palette order. At most one may be boosted
+// (2/3 of the pie; the others share the remaining 1/3 equally). No boost = equal shares.
+function normCol(x){
+ let ids=[],boost=0;
+ if(Array.isArray(x))ids=x;
+ else if(x&&typeof x==='object'){ids=x.c||[];boost=x.b||0}
+ const seen=new Set(),c=[];
+ for(const x of ids){const d=+x;if(d>=1&&d<=9&&!seen.has(d)){seen.add(d);c.push(d)}}
+ c.sort((a,b)=>a-b);if(c.length>MAXCOL)c.length=MAXCOL;
+ if(!c.includes(boost))boost=0;
+ return {c,b:boost}
+}
+function parseColourToks(toks){
+ const s=toks.join('');let boost=0,ids=[];
+ for(let i=0;i<s.length;i++){
+  if(/[1-9]/.test(s[i])){const d=+s[i];ids.push(d);if(s[i+1]==='*'){boost=d;i++}}
+ }
+ return normCol({c:ids,b:boost})
+}
+function fmtColour(o){o=normCol(o);return o.c.map(d=>o.b===d?d+'*':String(d)).join(' ')}
 const SAMPLE=`SUDOKU v1
 name Sample killer
 givens .................................................................................
@@ -47,7 +67,7 @@ cage 8 r8c9 r9c9
 cage 4 r9c3`;
 
 // ---------- Puzzle format (see README) ----------
-function blankPuzzle(name){return {id:uid(),name:name||'Untitled',givens:Array(81).fill(0),cages:[],v:Array(81).fill(0),cn:Array(81).fill(''),mn:Array(81).fill(''),col:Array.from({length:81},()=>[]),time:0,solved:false,extra:[],groups:{},updated:Date.now()}}
+function blankPuzzle(name){return {id:uid(),name:name||'Untitled',givens:Array(81).fill(0),cages:[],v:Array(81).fill(0),cn:Array(81).fill(''),mn:Array(81).fill(''),col:Array.from({length:81},()=>({c:[],b:0})),time:0,solved:false,extra:[],groups:{},updated:Date.now()}}
 function parseCell(t){const m=/^r([1-9])c([1-9])$/i.exec(t);return m?(m[1]-1)*9+(m[2]-1):-1}
 function parseGrid81(s){s=s.replace(/[\s|]/g,'');if(s.length!==81||/[^.0-9]/.test(s))return null;return [...s].map(ch=>ch==='.'?0:+ch)}
 function parsePuzzle(text){
@@ -67,9 +87,12 @@ function parsePuzzle(text){
   else if(kw==='cage'){const sum=+toks[0];const cells=toks.slice(1).map(parseCell);
    if(!Number.isInteger(sum)||sum<1||sum>45||!cells.length||cells.some(c=>c<0)){errs.push(`Line ${ln}: expected "cage SUM r1c1 r1c2 ..."`);continue}
    const cg={sum,cells:[...new Set(cells)].sort((a,b)=>a-b),elim:[]};p.cages.push(cg);cageByAnchor[cg.cells[0]]=cg}
-  else if(kw==='corner'||kw==='centre'||kw==='center'||kw==='colour'||kw==='color'){const c=parseCell(toks[0]||''),d=(toks.slice(1).join('')).replace(/[^1-9]/g,'');
+  else if(kw==='colour'||kw==='color'){const c=parseCell(toks[0]||'');
+   if(c<0){errs.push(`Line ${ln}: expected "${kw} r1c1 COLOURS"`);continue}
+   p.col[c]=parseColourToks(toks.slice(1))}
+  else if(kw==='corner'||kw==='centre'||kw==='center'){const c=parseCell(toks[0]||''),d=(toks.slice(1).join('')).replace(/[^1-9]/g,'');
    if(c<0){errs.push(`Line ${ln}: expected "${kw} r1c1 DIGITS"`);continue}
-   const u=[...new Set(d)];if(kw==='corner')p.cn[c]=u.sort().join('');else if(kw[0]==='c'&&kw[1]==='e')p.mn[c]=u.sort().join('');else p.col[c]=u.slice(0,MAXCOL).map(Number)}
+   const u=[...new Set(d)];if(kw==='corner')p.cn[c]=u.sort().join('');else p.mn[c]=u.sort().join('')}
   else if(kw==='elim'||kw==='groupsum')pend.push([ln,toks,kw]);
   else if(kw==='time'){p.time=Math.max(0,parseInt(toks[0])||0)}
   else if(kw==='solved')p.solved=true;
@@ -90,7 +113,7 @@ function exportPuzzle(p,state){
  L.push(...p.extra);
  if(state){
   if(p.v.some(x=>x))L.push('values '+gridStr(p.v));
-  for(let i=0;i<81;i++){if(p.cn[i])L.push(`corner ${RC(i)} ${p.cn[i]}`);if(p.mn[i])L.push(`centre ${RC(i)} ${p.mn[i]}`);if(p.col[i].length)L.push(`colour ${RC(i)} ${p.col[i].join('')}`)}
+  for(let i=0;i<81;i++){if(p.cn[i])L.push(`corner ${RC(i)} ${p.cn[i]}`);if(p.mn[i])L.push(`centre ${RC(i)} ${p.mn[i]}`);const co=normCol(p.col[i]);if(co.c.length)L.push(`colour ${RC(i)} ${fmtColour(co)}`)}
   for(const c of p.cages)if(c.elim&&c.elim.length)L.push(`elim ${RC(c.cells[0])} ${c.elim.join(' ')}`);
   for(let b=0;b<9;b++){const G=groupOf(p,b);if(!G||!G.stored)continue;if(!G.derived&&G.sum)L.push(`groupsum ${G.key} ${G.sum}`);if(G.elim.length)L.push(`elim ${G.key} ${G.elim.join(' ')}`)}
   L.push('time '+Math.floor(p.time));if(p.solved)L.push('solved');
@@ -114,7 +137,7 @@ function ensureGroup(p,G){p.groups=p.groups||{};let g=p.groups[G.key];if(!g||g.c
 // ---------- Storage ----------
 let DB=LS('sdk_puzzles')||{};let curId=LS('sdk_cur');
 if(!Object.keys(DB).length){const {p}=parsePuzzle(SAMPLE);DB[p.id]=p;curId=p.id}
-for(const p of Object.values(DB)){p.extra=p.extra||[];p.groups=p.groups||{};p.cages.forEach(c=>c.elim=c.elim||[])}
+for(const p of Object.values(DB)){p.extra=p.extra||[];p.groups=p.groups||{};p.cages.forEach(c=>c.elim=c.elim||[]);if(p.col)for(let i=0;i<81;i++)p.col[i]=normCol(p.col[i])}
 if(!DB[curId])curId=Object.values(DB).sort((a,b)=>b.updated-a.updated)[0].id;
 let P=DB[curId];
 let saveT=null;const saveNow=()=>{clearTimeout(saveT);saveT=null;SV('sdk_puzzles',DB);SV('sdk_cur',curId)};
@@ -140,7 +163,7 @@ function redo(){if(!redoS.length)return;undoS.push(snap());restore(redoS.pop());
 const grid=$('#grid'),cells=[];
 for(let i=0;i<81;i++){const d=document.createElement('div');d.className='cell';cells.push(d);grid.appendChild(d)}
 const pad=$('#pad');const padBtns=[];
-for(let d=1;d<=9;d++){const b=document.createElement('button');b.dataset.d=d;b.innerHTML=`<span class="sw"></span><span class="n">${d}</span>`;pad.appendChild(b);padBtns.push(b)}
+for(let d=1;d<=9;d++){const b=document.createElement('button');b.dataset.d=d;b.innerHTML=`<span class="sw"></span><span class="n">${d}</span><span class="cpm minus" data-op="-">−</span><span class="cpm plus" data-op="+">+</span>`;pad.appendChild(b);padBtns.push(b)}
 const actBtn=document.createElement('button');actBtn.className='act';actBtn.id='bAct';pad.appendChild(actBtn);
 const sumPad=$('#sumPad');[1,2,3,4,5,6,7,8,9,0].forEach(d=>{const b=document.createElement('button');b.dataset.s=d;b.textContent=d;sumPad.appendChild(b)});
 const sb=document.createElement('button');sb.dataset.s='bk';sb.textContent='⌫';sumPad.appendChild(sb);sumPad.style.gridTemplateColumns='repeat(6,1fr)';
@@ -148,7 +171,12 @@ const givPad=$('#givPad');for(let d=1;d<=9;d++){const b=document.createElement('
 {const b=document.createElement('button');b.dataset.g=0;b.className='act';b.textContent='⌫ Clear';givPad.appendChild(b)}
 
 // ---------- Rendering ----------
-function pie(cs){if(cs.length===1)return COLOURS[cs[0]-1];const n=cs.length;return 'conic-gradient('+cs.map((c,k)=>`${COLOURS[c-1]} ${k*100/n}% ${(k+1)*100/n}%`).join(',')+')'}
+function pie(o){o=normCol(o);const cs=o.c;if(!cs.length)return'transparent';if(cs.length===1)return COLOURS[cs[0]-1];
+ const n=cs.length,boost=o.b&&cs.includes(o.b)?o.b:0;
+ const share=id=>boost?(id===boost?2/3:(1/3)/(n-1)):1/n;
+ let acc=0;const stops=cs.map((id,k)=>{const a=acc;acc+=share(id);return `${COLOURS[id-1]} ${a*100}% ${k===cs.length-1?100:acc*100}%`});
+ // Start 30° clockwise from 12 o'clock so a 50-50 split has its dividing line 30° from vertical; all pies use this start.
+ return 'conic-gradient(from 30deg,'+stops.join(',')+')'}
 let bad=new Set(),cageBad=new Set();
 function computeConflicts(){bad=new Set();cageBad=new Set();
  const units=HOUSES.concat(P.cages.map(c=>c.cells));
@@ -157,7 +185,7 @@ function computeConflicts(){bad=new Set();cageBad=new Set();
 function noteMark(d){return numSel&&+d===numSel?`<span class="nh">${d}</span>`:`<span>${d}</span>`}
 function cellHTML(i){
  let h='';const v=valAt(i);
- if(P.col[i].length)h+=`<div class="bg" style="background:${pie(P.col[i])}"></div>`;
+ if(normCol(P.col[i]).c.length)h+=`<div class="bg" style="background:${pie(P.col[i])}"></div>`;
  const anc=cagesOf[i].find(k=>P.cages[k].cells[0]===i);
  if(anc!==undefined)h+=`<span class="sum${cageBad.has(anc)?' bad':''}">${P.cages[anc].sum}</span>`;
  if(v)h+=`<span class="val">${v}</span>`;
@@ -272,19 +300,38 @@ function toast(m){$$('.toast').forEach(x=>x.remove());const d=document.createEle
 function pressDigit(d,el){
  // No cell selected (and not in Colour mode): the pad selects / toggles that number's highlight.
  if(!editing&&!sel.size&&mode!=='k'){numSel=numSel===d?0:d;render();return}
+ if(mode==='k'){pressColour(d,true,el);return}
  const cs=editable();if(!cs.length){if(el)nudge(el);return}
  act(()=>{
   if(mode==='v'){const all=cs.every(i=>P.v[i]===d);
    for(const i of cs){if(all)P.v[i]=0;else{P.v[i]=d;for(const j of peers(i)){P.cn[j]=P.cn[j].replace(String(d),'');P.mn[j]=P.mn[j].replace(String(d),'')}}}}
   else if(mode==='c'||mode==='m'){const A=mode==='c'?P.cn:P.mn,t=cs.filter(i=>!P.v[i]);if(!t.length)return;const all=t.every(i=>A[i].includes(d));
    for(const i of t){const s=new Set(A[i]);all?s.delete(String(d)):s.add(String(d));A[i]=[...s].sort().join('')}}
-  else if(mode==='k'){const all=[...sel].every(i=>P.col[i].includes(d));let full=0;
-   for(const i of sel){const c=P.col[i];if(all)P.col[i]=c.filter(x=>x!==d);else if(!c.includes(d)){if(c.length>=MAXCOL)full++;else c.push(d)}}
-   if(full)toast(`Max ${MAXCOL} colours per cell`)}
  })}
+// Colour pad: '+' adds a new colour (unboosted) or boosts one already in the cell (moving any existing boost).
+// '+' on an already-boosted colour does nothing. '−' un-boosts a boosted colour, or removes an unboosted one.
+function pressColour(d,add,el){
+ if(!sel.size){if(el)nudge(el);return}
+ act(()=>{
+  let full=0;
+  for(const i of sel){
+   const o=normCol(P.col[i]);
+   if(add){
+    if(!o.c.includes(d)){if(o.c.length>=MAXCOL){full++;continue}o.c.push(d);o.c.sort((a,b)=>a-b)}
+    else if(o.b!==d)o.b=d;
+   }else{
+    if(!o.c.includes(d))continue;
+    if(o.b===d)o.b=0;
+    else{o.c=o.c.filter(x=>x!==d);if(!o.c.includes(o.b))o.b=0}
+   }
+   P.col[i]=o;
+  }
+  if(full)toast(`Max ${MAXCOL} colours per cell`);
+ })
+}
 function erase(){const cs=editable();if(mode==='k'){clearColours();return}
- act(()=>{if(cs.some(i=>P.v[i]))cs.forEach(i=>P.v[i]=0);else if(cs.some(i=>P.cn[i]||P.mn[i]))cs.forEach(i=>{P.cn[i]='';P.mn[i]=''});else [...sel].forEach(i=>P.col[i]=[])})}
-function clearColours(){act(()=>[...sel].forEach(i=>P.col[i]=[]))}
+ act(()=>{if(cs.some(i=>P.v[i]))cs.forEach(i=>P.v[i]=0);else if(cs.some(i=>P.cn[i]||P.mn[i]))cs.forEach(i=>{P.cn[i]='';P.mn[i]=''});else [...sel].forEach(i=>P.col[i]={c:[],b:0})})}
+function clearColours(){act(()=>[...sel].forEach(i=>P.col[i]={c:[],b:0}))}
 function checkSolved(){if(P.solved||editing)return;for(let i=0;i<81;i++)if(!valAt(i))return;if(bad.size||cageBad.size)return;P.solved=true;save();toast('Solved! 🎉 '+fmtT(P.time))}
 
 // ---------- Grid pointer: tap / drag select, double/triple tap, multi-select ----------
@@ -323,7 +370,7 @@ grid.addEventListener('touchstart',e=>e.preventDefault(),{passive:false});
 document.addEventListener('dblclick',e=>e.preventDefault(),{passive:false});
 document.addEventListener('touchmove',e=>{if(e.touches.length>1)e.preventDefault()},{passive:false});
 let lastTE=0;document.addEventListener('touchend',e=>{const now=Date.now();
- if(now-lastTE<400&&!e.target.closest('textarea,input')){e.preventDefault();const b=e.target.closest('button,.combo,#infoTxt');if(b&&!b.disabled&&!b.dataset.lp)b.click()}
+ if(now-lastTE<400&&!e.target.closest('textarea,input')){e.preventDefault();const b=e.target.closest('button,.combo,#infoTxt');if(b&&!b.disabled&&!b.dataset.lp){const inner=e.target.closest('.cpm');(inner||b).click()}}
  lastTE=now},{passive:false});
 
 // ---------- Multi-select + select-by-colour ----------
@@ -335,7 +382,7 @@ $('#bPick').onclick=()=>setPick(!pickColour);
 // Tap the status line to drop the cell selection (number highlight stays). A quick second tap on a cell is a double-tap (cage/box), so this is the reliable way to get to 'no cell selected' without waiting 350ms.
 $('#infoTxt').addEventListener('click',()=>{if(editing||!sel.size)return;sel.clear();renderSel()});
 const CNAMES=['red','orange','yellow','green','teal','blue','purple','pink','grey'];
-function selectColour(d){const hit=[];for(let i=0;i<81;i++)if(P.col[i].includes(d))hit.push(i);
+function selectColour(d){const hit=[];for(let i=0;i<81;i++)if(normCol(P.col[i]).c.includes(d))hit.push(i);
  sel=new Set([...(multi?sel:[]),...hit]);setPick(false);if(!hit.length)toast(`No ${CNAMES[d-1]} cells`);renderSel()}
 // long-press a colour key (Colour mode) = select all cells with that colour
 padBtns.forEach(b=>{let t=null;
@@ -345,7 +392,9 @@ padBtns.forEach(b=>{let t=null;
 
 // ---------- Controls ----------
 $$('.modes button').forEach(b=>b.onclick=()=>{mode=b.dataset.m;if(mode!=='k')setPick(false);renderControls();renderSel()});
-padBtns.forEach(b=>b.onclick=()=>{if(b.dataset.lp){delete b.dataset.lp;return}if(mode==='k'&&pickColour){selectColour(+b.dataset.d);return}pressDigit(+b.dataset.d,b)});
+padBtns.forEach(b=>b.onclick=e=>{if(b.dataset.lp){delete b.dataset.lp;return}if(mode==='k'&&pickColour){selectColour(+b.dataset.d);return}
+ if(mode==='k'){pressColour(+b.dataset.d,!e.target.closest('.cpm.minus'),b);return}
+ pressDigit(+b.dataset.d,b)});
 actBtn.onclick=()=>mode==='k'?clearColours():erase();
 $('#bErase').onclick=erase;$('#bUndo').onclick=$('#eUndo').onclick=undo;$('#bRedo').onclick=$('#eRedo').onclick=redo;
 $('#bEdit').onclick=()=>setEditing(!editing);$('#bDone').onclick=()=>setEditing(false);
@@ -410,7 +459,7 @@ $('#items').addEventListener('click',e=>{const b=e.target.closest('button');if(!
  if(a==='open')openPuzzle(id);
  else if(a==='copy')exportDialog(p);
  else if(a==='ren'){const n=prompt('Puzzle name',p.name);if(n&&n.trim()){p.name=n.trim();saveNow();showList()}}
- else if(a==='restart'){if(confirm(`Restart "${p.name}"? Your digits, notes, colours, ruled-out combos and time will be cleared.`)){Object.assign(p,{v:Array(81).fill(0),cn:Array(81).fill(''),mn:Array(81).fill(''),col:Array.from({length:81},()=>[]),time:0,solved:false});p.cages.forEach(c=>c.elim=[]);p.groups={};if(id===curId){undoS=[];redoS=[];cellCache=Array(81).fill(null)}saveNow();showList()}}
+ else if(a==='restart'){if(confirm(`Restart "${p.name}"? Your digits, notes, colours, ruled-out combos and time will be cleared.`)){Object.assign(p,{v:Array(81).fill(0),cn:Array(81).fill(''),mn:Array(81).fill(''),col:Array.from({length:81},()=>({c:[],b:0})),time:0,solved:false});p.cages.forEach(c=>c.elim=[]);p.groups={};if(id===curId){undoS=[];redoS=[];cellCache=Array(81).fill(null)}saveNow();showList()}}
  else if(a==='del'){if(confirm(`Delete "${p.name}"? This can't be undone.`)){delete DB[id];if(!Object.keys(DB).length){const n=blankPuzzle('Untitled');DB[n.id]=n}if(id===curId){curId=Object.values(DB).sort((a,b)=>b.updated-a.updated)[0].id;P=DB[curId];undoS=[];redoS=[];cellCache=Array(81).fill(null)}saveNow();showList()}}});
 $('#bList').onclick=showList;$('#bBack').onclick=()=>{showGame();render()};
 $('#bNew').onclick=()=>{const n=prompt('Name for the new puzzle','Puzzle '+(Object.keys(DB).length+1));if(n===null)return;const p=blankPuzzle(n.trim()||'Untitled');DB[p.id]=p;openPuzzle(p.id);setEditing(true)};
