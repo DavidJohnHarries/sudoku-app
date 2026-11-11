@@ -5,9 +5,9 @@ Personal killer-sudoku solving tool (iPhone home-screen web app). Plain HTML/CSS
 Live: https://davidjohnharries.github.io/sudoku-app/
 
 ## Using it
-- **Select:** tap a cell; drag to select several; tap the only selected cell again to deselect.
+- **Select:** tap a cell; drag to select several. To deselect: tap the status line above the grid, or tap the only selected cell again after a short pause (a quick double-tap selects the cage or box instead). Number highlight, if any, stays until you tap that digit again or select a different cell.
 - **Modes:** Digit · Corner (small digits along the top/bottom edges: where a digit can go in a house) · Centre (candidates for the cell) · Colour.
-- **Number pad** toggles that digit in the current mode on all selected cells (givens are locked). Placing a digit removes it from corner/centre notes in the same row, column, box and cage.
+- **Number pad** toggles that digit in the current mode on all selected cells (givens are locked). Placing a digit removes it from corner/centre notes in the same row, column, box and cage. With no cell selected, the pad selects that number instead (see below).
 - **Colour:** up to 3 colours per cell, drawn as pie slices. A 4th colour is ignored (with a message) — remove one first. **Clear colours** (in the pad in Colour mode) removes all colours from the selected cells.
 - **Erase** clears digits first, then notes (then colours). **Undo/Redo** covers everything, including cage edits and ruled-out combos.
 - **Conflicts:** repeated digits in a row/column/box/cage turn red; a cage whose digits go over its sum, or that's full with the wrong sum, gets a red sum label.
@@ -54,3 +54,14 @@ Double-tap a cell with no cage → selects the uncaged cells of its 3x3 box; **�
 - If a cage crosses the box edge, the sum can't be worked out: type it in the calculator header (remembered).
 - Ruled-out combos and typed sums are saved per box (`box1`–`box9`) and reset automatically if cage edits change that group's cells (or its worked-out sum).
 - The combos list uses 1–3 columns so the worst case (12 combos: 4 cells/20 or 5 cells/25) fits on an iPhone SE screen; it still scrolls if ever needed.
+
+## Number selection (v4)
+Selecting a single cell that already has a digit (a given or one you placed) highlights that number:
+- Every cell that already contains it is tinted yellow (same as before).
+- Its row, column, 3×3 box, and the rest of its cage are greyed — places the digit cannot legally go. If several of that digit are placed, all of their houses are greyed.
+- Any corner or centre pencil mark of that digit is drawn bold and blue, including marks that sit in a greyed cell (so you can spot ones to clean up).
+- The matching key on the number pad lights up.
+
+With no cell selected, tapping a number key does the same highlight; tapping that key again clears it. (If a cell *is* selected, the pad still enters values or notes as before.) Number selection updates live as you place, erase, or note digits, and clears if you select an empty cell or more than one cell (multi-select, a cage, or a box). It is not used in Colour mode, where the keys are colours. On a keyboard, Esc clears the cell selection and the number highlight.
+
+To get to "no cell selected" so the pad highlights a number instead of entering it: tap the status line above the grid (the number highlight stays), or tap the selected cell again after a short pause. A quick second tap is still a double-tap and selects the cage or the uncaged cells of the box.

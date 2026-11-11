@@ -128,7 +128,7 @@ function peers(i){const s=new Set();for(let j=0;j<81;j++)if(j!==i&&(ROW(j)===ROW
 const valAt=i=>P.givens[i]||P.v[i];
 
 // ---------- UI state ----------
-let sel=new Set(),mode='v',editing=false,etab='cage',sumBuf='',editCage=-1,paused=false;
+let sel=new Set(),mode='v',editing=false,etab='cage',sumBuf='',editCage=-1,paused=false,numSel=0;
 let undoS=[],redoS=[];
 const snap=()=>JSON.stringify({gr:P.groups,g:P.givens,c:P.cages,v:P.v,cn:P.cn,mn:P.mn,col:P.col,s:P.solved});
 function restore(s){const o=JSON.parse(s);Object.assign(P,{groups:o.gr||{},givens:o.g,cages:o.c,v:o.v,cn:o.cn,mn:o.mn,col:o.col,solved:o.s})}
@@ -154,6 +154,7 @@ function computeConflicts(){bad=new Set();cageBad=new Set();
  const units=HOUSES.concat(P.cages.map(c=>c.cells));
  for(const u of units){const m={};for(const i of u){const v=valAt(i);if(v)(m[v]=m[v]||[]).push(i)}for(const k in m)if(m[k].length>1)m[k].forEach(i=>bad.add(i))}
  P.cages.forEach((c,k)=>{let s=0,f=0;for(const i of c.cells){const v=valAt(i);if(v){s+=v;f++}}if(s>c.sum||(f===c.cells.length&&s!==c.sum))cageBad.add(k)})}
+function noteMark(d){return numSel&&+d===numSel?`<span class="nh">${d}</span>`:`<span>${d}</span>`}
 function cellHTML(i){
  let h='';const v=valAt(i);
  if(P.col[i].length)h+=`<div class="bg" style="background:${pie(P.col[i])}"></div>`;
@@ -161,9 +162,9 @@ function cellHTML(i){
  if(anc!==undefined)h+=`<span class="sum${cageBad.has(anc)?' bad':''}">${P.cages[anc].sum}</span>`;
  if(v)h+=`<span class="val">${v}</span>`;
  else{
-  if(P.cn[i]){const d=[...P.cn[i]],t=Math.ceil(d.length/2),sp=a=>a.map(x=>`<span>${x}</span>`).join('');
+  if(P.cn[i]){const d=[...P.cn[i]],t=Math.ceil(d.length/2),sp=a=>a.map(noteMark).join('');
    h+=`<div class="cn${anc!==undefined?' a':''}"><div>${sp(d.slice(0,t))}</div><div>${sp(d.slice(t))}</div></div>`}
-  if(P.mn[i])h+=`<span class="mn m${P.mn[i].length}">${P.mn[i]}</span>`;
+  if(P.mn[i])h+=`<span class="mn m${P.mn[i].length}">${[...P.mn[i]].map(noteMark).join('')}</span>`;
  }
  return h}
 let cellCache=Array(81).fill(null);
@@ -183,14 +184,31 @@ function renderLines(){
  $('#lines').innerHTML=g}
 function selGroup(){if(!sel.size)return null;const b=BOX([...sel][0]);const G=groupOf(P,b);if(!G||G.cells.length!==sel.size||!G.cells.every(i=>sel.has(i)))return null;return G}
 function selCage(){if(!sel.size)return -1;const ks=cagesOf[[...sel][0]];for(const k of ks)if([...sel].every(i=>cagesOf[i].includes(k)))return k;return -1}
+// Number selection (digit highlight): numSel is 1–9 or 0.
+// A single selected cell that has a placed digit (given or user) sets numSel to that digit.
+// Multi-select or a single empty cell clears it. An empty selection leaves it alone, so
+// you can deselect the cell and keep studying that digit, or set it from the pad.
+function syncNumSel(){
+ if(editing)numSel=0;
+ else if(sel.size===1)numSel=valAt([...sel][0])||0;
+ else if(sel.size>1)numSel=0}
+function blockedCells(){const s=new Set();if(!numSel)return s;
+ for(let i=0;i<81;i++)if(valAt(i)===numSel){
+  for(let j=0;j<81;j++)if(j!==i&&(ROW(j)===ROW(i)||COL(j)===COL(i)||BOX(j)===BOX(i)))s.add(j);
+  for(const k of cagesOf[i])for(const j of P.cages[k].cells)if(j!==i)s.add(j)}
+ for(let i=0;i<81;i++)if(valAt(i)===numSel)s.delete(i);return s}
+let paintedNum=-1;
 function renderSel(){
- const one=sel.size===1?valAt([...sel][0]):0;
- for(let i=0;i<81;i++){cells[i].classList.toggle('sel',sel.has(i));cells[i].classList.toggle('same',!!one&&valAt(i)===one)}
+ syncNumSel();
+ if(paintedNum!==numSel){renderCells();paintedNum=numSel}
+ const blocked=blockedCells();
+ for(let i=0;i<81;i++){cells[i].classList.toggle('sel',sel.has(i));cells[i].classList.toggle('same',!!numSel&&valAt(i)===numSel);cells[i].classList.toggle('blocked',blocked.has(i))}
+ padBtns.forEach((b,k)=>b.classList.toggle('nsel',mode!=='k'&&!editing&&numSel===k+1));
  if(editing){$('#bPick').classList.add('hidden');$('#infoTxt').textContent=sel.size?`${sel.size} cell${sel.size>1?'s':''} selected`:'Drag across cells to make a cage';$('#bCalc').classList.add('hidden');return}
  $('#bCalc').classList.toggle('hidden',!FEATURES.calculator||mode==='k');$('#bPick').classList.toggle('hidden',mode!=='k');
  const k=selCage(),G=k<0?selGroup():null;
  if(G){$('#infoTxt').textContent=`Box ${G.b+1} uncaged · ${G.cells.length} cell${G.cells.length>1?'s':''} · sum ${G.sum||'?'}`;$('#bCalc').disabled=false}
- else if(k<0){$('#infoTxt').textContent=sel.size?'No cage selected':'Tap a cell to select';$('#bCalc').disabled=true}
+ else if(k<0){$('#infoTxt').textContent=sel.size?'No cage selected':(numSel?`Number ${numSel} — tap ${numSel} again to clear`:'Tap a cell to select');$('#bCalc').disabled=true}
  else{const c=P.cages[k];$('#infoTxt').textContent=`Cage ${c.sum} · ${c.cells.length} cell${c.cells.length>1?'s':''}`;$('#bCalc').disabled=false}
 }
 function renderControls(){
@@ -207,7 +225,7 @@ function renderControls(){
  $('#bUndo').disabled=$('#eUndo').disabled=!undoS.length;$('#bRedo').disabled=$('#eRedo').disabled=!redoS.length;
  $('#pname').textContent=P.name;
 }
-function render(){indexCages();renderCells();renderLines();renderSel();renderControls();if(editing)renderWarn();checkSolved()}
+function render(){indexCages();syncNumSel();renderCells();paintedNum=numSel;renderLines();renderSel();renderControls();if(editing)renderWarn();checkSolved()}
 
 // ---------- Cage validation ----------
 const minSum=n=>n*(n+1)/2,maxSum=n=>n*(19-n)/2;
@@ -229,6 +247,8 @@ const editable=()=>[...sel].filter(i=>!P.givens[i]);
 function nudge(el){el.classList.remove('nudge');void el.offsetWidth;el.classList.add('nudge')}
 function toast(m){$$('.toast').forEach(x=>x.remove());const d=document.createElement('div');d.className='toast';d.textContent=m;document.body.appendChild(d);setTimeout(()=>d.remove(),1600)}
 function pressDigit(d,el){
+ // No cell selected (and not in Colour mode): the pad selects / toggles that number's highlight.
+ if(!editing&&!sel.size&&mode!=='k'){numSel=numSel===d?0:d;render();return}
  const cs=editable();if(!cs.length){if(el)nudge(el);return}
  act(()=>{
   if(mode==='v'){const all=cs.every(i=>P.v[i]===d);
@@ -276,7 +296,7 @@ grid.addEventListener('touchstart',e=>e.preventDefault(),{passive:false});
 document.addEventListener('dblclick',e=>e.preventDefault(),{passive:false});
 document.addEventListener('touchmove',e=>{if(e.touches.length>1)e.preventDefault()},{passive:false});
 let lastTE=0;document.addEventListener('touchend',e=>{const now=Date.now();
- if(now-lastTE<400&&!e.target.closest('textarea,input')){e.preventDefault();const b=e.target.closest('button,.combo');if(b&&!b.disabled&&!b.dataset.lp)b.click()}
+ if(now-lastTE<400&&!e.target.closest('textarea,input')){e.preventDefault();const b=e.target.closest('button,.combo,#infoTxt');if(b&&!b.disabled&&!b.dataset.lp)b.click()}
  lastTE=now},{passive:false});
 
 // ---------- Multi-select + select-by-colour ----------
@@ -285,6 +305,8 @@ $('#bMulti').onclick=()=>setMulti(!multi);
 let pickColour=false;
 function setPick(on){pickColour=on;$('#bPick').classList.toggle('on',on);$('#bPick').textContent=on?'Tap a colour…':'◎ Select colour';pad.classList.toggle('picking',on)}
 $('#bPick').onclick=()=>setPick(!pickColour);
+// Tap the status line to drop the cell selection (number highlight stays). A quick second tap on a cell is a double-tap (cage/box), so this is the reliable way to get to 'no cell selected' without waiting 350ms.
+$('#infoTxt').addEventListener('click',()=>{if(editing||!sel.size)return;sel.clear();renderSel()});
 const CNAMES=['red','orange','yellow','green','teal','blue','purple','pink','grey'];
 function selectColour(d){const hit=[];for(let i=0;i<81;i++)if(P.col[i].includes(d))hit.push(i);
  sel=new Set([...(multi?sel:[]),...hit]);setPick(false);if(!hit.length)toast(`No ${CNAMES[d-1]} cells`);renderSel()}
@@ -350,7 +372,7 @@ $('#timer').onclick=()=>{paused=!paused;$('#timer').classList.toggle('paused',pa
 document.addEventListener('visibilitychange',()=>{if(document.hidden)saveNow();lastTick=Date.now()});
 
 // ---------- Puzzle list, import / export ----------
-function openPuzzle(id){saveNow();curId=id;P=DB[id];undoS=[];redoS=[];sel.clear();editing=false;editCage=-1;paused=false;cellCache=Array(81).fill(null);SV('sdk_cur',curId);showGame();render()}
+function openPuzzle(id){saveNow();curId=id;P=DB[id];undoS=[];redoS=[];sel.clear();numSel=0;editing=false;editCage=-1;paused=false;cellCache=Array(81).fill(null);SV('sdk_cur',curId);showGame();render()}
 function showGame(){$('#list').classList.add('hidden');$('#game').classList.remove('hidden')}
 function progress(p){let f=0,g=0;for(let i=0;i<81;i++){if(p.givens[i])g++;else if(p.v[i])f++}return Math.round(100*(f+g)/81)}
 function showList(){saveNow();$('#game').classList.add('hidden');$('#list').classList.remove('hidden');
@@ -382,6 +404,7 @@ function exportDialog(p){
 // ---------- Keyboard (handy on a Mac/iPad keyboard) ----------
 document.addEventListener('keydown',e=>{if(!$('#modal').classList.contains('hidden')||!$('#list').classList.contains('hidden'))return;
  if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='z'){e.preventDefault();e.shiftKey?redo():undo();return}
+ if(e.key==='Escape'&&!editing){e.preventDefault();sel.clear();numSel=0;render();return}
  if(/^[1-9]$/.test(e.key)&&!editing){pressDigit(+e.key);return}
  if((e.key==='Backspace'||e.key==='Delete')&&!editing){erase();return}
  const m={z:'v',x:'c',c:'m',v:'k'}[e.key];if(m&&!editing){mode=m;if(m!=='k')setPick(false);renderControls();renderSel();return}
