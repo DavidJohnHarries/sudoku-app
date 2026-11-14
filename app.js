@@ -309,6 +309,7 @@ function pressDigit(d,el){
  const cs=editable();if(!cs.length){if(el)nudge(el);return}
  act(()=>{
   if(mode==='v'){const all=cs.every(i=>P.v[i]===d);
+   if(!all)lastPlace=cs[cs.length-1];
    for(const i of cs){if(all)P.v[i]=0;else{P.v[i]=d;for(const j of peers(i)){P.cn[j]=P.cn[j].replace(String(d),'');P.mn[j]=P.mn[j].replace(String(d),'')}}}
    numSel=0;tapSeq.cell=-1} // placing does not enter number-highlight mode; break any pending double-tap
   else if(mode==='c'||mode==='m'){const A=mode==='c'?P.cn:P.mn,t=cs.filter(i=>!P.v[i]);if(!t.length)return;const all=t.every(i=>A[i].includes(d));
@@ -339,7 +340,57 @@ function pressColour(d,add,el){
 function erase(){const cs=editable();if(mode==='k'){clearColours();return}
  act(()=>{if(cs.some(i=>P.v[i]))cs.forEach(i=>P.v[i]=0);else if(cs.some(i=>P.cn[i]||P.mn[i]))cs.forEach(i=>{P.cn[i]='';P.mn[i]=''});else [...sel].forEach(i=>P.col[i]={c:[],b:0})})}
 function clearColours(){act(()=>[...sel].forEach(i=>P.col[i]={c:[],b:0}))}
-function checkSolved(){if(P.solved||editing)return;for(let i=0;i<81;i++)if(!valAt(i)||solWrong(i))return;if(bad.size||cageBad.size)return;P.solved=true;save();toast('Solved! 🎉 '+fmtT(P.time))}
+let lastPlace=40,celebT=0,celebRAF=0;
+function reducedMotion(){return window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches}
+function checkSolved(){if(P.solved||editing)return;for(let i=0;i<81;i++)if(!valAt(i)||solWrong(i))return;if(bad.size||cageBad.size)return;P.solved=true;save();celebrate()}
+function endCeleb(){
+ clearTimeout(celebT);if(celebRAF)cancelAnimationFrame(celebRAF);celebRAF=0;
+ grid.classList.remove('celeb-wave');cells.forEach(c=>c.style.removeProperty('--wave'));
+ const fx=$('#celebFx');if(fx){const c=fx.getContext('2d');c&&c.clearRect(0,0,fx.width,fx.height)}
+ const el=$('#celeb');if(!el)return;el.classList.add('hidden');el.classList.remove('shown','card-on');el.setAttribute('aria-hidden','true')}
+function startConfetti(){
+ const canvas=$('#celebFx');if(!canvas)return;const ctx=canvas.getContext('2d');
+ const rec=canvas.getBoundingClientRect(),dpr=Math.min(window.devicePixelRatio||1,2);
+ canvas.width=Math.max(1,rec.width*dpr);canvas.height=Math.max(1,rec.height*dpr);
+ ctx.setTransform(dpr,0,0,dpr,0,0);
+ const w=rec.width,h=rec.height;
+ const g=grid.getBoundingClientRect();
+ const ox=g.left-rec.left+g.width/2,oy=g.top-rec.top+g.height/2;
+ const cols=['#1e3a8a','#f59e0b','#fde68a','#2563eb','#ffffff','#b91c1c','#93c5fd'];
+ const parts=[];
+ for(let i=0;i<90;i++){
+  const a=-Math.PI/2+(Math.random()-.5)*Math.PI,sp=7+Math.random()*11;
+  parts.push({x:ox+(Math.random()-.5)*36,y:oy+(Math.random()-.5)*18,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp-2,w:4+Math.random()*4,h:6+Math.random()*7,rot:Math.random()*Math.PI,vr:(Math.random()-.5)*.28,col:cols[i%cols.length]});
+ }
+ const t0=performance.now();
+ const tick=t=>{
+  const age=(t-t0)/2200;ctx.clearRect(0,0,w,h);
+  for(const p of parts){
+   p.vy+=0.18;p.x+=p.vx;p.y+=p.vy;p.rot+=p.vr;p.vx*=0.995;
+   const a=age<0.7?1:Math.max(0,1-(age-0.7)/0.3);if(a<=0)continue;
+   ctx.save();ctx.translate(p.x,p.y);ctx.rotate(p.rot);ctx.globalAlpha=a;ctx.fillStyle=p.col;ctx.fillRect(-p.w/2,-p.h/2,p.w,p.h);ctx.restore();
+  }
+  if(age<1)celebRAF=requestAnimationFrame(tick);else{ctx.clearRect(0,0,w,h);celebRAF=0}
+ };
+ celebRAF=requestAnimationFrame(tick)}
+function celebrate(){
+ sel.clear();numSel=0;renderSel();
+ const el=$('#celeb');if(!el)return;
+ const showCard=()=>{
+  $('#celebName').textContent=P.name||'Puzzle';
+  const msgs=['Nice.','Beautifully done.','A clean finish.','Well spotted.','That was a good one.'];
+  $('#celebMsg').textContent=msgs[Math.abs((P.time|0)+lastPlace)%msgs.length];
+  $('#celebTime').textContent=fmtT(P.time);
+  el.classList.add('shown','card-on');
+ };
+ el.classList.remove('hidden');el.setAttribute('aria-hidden','false');
+ if(reducedMotion()){el.classList.add('shown');showCard();return}
+ const or=ROW(lastPlace),oc=COL(lastPlace);let max=0;
+ for(let i=0;i<81;i++){const d=Math.max(Math.abs(ROW(i)-or),Math.abs(COL(i)-oc));cells[i].style.setProperty('--wave',(d*55)+'ms');if(d>max)max=d}
+ grid.classList.add('celeb-wave');startConfetti();
+ celebT=setTimeout(showCard,max*55+750)}
+$('#celebClose').onclick=()=>endCeleb();
+$('#celebList').onclick=()=>{endCeleb();showList()};
 
 // ---------- Grid pointer: tap / drag select, double/triple tap, multi-select ----------
 // Single tap acts instantly; a 2nd tap on the same cell within 350ms upgrades to the cage (or box if no cage),
@@ -467,7 +518,7 @@ document.addEventListener('visibilitychange',()=>{if(document.hidden)saveNow();l
 function openPuzzle(id){saveNow();curId=id;P=DB[id];undoS=[];redoS=[];sel.clear();numSel=0;editing=false;editCage=-1;paused=false;cellCache=Array(81).fill(null);SV('sdk_cur',curId);showGame();render()}
 function showGame(){$('#list').classList.add('hidden');$('#game').classList.remove('hidden')}
 function progress(p){let f=0,g=0;for(let i=0;i<81;i++){if(p.givens[i])g++;else if(p.v[i])f++}return Math.round(100*(f+g)/81)}
-function showList(){saveNow();$('#game').classList.add('hidden');$('#list').classList.remove('hidden');
+function showList(){endCeleb();saveNow();$('#game').classList.add('hidden');$('#list').classList.remove('hidden');
  const ps=Object.values(DB).sort((a,b)=>b.updated-a.updated);
  $('#items').innerHTML=ps.map(p=>`<div class="item${p.id===curId?' cur':''}" data-id="${p.id}"><div class="t">${esc(p.name)}</div><div class="s">${p.solved?'Solved ✓':progress(p)+'% filled'} · ${fmtT(p.time)} · ${p.cages.length} cages · ${new Date(p.updated).toLocaleDateString('en-US',{month:'short',day:'numeric'})}</div>
  <div class="r"><button class="open" data-a="open">Open</button><button data-a="copy">Copy</button><button data-a="ren">Rename</button><button data-a="restart">Restart</button><button class="del" data-a="del">Delete</button></div></div>`).join('')}
@@ -494,7 +545,7 @@ function exportDialog(p){
  $('#xP').onclick=()=>go(false);$('#xS').onclick=()=>go(true);$('#xOut').value=exportPuzzle(p,false)}
 
 // ---------- Keyboard (handy on a Mac/iPad keyboard) ----------
-document.addEventListener('keydown',e=>{if(!$('#modal').classList.contains('hidden')||!$('#list').classList.contains('hidden'))return;
+document.addEventListener('keydown',e=>{if(!$('#celeb').classList.contains('hidden')){if(e.key==='Escape'){e.preventDefault();endCeleb()}return}if(!$('#modal').classList.contains('hidden')||!$('#list').classList.contains('hidden'))return;
  if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='z'){e.preventDefault();e.shiftKey?redo():undo();return}
  if(e.key==='Escape'&&!editing){e.preventDefault();sel.clear();numSel=0;render();return}
  if(/^[1-9]$/.test(e.key)&&!editing){pressDigit(+e.key);return}

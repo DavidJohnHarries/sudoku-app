@@ -95,3 +95,26 @@ header{display:flex;align-items:center;gap:6px;height:50px}
 .pad.hlmode button:not(.act)::after{content:'Highlight';display:block;font-size:9px;font-weight:700;letter-spacing:0;margin-top:2px;text-transform:none}
 .pad.hlmode button.nsel{background:#1e3a8a;color:#fff;box-shadow:0 0 0 2px #93c5fd}
 .pad.hlmode.nmode button:not(.act){font-size:18px}
+
+/* Solved celebration (v10): ripple from the last-placed cell, glowing digits, then a card. */
+#celeb{position:fixed;inset:0;z-index:40;display:flex;align-items:flex-end;justify-content:center;padding:16px 16px calc(20px + env(safe-area-inset-bottom));background:transparent;transition:background .35s ease}
+#celeb.card-on{background:rgba(17,24,39,.38)}
+#celebFx{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+.celeb-card{position:relative;background:#fff;border-radius:20px;padding:22px 20px 16px;width:100%;max-width:340px;text-align:center;box-shadow:0 18px 50px rgba(0,0,0,.22);opacity:0;transform:translateY(16px) scale(.97)}
+#celeb.card-on .celeb-card{animation:celebIn .45s cubic-bezier(.2,.8,.2,1) forwards}
+@keyframes celebIn{to{opacity:1;transform:none}}
+.celeb-kicker{font-size:12px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:#b45309;margin-bottom:6px}
+.celeb-card h2{margin:0 0 6px;font-size:24px;line-height:1.2}
+.celeb-msg{margin:0 0 12px;font-size:17px;color:#374151}
+.celeb-time{font-variant-numeric:tabular-nums;font-size:28px;font-weight:700;color:#1e3a8a;margin:0 0 16px}
+.celeb-card .r{display:flex;gap:8px}.celeb-card .r button{flex:1}
+
+#grid.celeb-wave .cell{animation:cellRipple .6s ease both;animation-delay:var(--wave,0s)}
+@keyframes cellRipple{0%,100%{box-shadow:inset 0 0 0 0 transparent}40%{box-shadow:inset 0 0 0 50px rgba(253,230,138,.75)}}
+#grid.celeb-wave .cell .val{animation:digitGlow .7s ease both;animation-delay:var(--wave,0s)}
+@keyframes digitGlow{0%,100%{transform:scale(1);filter:none}40%{transform:scale(1.16);color:#b45309;filter:drop-shadow(0 0 5px #f59e0b)}}
+
+@media (prefers-reduced-motion:reduce){
+  #grid.celeb-wave .cell,#grid.celeb-wave .cell .val{animation:none}
+  #celeb.card-on .celeb-card{animation:none;opacity:1;transform:none}
+}

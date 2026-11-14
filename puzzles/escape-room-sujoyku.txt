@@ -1,0 +1,26 @@
+SUDOKU v1
+name Escape Room
+# Author: sujoyku
+# Source: https://logic-masters.de/Raetselportal/Raetsel/zeigen.php?chlang=en&id=000J9E
+# Play: https://sudokupad.app/hu2inqymo8
+# f-puzzles: https://f-puzzles.com/?id=26359562
+# Published 8 Aug 2024 on Logic Masters Deutschland. Author rated 3★; several solvers
+# described a well-hidden break-in and rated it closer to 4★ (TheNineElements 52:22).
+# Sparse killer: 15 cages covering 40 cells, no givens, plain killer rules only.
+givens .................................................................................
+solution 348769512 179258364 562341789 985472136 417693825 623815497 794136258 851927643 236584971
+cage 21 r1c3 r1c4 r1c5
+cage 22 r1c6 r1c7 r2c6
+cage 7 r1c8 r2c8
+cage 8 r2c1 r2c2
+cage 12 r2c5 r3c5 r3c6 r4c6
+cage 8 r3c2 r3c3
+cage 12 r4c3 r5c3
+cage 11 r4c7 r4c8 r5c8 r5c9
+cage 10 r5c1 r5c2 r6c2 r6c3
+cage 12 r5c7 r6c7
+cage 7 r7c7 r7c8
+cage 20 r8c4 r9c3 r9c4
+cage 8 r8c2 r9c2
+cage 7 r8c8 r8c9
+cage 21 r9c5 r9c6 r9c7

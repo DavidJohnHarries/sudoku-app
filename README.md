@@ -90,3 +90,8 @@ Tapping the already-selected cell now also clears the number highlight (the v7 b
 
 ## Place digit without highlight (v9)
 Selecting a cell and placing a digit leaves the cell selected, but does not turn on number highlight (grey houses and amber cells). Tap that same cell again to turn highlight on for the digit; tap it again to deselect and clear highlight, as in v8. Highlight still turns on when you tap a cell that already has a given or placed digit, or when you tap a pad key with no cell selected. Placing a digit on several cells at once also stays out of highlight mode.
+
+## Solved celebration and a harder puzzle (v10)
+Finishing a puzzle no longer shows a brief toast. A gold ripple spreads across the grid from the last digit you placed, the digits glow, and a short burst of confetti falls; then a card names the puzzle, shows your time, and offers a short "Nice."-style line, with **Close** and **Puzzle list**. The animation is skipped when the device asks for reduced motion (the card still appears). Opening an already-solved puzzle does not replay it.
+
+A published hard killer is in `puzzles/escape-room-sujoyku.txt` — *Escape Room* by sujoyku (Logic Masters Deutschland, 8 Aug 2024). Plain killer rules, no givens, only 15 cages. Paste it in from the puzzle list.
