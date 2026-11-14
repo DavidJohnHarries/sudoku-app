@@ -238,14 +238,14 @@ function selInfoText(){
  return `Total ${t.sum} (${t.n} cell${t.n>1?'s':''})  ${near45(t.sum)}`}
 function fitInfo(){const el=$('#infoTxt');el.style.fontSize='';let fs=15;while(el.scrollWidth>el.clientWidth&&fs>11){fs--;el.style.fontSize=fs+'px'}}
 // Number selection (digit highlight): numSel is 1–9 or 0.
-// A single selected cell that has a placed digit (given or user) sets numSel to that digit.
-// Multi-select or a single empty cell clears it. Tapping the already-selected cell also
-// clears numSel (grid back to normal). An empty selection from the status line or from
-// the pad leaves numSel alone, so you can study a digit with no cell selected.
+// It turns on when you tap a cell that already has a given or placed digit, when you
+// tap the already-selected cell after placing a digit, or when you tap a pad key with
+// no cell selected. Placing a digit into a selected cell does not turn it on.
+// Multi-select or a single empty cell clears it. An empty selection from the status
+// line or the pad leaves numSel alone.
 function syncNumSel(){
- if(editing)numSel=0;
- else if(sel.size===1)numSel=valAt([...sel][0])||0;
- else if(sel.size>1)numSel=0}
+ if(editing||sel.size>1)numSel=0;
+ else if(sel.size===1&&!valAt([...sel][0]))numSel=0}
 function blockedCells(){const s=new Set();if(!numSel)return s;
  for(let i=0;i<81;i++)if(valAt(i)===numSel){
   for(let j=0;j<81;j++)if(j!==i&&(ROW(j)===ROW(i)||COL(j)===COL(i)||BOX(j)===BOX(i)))s.add(j);
@@ -309,9 +309,11 @@ function pressDigit(d,el){
  const cs=editable();if(!cs.length){if(el)nudge(el);return}
  act(()=>{
   if(mode==='v'){const all=cs.every(i=>P.v[i]===d);
-   for(const i of cs){if(all)P.v[i]=0;else{P.v[i]=d;for(const j of peers(i)){P.cn[j]=P.cn[j].replace(String(d),'');P.mn[j]=P.mn[j].replace(String(d),'')}}}}
+   for(const i of cs){if(all)P.v[i]=0;else{P.v[i]=d;for(const j of peers(i)){P.cn[j]=P.cn[j].replace(String(d),'');P.mn[j]=P.mn[j].replace(String(d),'')}}}
+   numSel=0;tapSeq.cell=-1} // placing does not enter number-highlight mode; break any pending double-tap
   else if(mode==='c'||mode==='m'){const A=mode==='c'?P.cn:P.mn,t=cs.filter(i=>!P.v[i]);if(!t.length)return;const all=t.every(i=>A[i].includes(d));
-   for(const i of t){const s=new Set(A[i]);all?s.delete(String(d)):s.add(String(d));A[i]=[...s].sort().join('')}}
+   for(const i of t){const s=new Set(A[i]);all?s.delete(String(d)):s.add(String(d));A[i]=[...s].sort().join('')}
+   tapSeq.cell=-1}
  })}
 // Colour pad: '+' adds a new colour (unboosted) or boosts one already in the cell (moving any existing boost).
 // '+' on an already-boosted colour does nothing. '−' un-boosts a boosted colour, or removes an unboosted one.
@@ -349,16 +351,19 @@ function cellAt(x,y){const r=grid.getBoundingClientRect();const c=Math.floor((x-
 grid.addEventListener('pointerdown',e=>{const i=cellAt(e.clientX,e.clientY);if(i<0)return;e.preventDefault();
  const add=multi||e.shiftKey||e.metaKey||e.ctrlKey;const now=Date.now();
  const rep=!editing&&tapSeq.cell===i&&now-tapSeq.t<350;
- // Tap an already-selected single cell (not Multi, not editing): deselect immediately and
- // clear the number highlight so the grid returns to normal. A second tap within 350ms is
- // still a double-tap (cage/box). To study a digit with no cell selected, use the pad.
+ // Tap an already-selected single cell (not Multi, not editing):
+ //  • if it has a digit and number-highlight is off → turn highlight on, stay selected
+ //  • otherwise deselect and clear highlight (grid back to normal)
+ // A second tap within 350ms is still a double-tap (cage/box).
  const already=!editing&&!add&&sel.size===1&&sel.has(i);
  if(!rep)tapSeq={cell:i,t:now,n:0,base:new Set(sel)};
  gp={id:e.pointerId,start:i,moved:false,wasOnly:sel.size===1&&sel.has(i),wasSel:sel.has(i),add,rep,already};
  try{grid.setPointerCapture(e.pointerId)}catch(_){}
  if(rep)return; // upgrade happens on pointerup
- if(already){sel.clear();numSel=0;renderSel();return}
- if(!add)sel=new Set();sel.add(i);renderSel()});
+ if(already){const v=valAt(i);if(v&&numSel!==v){numSel=v;renderSel();return}sel.clear();numSel=0;renderSel();return}
+ if(!add)sel=new Set();sel.add(i);
+ if(!editing&&!add)numSel=valAt(i)||0; // selecting a cell that already has a digit turns highlight on
+ renderSel()});
 grid.addEventListener('pointermove',e=>{if(!gp||e.pointerId!==gp.id)return;const i=cellAt(e.clientX,e.clientY);if(i<0||i===gp.last)return;gp.last=i;if(i!==gp.start){gp.moved=true;tapSeq.cell=-1}if(!sel.has(i)){sel.add(i);renderSel()}});
 function endGP(e){if(!gp||(e&&e.pointerId!=null&&e.pointerId!==gp.id))return;const g=gp;gp=null;
  if(g.moved){if(editing&&editCage>=0){editCage=-1;sumBuf='';renderLines();renderControls()}renderSel();return}
