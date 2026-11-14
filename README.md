@@ -5,7 +5,7 @@ Personal killer-sudoku solving tool (iPhone home-screen web app). Plain HTML/CSS
 Live: https://davidjohnharries.github.io/sudoku-app/
 
 ## Using it
-- **Select:** tap a cell; drag to select several. Tap the only selected cell again to deselect (works for empty, placed, and given cells). A second tap within the double-tap window still selects the cage or box. You can also tap the status line above the grid. If you deselect a cell that had a digit, the number highlight stays so the pad can keep studying that digit.
+- **Select:** tap a cell; drag to select several. Tap the only selected cell again to deselect (works for empty, placed, and given cells) and clear any number highlight so the grid looks normal again. A second tap within the double-tap window still selects the cage or box. You can also tap the status line above the grid (that leaves a number highlight in place, if any).
 - **Modes:** Digit · Corner (small digits along the top/bottom edges: where a digit can go in a house) · Centre (candidates for the cell) · Colour.
 - **Number pad** toggles that digit in the current mode on all selected cells (givens are locked). Placing a digit removes it from corner/centre notes in the same row, column, box and cage. With no cell selected, the keys switch to an outlined **Highlight** style and tap a number to study it rather than enter it (see below).
 - **Colour:** up to 3 colours per cell, drawn as pie slices in a fixed palette order (red before orange before yellow, and so on). At most one colour may be **boosted** so it takes 2/3 of the pie; the others share the remaining 1/3 equally (two colours: 2/3 + 1/3; three: 2/3 + 1/6 + 1/6). With no boost the shares are equal. In Colour mode each colour key is split: **+** on the right adds that colour, or boosts it if it's already in the cell (moving the boost off any other colour); **−** on the left un-boosts a boosted colour, or removes an unboosted one. A 4th colour is ignored (with a message) — remove one first. **Clear colours** removes all colours from the selected cells.
@@ -67,7 +67,7 @@ Selecting a single cell that already has a digit (a given or one you placed) hig
 
 With no cell selected, tapping a number key does the same highlight; tapping that key again clears it. (If a cell *is* selected, the pad still enters values or notes as before.) Number selection updates live as you place, erase, or note digits, and clears if you select an empty cell or more than one cell (multi-select, a cage, or a box). It is not used in Colour mode, where the keys are colours. On a keyboard, Esc clears the cell selection and the number highlight.
 
-To get to "no cell selected" so the pad highlights a number instead of entering it: tap the selected cell once (the number highlight stays if that cell had a digit), or tap the status line above the grid. A second tap on the same cell within 350ms is still a double-tap and selects the cage or the uncaged cells of the box. With nothing selected, the pad keys are outlined and labelled **Highlight** so a tap will not accidentally place a note.
+To study a number with no cell selected, first deselect (tap the selected cell, or the status line), then tap a digit on the pad — the keys are outlined and labelled **Highlight** so a tap will not accidentally place a note. Tapping the selected cell also clears any number highlight. Tapping the status line leaves a highlight in place, if any. A second tap on the same cell within 350ms is still a double-tap and selects the cage or the uncaged cells of the box.
 
 ## Selection totals and multi double-tap (v5)
 - **Status line:** for any selection, **Total** adds every *fully* selected cage's sum, plus the known sum of every fully selected uncaged group (the worked-out 45 − cage-sums value, or a sum you typed in the calculator), plus the placed digit (given or yours) of any other selected cell. The cell count is how many cells are selected. If any selected cell can't be accounted for (an empty cell in a cage that's only partly selected, or an empty uncaged cell whose group has no known sum), the total is hidden and you just see e.g. `12 cells`. Combos still opens from any cell of a single cage — double-tap to select the whole cage if you want its printed sum in the total.
@@ -80,7 +80,10 @@ To get to "no cell selected" so the pad highlights a number instead of entering 
 - Keyboard 1–9 in Colour mode acts as **+**. There is no keyboard **−**; use the left half of the key, or Clear colours.
 
 ## Deselect, number highlight, solution (v7)
-- Tapping the already-selected cell deselects it immediately, including when it holds a given or a digit you placed. A second tap within the double-tap window still selects the cage (or the uncaged cells of the box).
-- Deselecting a cell that has a digit leaves that number highlighted, so you can keep studying it from the pad. Tap the lit key (or an empty cell) to clear the highlight.
+- Tapping the already-selected cell deselects it immediately, including when it holds a given or a digit you placed, and clears the number highlight so the grid is back to normal. A second tap within the double-tap window still selects the cage (or the uncaged cells of the box).
+- To highlight a number with no cell selected, tap it on the pad (the keys show **Highlight**). Tapping the status line deselects cells but leaves a highlight in place, if any.
 - Number-highlight greys are a little darker than before. Every cell that contains the number, or a pencil mark of it, has a whole-cell amber tint (stronger when the number is placed).
 - Optional `solution` line (81 digits, same layout as `givens`). It is part of the puzzle and is included in both Copy puzzle and Copy with progress. A user-placed digit that doesn't match is red; givens are not checked this way.
+
+## Deselect clears highlight (v8)
+Tapping the already-selected cell now also clears the number highlight (the v7 behaviour of leaving it on made the grid still look selected). Pad highlight — no cell selected, then tap a digit — is unchanged.

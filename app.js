@@ -239,8 +239,9 @@ function selInfoText(){
 function fitInfo(){const el=$('#infoTxt');el.style.fontSize='';let fs=15;while(el.scrollWidth>el.clientWidth&&fs>11){fs--;el.style.fontSize=fs+'px'}}
 // Number selection (digit highlight): numSel is 1–9 or 0.
 // A single selected cell that has a placed digit (given or user) sets numSel to that digit.
-// Multi-select or a single empty cell clears it. An empty selection leaves it alone, so
-// you can deselect the cell and keep studying that digit, or set it from the pad.
+// Multi-select or a single empty cell clears it. Tapping the already-selected cell also
+// clears numSel (grid back to normal). An empty selection from the status line or from
+// the pad leaves numSel alone, so you can study a digit with no cell selected.
 function syncNumSel(){
  if(editing)numSel=0;
  else if(sel.size===1)numSel=valAt([...sel][0])||0;
@@ -348,14 +349,15 @@ function cellAt(x,y){const r=grid.getBoundingClientRect();const c=Math.floor((x-
 grid.addEventListener('pointerdown',e=>{const i=cellAt(e.clientX,e.clientY);if(i<0)return;e.preventDefault();
  const add=multi||e.shiftKey||e.metaKey||e.ctrlKey;const now=Date.now();
  const rep=!editing&&tapSeq.cell===i&&now-tapSeq.t<350;
- // Tap an already-selected single cell (not Multi, not editing): deselect immediately so the
- // pad switches to highlight style. A second tap within 350ms is still a double-tap (cage/box).
+ // Tap an already-selected single cell (not Multi, not editing): deselect immediately and
+ // clear the number highlight so the grid returns to normal. A second tap within 350ms is
+ // still a double-tap (cage/box). To study a digit with no cell selected, use the pad.
  const already=!editing&&!add&&sel.size===1&&sel.has(i);
  if(!rep)tapSeq={cell:i,t:now,n:0,base:new Set(sel)};
  gp={id:e.pointerId,start:i,moved:false,wasOnly:sel.size===1&&sel.has(i),wasSel:sel.has(i),add,rep,already};
  try{grid.setPointerCapture(e.pointerId)}catch(_){}
  if(rep)return; // upgrade happens on pointerup
- if(already){sel.clear();renderSel();return}
+ if(already){sel.clear();numSel=0;renderSel();return}
  if(!add)sel=new Set();sel.add(i);renderSel()});
 grid.addEventListener('pointermove',e=>{if(!gp||e.pointerId!==gp.id)return;const i=cellAt(e.clientX,e.clientY);if(i<0||i===gp.last)return;gp.last=i;if(i!==gp.start){gp.moved=true;tapSeq.cell=-1}if(!sel.has(i)){sel.add(i);renderSel()}});
 function endGP(e){if(!gp||(e&&e.pointerId!=null&&e.pointerId!==gp.id))return;const g=gp;gp=null;
