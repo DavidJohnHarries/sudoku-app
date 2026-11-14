@@ -32,6 +32,8 @@ colour r5c5 1 4               # colour numbers 1-9, up to 3, in palette order; 1
 elim r3c7 12479 12389          # ruled-out combos for the cage whose top-left cell is r3c7
 elim box5 1259                 # ruled-out combos for box 5's uncaged cells
 groupsum box5 23               # typed sum for box 5's uncaged cells (only when it can't be worked out)
+linesum 16 r1c1 r1c3 r1c5      # typed sum for an exact row/column cell set (Copy with progress)
+elim line r1c1 r1c3 r1c5 259   # ruled-out combos for that same line selection
 time 754                       # seconds on the clock
 solved
 ```
@@ -67,7 +69,7 @@ Selecting a single cell that already has a digit (a given or one you placed) hig
 
 With no cell selected, tapping a number key does the same highlight; tapping that key again clears it. (If a cell *is* selected, the pad still enters values or notes as before.) Number selection updates live as you place, erase, or note digits, and clears if you select an empty cell or more than one cell (multi-select, a cage, or a box). It is not used in Colour mode, where the keys are colours. On a keyboard, Esc clears the cell selection and the number highlight.
 
-Number highlight turns on when you tap a cell that already has a digit, when you tap the still-selected cell after placing a digit, or when you tap a pad key with no cell selected (the keys are outlined and labelled **Highlight**). It does not turn on merely from placing a digit. If highlight is already on, tapping the selected cell deselects and clears it. Tapping the status line deselects but leaves a highlight in place, if any. A second tap on the same cell within 350ms is still a double-tap and selects the cage or the uncaged cells of the box.
+Number highlight turns on when you tap a cell that already has a digit, when you tap the still-selected cell after placing a digit, or when you tap a pad key with no cell selected (the keys are outlined and labelled **Highlight**). It does not turn on merely from placing a digit. If highlight is already on, tapping the selected cell deselects and clears it. Tapping the status line deselects but leaves a highlight in place, if any. A second tap on the same cell within 250ms of the previous tap is still a double-tap and selects the cage or the uncaged cells of the box.
 
 ## Selection totals and multi double-tap (v5)
 - **Status line:** for any selection, **Total** adds every *fully* selected cage's sum, plus the known sum of every fully selected uncaged group (the worked-out 45 − cage-sums value, or a sum you typed in the calculator), plus the placed digit (given or yours) of any other selected cell. The cell count is how many cells are selected. If any selected cell can't be accounted for (an empty cell in a cage that's only partly selected, or an empty uncaged cell whose group has no known sum), the total is hidden and you just see e.g. `12 cells`. Combos still opens from any cell of a single cage — double-tap to select the whole cage if you want its printed sum in the total.
@@ -95,3 +97,7 @@ Selecting a cell and placing a digit leaves the cell selected, but does not turn
 Finishing a puzzle no longer shows a brief toast. A gold ripple spreads across the grid from the last digit you placed, the digits glow, and a short burst of confetti falls; then a card names the puzzle, shows your time, and offers a short "Nice."-style line, with **Close** and **Puzzle list**. The animation is skipped when the device asks for reduced motion (the card still appears). Opening an already-solved puzzle does not replay it.
 
 A published hard killer is in `puzzles/escape-room-sujoyku.txt` — *Escape Room* by sujoyku (Logic Masters Deutschland, 8 Aug 2024). Plain killer rules, no givens, only 15 cages. Paste it in from the puzzle list.
+
+## Line sums and a tighter double-tap (v11)
+- **Line sums:** if you select two or more cells that all lie in the same row or the same column — even if they sit in different boxes, skip cells, or some of them belong to cages — **Σ Combos** lets you type a sum for that exact set. The sum is remembered and shown in **Total** only when you select those same cells again (a larger or smaller selection does not use it, so it is never mixed with cage or group totals). Double-tap is unchanged: it still selects a cage or the uncaged cells of a box, not a row or column. A full row or column is 45 automatically. Existing typed sums for uncaged box groups still work, and old saved puzzles load as before.
+- **Double-tap window:** shortened from 350ms to 250ms, measured as the gap between consecutive taps on the same cell (from lifting the finger to putting it down again). A slightly slower second tap now deselects instead of selecting the cage.
