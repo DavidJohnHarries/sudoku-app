@@ -67,7 +67,7 @@ cage 8 r8c9 r9c9
 cage 4 r9c3`;
 
 // ---------- Puzzle format (see README) ----------
-function blankPuzzle(name){return {id:uid(),name:name||'Untitled',givens:Array(81).fill(0),cages:[],v:Array(81).fill(0),cn:Array(81).fill(''),mn:Array(81).fill(''),col:Array.from({length:81},()=>({c:[],b:0})),time:0,solved:false,extra:[],groups:{},updated:Date.now()}}
+function blankPuzzle(name){return {id:uid(),name:name||'Untitled',givens:Array(81).fill(0),sol:null,cages:[],v:Array(81).fill(0),cn:Array(81).fill(''),mn:Array(81).fill(''),col:Array.from({length:81},()=>({c:[],b:0})),time:0,solved:false,extra:[],groups:{},updated:Date.now()}}
 function parseCell(t){const m=/^r([1-9])c([1-9])$/i.exec(t);return m?(m[1]-1)*9+(m[2]-1):-1}
 function parseGrid81(s){s=s.replace(/[\s|]/g,'');if(s.length!==81||/[^.0-9]/.test(s))return null;return [...s].map(ch=>ch==='.'?0:+ch)}
 function parsePuzzle(text){
@@ -83,7 +83,7 @@ function parsePuzzle(text){
   const toks=rest.split(/\s+/).filter(Boolean);
   const grabGrid=()=>{let s=rest;while(s.replace(/[\s|]/g,'').length<81&&i+1<lines.length&&/^[\s.0-9|]+$/.test(lines[i+1])&&lines[i+1].trim()){i++;s+=lines[i]}return parseGrid81(s)};
   if(kw==='name')p.name=rest||p.name;
-  else if(kw==='givens'||kw==='values'){const g=grabGrid();if(!g){errs.push(`Line ${ln}: ${kw} needs 81 characters of 1-9 or . (0 also = empty)`);continue}if(kw==='givens')p.givens=g;else p.v=g}
+  else if(kw==='givens'||kw==='values'||kw==='solution'){const g=grabGrid();if(!g){errs.push(`Line ${ln}: ${kw} needs 81 characters of 1-9 or . (0 also = empty)`);continue}if(kw==='givens')p.givens=g;else if(kw==='values')p.v=g;else p.sol=g}
   else if(kw==='cage'){const sum=+toks[0];const cells=toks.slice(1).map(parseCell);
    if(!Number.isInteger(sum)||sum<1||sum>45||!cells.length||cells.some(c=>c<0)){errs.push(`Line ${ln}: expected "cage SUM r1c1 r1c2 ..."`);continue}
    const cg={sum,cells:[...new Set(cells)].sort((a,b)=>a-b),elim:[]};p.cages.push(cg);cageByAnchor[cg.cells[0]]=cg}
@@ -109,6 +109,7 @@ function parsePuzzle(text){
 function gridStr(a){let s='';for(let r=0;r<9;r++)s+=(r?' ':'')+a.slice(r*9,r*9+9).map(x=>x||'.').join('');return s}
 function exportPuzzle(p,state){
  const L=['SUDOKU v1','name '+p.name,'givens '+gridStr(p.givens)];
+ if(p.sol&&p.sol.some(x=>x))L.push('solution '+gridStr(p.sol));
  for(const c of p.cages)L.push(`cage ${c.sum} `+c.cells.map(RC).join(' '));
  L.push(...p.extra);
  if(state){
@@ -137,7 +138,7 @@ function ensureGroup(p,G){p.groups=p.groups||{};let g=p.groups[G.key];if(!g||g.c
 // ---------- Storage ----------
 let DB=LS('sdk_puzzles')||{};let curId=LS('sdk_cur');
 if(!Object.keys(DB).length){const {p}=parsePuzzle(SAMPLE);DB[p.id]=p;curId=p.id}
-for(const p of Object.values(DB)){p.extra=p.extra||[];p.groups=p.groups||{};p.cages.forEach(c=>c.elim=c.elim||[]);if(p.col)for(let i=0;i<81;i++)p.col[i]=normCol(p.col[i])}
+for(const p of Object.values(DB)){p.extra=p.extra||[];p.groups=p.groups||{};p.sol=p.sol||null;p.cages.forEach(c=>c.elim=c.elim||[]);if(p.col)for(let i=0;i<81;i++)p.col[i]=normCol(p.col[i])}
 if(!DB[curId])curId=Object.values(DB).sort((a,b)=>b.updated-a.updated)[0].id;
 let P=DB[curId];
 let saveT=null;const saveNow=()=>{clearTimeout(saveT);saveT=null;SV('sdk_puzzles',DB);SV('sdk_cur',curId)};
@@ -196,7 +197,8 @@ function cellHTML(i){
  }
  return h}
 let cellCache=Array(81).fill(null);
-function renderCells(){computeConflicts();for(let i=0;i<81;i++){const h=cellHTML(i);if(cellCache[i]!==h){cells[i].innerHTML=h;cellCache[i]=h}cells[i].classList.toggle('given',!!P.givens[i]);cells[i].classList.toggle('bad',bad.has(i))}}
+const solWrong=i=>!!(P.sol&&P.v[i]&&P.sol[i]&&P.v[i]!==P.sol[i]);
+function renderCells(){computeConflicts();for(let i=0;i<81;i++){const h=cellHTML(i);if(cellCache[i]!==h){cells[i].innerHTML=h;cellCache[i]=h}cells[i].classList.toggle('given',!!P.givens[i]);cells[i].classList.toggle('bad',bad.has(i)||solWrong(i))}}
 function renderLines(){
  const S=100,d=7;let g='';
  P.cages.forEach((c,k)=>{const set=new Set(c.cells);const IN=(r,cc)=>r>=0&&r<9&&cc>=0&&cc<9&&set.has(r*9+cc);let p='';
@@ -248,13 +250,15 @@ function blockedCells(){const s=new Set();if(!numSel)return s;
   for(let j=0;j<81;j++)if(j!==i&&(ROW(j)===ROW(i)||COL(j)===COL(i)||BOX(j)===BOX(i)))s.add(j);
   for(const k of cagesOf[i])for(const j of P.cages[k].cells)if(j!==i)s.add(j)}
  for(let i=0;i<81;i++)if(valAt(i)===numSel)s.delete(i);return s}
+function hasPencil(i,n){if(!n||valAt(i))return false;const d=String(n);return P.cn[i].includes(d)||P.mn[i].includes(d)}
 let paintedNum=-1;
 function renderSel(){
  syncNumSel();
  if(paintedNum!==numSel){renderCells();paintedNum=numSel}
  const blocked=blockedCells();
- for(let i=0;i<81;i++){cells[i].classList.toggle('sel',sel.has(i));cells[i].classList.toggle('same',!!numSel&&valAt(i)===numSel);cells[i].classList.toggle('blocked',blocked.has(i))}
+ for(let i=0;i<81;i++){cells[i].classList.toggle('sel',sel.has(i));cells[i].classList.toggle('same',!!numSel&&valAt(i)===numSel);cells[i].classList.toggle('nmark',hasPencil(i,numSel));cells[i].classList.toggle('blocked',blocked.has(i))}
  padBtns.forEach((b,k)=>b.classList.toggle('nsel',mode!=='k'&&!editing&&numSel===k+1));
+ pad.classList.toggle('hlmode',!editing&&mode!=='k'&&!sel.size);
  if(editing){$('#bPick').classList.add('hidden');$('#infoTxt').textContent=sel.size?`${sel.size} cell${sel.size>1?'s':''} selected`:'Drag across cells to make a cage';$('#bCalc').classList.add('hidden');return}
  $('#bCalc').classList.toggle('hidden',!FEATURES.calculator||mode==='k');$('#bPick').classList.toggle('hidden',mode!=='k');
  const k=selCage(),G=k<0?selGroup():null;
@@ -264,7 +268,7 @@ function renderSel(){
 }
 function renderControls(){
  $$('.modes button').forEach(b=>b.classList.toggle('on',b.dataset.m===mode));
- pad.classList.toggle('cmode',mode==='k');pad.classList.toggle('nmode',mode==='c'||mode==='m');
+ pad.classList.toggle('cmode',mode==='k');pad.classList.toggle('nmode',mode==='c'||mode==='m');pad.classList.toggle('hlmode',!editing&&mode!=='k'&&!sel.size);
  padBtns.forEach((b,k)=>{b.querySelector('.sw').style.background=mode==='k'?COLOURS[k]:'transparent'});
  actBtn.textContent=mode==='k'?'Clear colours':'⌫';
  $('#play').classList.toggle('hidden',editing);$('#edit').classList.toggle('hidden',!editing);
@@ -332,7 +336,7 @@ function pressColour(d,add,el){
 function erase(){const cs=editable();if(mode==='k'){clearColours();return}
  act(()=>{if(cs.some(i=>P.v[i]))cs.forEach(i=>P.v[i]=0);else if(cs.some(i=>P.cn[i]||P.mn[i]))cs.forEach(i=>{P.cn[i]='';P.mn[i]=''});else [...sel].forEach(i=>P.col[i]={c:[],b:0})})}
 function clearColours(){act(()=>[...sel].forEach(i=>P.col[i]={c:[],b:0}))}
-function checkSolved(){if(P.solved||editing)return;for(let i=0;i<81;i++)if(!valAt(i))return;if(bad.size||cageBad.size)return;P.solved=true;save();toast('Solved! 🎉 '+fmtT(P.time))}
+function checkSolved(){if(P.solved||editing)return;for(let i=0;i<81;i++)if(!valAt(i)||solWrong(i))return;if(bad.size||cageBad.size)return;P.solved=true;save();toast('Solved! 🎉 '+fmtT(P.time))}
 
 // ---------- Grid pointer: tap / drag select, double/triple tap, multi-select ----------
 // Single tap acts instantly; a 2nd tap on the same cell within 350ms upgrades to the cage (or box if no cage),
@@ -344,21 +348,26 @@ function cellAt(x,y){const r=grid.getBoundingClientRect();const c=Math.floor((x-
 grid.addEventListener('pointerdown',e=>{const i=cellAt(e.clientX,e.clientY);if(i<0)return;e.preventDefault();
  const add=multi||e.shiftKey||e.metaKey||e.ctrlKey;const now=Date.now();
  const rep=!editing&&tapSeq.cell===i&&now-tapSeq.t<350;
+ // Tap an already-selected single cell (not Multi, not editing): deselect immediately so the
+ // pad switches to highlight style. A second tap within 350ms is still a double-tap (cage/box).
+ const already=!editing&&!add&&sel.size===1&&sel.has(i);
  if(!rep)tapSeq={cell:i,t:now,n:0,base:new Set(sel)};
- gp={id:e.pointerId,start:i,moved:false,wasOnly:sel.size===1&&sel.has(i),wasSel:sel.has(i),add,rep};
+ gp={id:e.pointerId,start:i,moved:false,wasOnly:sel.size===1&&sel.has(i),wasSel:sel.has(i),add,rep,already};
  try{grid.setPointerCapture(e.pointerId)}catch(_){}
  if(rep)return; // upgrade happens on pointerup
+ if(already){sel.clear();renderSel();return}
  if(!add)sel=new Set();sel.add(i);renderSel()});
 grid.addEventListener('pointermove',e=>{if(!gp||e.pointerId!==gp.id)return;const i=cellAt(e.clientX,e.clientY);if(i<0||i===gp.last)return;gp.last=i;if(i!==gp.start){gp.moved=true;tapSeq.cell=-1}if(!sel.has(i)){sel.add(i);renderSel()}});
 function endGP(e){if(!gp||(e&&e.pointerId!=null&&e.pointerId!==gp.id))return;const g=gp;gp=null;
  if(g.moved){if(editing&&editCage>=0){editCage=-1;sumBuf='';renderLines();renderControls()}renderSel();return}
  if(g.rep){tapSeq.n++;tapSeq.t=Date.now();const i=g.start,ks=cagesOf[i];let grp;
   if(tapSeq.n===1&&ks.length)grp=P.cages[ks[0]].cells;else if(tapSeq.n===1)grp=BOXCELLS(i).filter(j=>!cagesOf[j].length);else grp=BOXCELLS(i);
-  // Use tapSeq.base (selection before the first tap): the first tap of a double-tap may already have toggled the cell.
+  // Use tapSeq.base (selection before the first tap): the first tap of a double-tap may already have toggled/deselected the cell.
   if(multi&&tapSeq.n===1&&tapSeq.base.has(i)){sel=new Set(tapSeq.base);for(const j of grp)sel.delete(j)}
   else sel=new Set([...(multi?tapSeq.base:[]),...grp]);
   renderSel();return}
  tapSeq.t=Date.now();
+ if(g.already){renderSel();return}
  if(editing&&etab==='cage'&&!g.add){const ks=cagesOf[g.start];if(ks.length){const k=ks[0];editCage=k;sel=new Set(P.cages[k].cells);sumBuf=String(P.cages[k].sum);renderLines();renderSel();renderControls();return}}
  if(g.add){if(g.wasSel)sel.delete(g.start)}else if(g.wasOnly)sel.clear();
  if(editing&&editCage>=0){editCage=-1;sumBuf='';renderLines();renderControls()}

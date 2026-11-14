@@ -5,12 +5,12 @@ Personal killer-sudoku solving tool (iPhone home-screen web app). Plain HTML/CSS
 Live: https://davidjohnharries.github.io/sudoku-app/
 
 ## Using it
-- **Select:** tap a cell; drag to select several. To deselect: tap the status line above the grid, or tap the only selected cell again after a short pause (a quick double-tap selects the cage or box instead). Number highlight, if any, stays until you tap that digit again or select a different cell.
+- **Select:** tap a cell; drag to select several. Tap the only selected cell again to deselect (works for empty, placed, and given cells). A second tap within the double-tap window still selects the cage or box. You can also tap the status line above the grid. If you deselect a cell that had a digit, the number highlight stays so the pad can keep studying that digit.
 - **Modes:** Digit · Corner (small digits along the top/bottom edges: where a digit can go in a house) · Centre (candidates for the cell) · Colour.
-- **Number pad** toggles that digit in the current mode on all selected cells (givens are locked). Placing a digit removes it from corner/centre notes in the same row, column, box and cage. With no cell selected, the pad selects that number instead (see below).
+- **Number pad** toggles that digit in the current mode on all selected cells (givens are locked). Placing a digit removes it from corner/centre notes in the same row, column, box and cage. With no cell selected, the keys switch to an outlined **Highlight** style and tap a number to study it rather than enter it (see below).
 - **Colour:** up to 3 colours per cell, drawn as pie slices in a fixed palette order (red before orange before yellow, and so on). At most one colour may be **boosted** so it takes 2/3 of the pie; the others share the remaining 1/3 equally (two colours: 2/3 + 1/3; three: 2/3 + 1/6 + 1/6). With no boost the shares are equal. In Colour mode each colour key is split: **+** on the right adds that colour, or boosts it if it's already in the cell (moving the boost off any other colour); **−** on the left un-boosts a boosted colour, or removes an unboosted one. A 4th colour is ignored (with a message) — remove one first. **Clear colours** removes all colours from the selected cells.
 - **Erase** clears digits first, then notes (then colours). **Undo/Redo** covers everything, including cage edits and ruled-out combos.
-- **Conflicts:** repeated digits in a row/column/box/cage turn red; a cage whose digits go over its sum, or that's full with the wrong sum, gets a red sum label.
+- **Conflicts:** repeated digits in a row/column/box/cage turn red; a cage whose digits go over its sum, or that's full with the wrong sum, gets a red sum label. If the puzzle includes a `solution` line, a digit you placed that doesn't match it is also red. Givens are never flagged this way.
 - **Σ Combos:** select a cage (any of its cells) → lists every set of different digits that makes the sum. Tap a row to rule it out (saved with the puzzle). Rows that don't include the digits already placed in the cage are greyed "not possible".
 - **✎ Edit puzzle:** Cages tab — drag cells, type the sum, Create cage; tap a cage to change its sum or Delete it. Givens tab — set the printed digits. Warnings: cells in two cages, cages not joined up, impossible sums for the cage size, totals ≠ 405 once every cell is caged.
 - **☰ Puzzles:** list (autosaved, resumes where you left off), Paste puzzle, New blank, Copy (puzzle only, or with progress), Rename, Restart, Delete. Tap the timer to pause.
@@ -22,6 +22,7 @@ Plain text, one item per line. Keyword first, then values. `#` starts a comment.
 SUDOKU v1                      # required header; version number
 name Sample killer
 givens 53..7.... 6..195... ... # 81 chars, 1-9 or . (0 also = empty); spaces/| ignored; may wrap over lines
+solution 534678912 6..        # optional published solution, same layout as givens; mismatching user digits draw red
 cage 21 r1c1 r1c2 r2c1         # cage SUM CELL...
 # --- optional solving state (Copy with progress) ---
 values ..1...... ......... ... # player digits, same layout as givens
@@ -59,14 +60,14 @@ Double-tap a cell with no cage → selects the uncaged cells of its 3x3 box; **�
 
 ## Number selection (v4)
 Selecting a single cell that already has a digit (a given or one you placed) highlights that number:
-- Every cell that already contains it is tinted yellow (same as before).
+- Every cell that already contains it gets a strong amber whole-cell wash.
+- Any cell with a corner or centre pencil mark of that digit gets a slightly lighter amber wash on the whole cell, and the mark itself is still drawn bold and blue (including marks that sit in a greyed cell, so you can spot ones to clean up).
 - Its row, column, 3×3 box, and the rest of its cage are greyed — places the digit cannot legally go. If several of that digit are placed, all of their houses are greyed.
-- Any corner or centre pencil mark of that digit is drawn bold and blue, including marks that sit in a greyed cell (so you can spot ones to clean up).
 - The matching key on the number pad lights up.
 
 With no cell selected, tapping a number key does the same highlight; tapping that key again clears it. (If a cell *is* selected, the pad still enters values or notes as before.) Number selection updates live as you place, erase, or note digits, and clears if you select an empty cell or more than one cell (multi-select, a cage, or a box). It is not used in Colour mode, where the keys are colours. On a keyboard, Esc clears the cell selection and the number highlight.
 
-To get to "no cell selected" so the pad highlights a number instead of entering it: tap the status line above the grid (the number highlight stays), or tap the selected cell again after a short pause. A quick second tap is still a double-tap and selects the cage or the uncaged cells of the box.
+To get to "no cell selected" so the pad highlights a number instead of entering it: tap the selected cell once (the number highlight stays if that cell had a digit), or tap the status line above the grid. A second tap on the same cell within 350ms is still a double-tap and selects the cage or the uncaged cells of the box. With nothing selected, the pad keys are outlined and labelled **Highlight** so a tap will not accidentally place a note.
 
 ## Selection totals and multi double-tap (v5)
 - **Status line:** for any selection, **Total** adds every *fully* selected cage's sum, plus the known sum of every fully selected uncaged group (the worked-out 45 − cage-sums value, or a sum you typed in the calculator), plus the placed digit (given or yours) of any other selected cell. The cell count is how many cells are selected. If any selected cell can't be accounted for (an empty cell in a cage that's only partly selected, or an empty uncaged cell whose group has no known sum), the total is hidden and you just see e.g. `12 cells`. Combos still opens from any cell of a single cage — double-tap to select the whole cage if you want its printed sum in the total.
@@ -77,3 +78,9 @@ To get to "no cell selected" so the pad highlights a number instead of entering 
 - Colours always draw in palette order, no matter which you added first. The pie starts 30° clockwise from 12 o'clock, so a two-colour equal split has its dividing line 30° off vertical; every other split uses the same start angle.
 - **+** / **−** on a colour key apply to every selected cell independently (useful in Multi mode). Long-press a key, or ◎ Select colour, still selects every cell that contains that colour.
 - Keyboard 1–9 in Colour mode acts as **+**. There is no keyboard **−**; use the left half of the key, or Clear colours.
+
+## Deselect, number highlight, solution (v7)
+- Tapping the already-selected cell deselects it immediately, including when it holds a given or a digit you placed. A second tap within the double-tap window still selects the cage (or the uncaged cells of the box).
+- Deselecting a cell that has a digit leaves that number highlighted, so you can keep studying it from the pad. Tap the lit key (or an empty cell) to clear the highlight.
+- Number-highlight greys are a little darker than before. Every cell that contains the number, or a pencil mark of it, has a whole-cell amber tint (stronger when the number is placed).
+- Optional `solution` line (81 digits, same layout as `givens`). It is part of the puzzle and is included in both Copy puzzle and Copy with progress. A user-placed digit that doesn't match is red; givens are not checked this way.
