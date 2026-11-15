@@ -105,8 +105,9 @@ function parsePuzzle(text){
    const src=kw==='elim'?toks.slice(1):toks,cells=[],rest=[];
    for(const t of src){const c=parseCell(t);if(c>=0)cells.push(c);else rest.push(t)}
    const uniq=[...new Set(cells)].sort((a,b)=>a-b);
-   const same=uniq.length>=2&&(uniq.every(i=>Math.floor(i/9)===Math.floor(uniq[0]/9))||uniq.every(i=>i%9===uniq[0]%9));
-   if(!same){errs.push(`Line ${ln}: expected "${kw==='linesum'?'linesum SUM r1c1 r1c2 ...':'elim line r1c1 r1c2 ... COMBOS'}"`);continue}
+   const onLine=uniq.length>=2&&(uniq.every(i=>Math.floor(i/9)===Math.floor(uniq[0]/9))||uniq.every(i=>i%9===uniq[0]%9));
+   const inCage=uniq.length>=2&&p.cages.some(c=>uniq.every(i=>c.cells.includes(i)));
+   if(!onLine&&!inCage){errs.push(`Line ${ln}: expected "${kw==='linesum'?'linesum SUM r1c1 r1c2 ...':'elim line r1c1 r1c2 ... COMBOS'}" (cells must share a row, a column, or a cage)`);continue}
    if(kw==='linesum'){const n=parseInt(rest[0]);if(!(n>=1&&n<=45)||rest.length!==1){errs.push(`Line ${ln}: expected "linesum SUM r1c1 r1c2 ..."`);continue}
     if(uniq.length<9){p.lineSums=p.lineSums||{};const L=p.lineSums[uniq.join(',')]=p.lineSums[uniq.join(',')]||{sum:null,elim:[]};L.sum=n}}
    else{p.lineSums=p.lineSums||{};const L=p.lineSums[uniq.join(',')]=p.lineSums[uniq.join(',')]||{sum:null,elim:[]};L.elim=rest.filter(t=>/^[1-9]+$/.test(t))}
@@ -147,18 +148,29 @@ function groupOf(p,b){const bc=boxCellsOf(b),cnt=Array(81).fill(0),touch=new Set
  return {key,b,cells,ck,dsum,derived,stored,sum:derived?dsum:(stored?g.sum:null),elim:stored?g.elim:[]}}
 function ensureGroup(p,G){p.groups=p.groups||{};let g=p.groups[G.key];if(!g||g.cells!==G.ck||g.dsum!==G.dsum)g=p.groups[G.key]={cells:G.ck,dsum:G.dsum,sum:null,elim:[]};return g}
 
-// ---------- Line sums (typed totals for a multi-cell row or column selection) ----------
-// Any 2+ selected cells that share a row or a column can have a typed sum, even if they
-// span boxes or include caged cells. A full row or column is 45. The sum is stored under
-// the exact cell set and is only used when that same set is selected again.
-function lineOfSel(){
+// ---------- Typed set sums (a line, or a 2+ cell subset of a cage) ----------
+// Stored in p.lineSums under the exact cell set (same key as v11 line sums) and only
+// used when that same set is selected again. A full row or column is 45.
+function cellsOnLine(cells){return cells.length>=2&&(cells.every(i=>ROW(i)===ROW(cells[0]))||cells.every(i=>COL(i)===COL(cells[0])))}
+function cageOfCells(cells){if(!cells.length)return -1;const ks=cagesOf[cells[0]]||[];for(const k of ks)if(cells.every(i=>cagesOf[i].includes(k)))return k;return -1}
+function exactCageOfSel(){if(!sel.size)return -1;const k=cageOfCells([...sel]);return k>=0&&P.cages[k].cells.length===sel.size?k:-1}
+function setOfSel(){
  if(sel.size<2)return null;
  const cells=[...sel].sort((a,b)=>a-b);
- if(!cells.every(i=>ROW(i)===ROW(cells[0]))&&!cells.every(i=>COL(i)===COL(cells[0])))return null;
- const ck=cells.join(','),derived=cells.length===9?45:null,g=P.lineSums&&P.lineSums[ck];
- return {ck,cells,derived:derived!=null,sum:derived!=null?derived:(g&&g.sum!=null?g.sum:null),elim:(g&&g.elim)||[]}}
+ const k=cageOfCells(cells);
+ if(k<0&&!cellsOnLine(cells))return null;
+ const ck=cells.join(','),derived=cellsOnLine(cells)&&cells.length===9?45:null,g=P.lineSums&&P.lineSums[ck];
+ return {ck,cells,cageK:k,cage:k>=0?P.cages[k]:null,derived:derived!=null,sum:derived!=null?derived:(g&&g.sum!=null?g.sum:null),elim:(g&&g.elim)||[]}}
 function ensureLine(L){P.lineSums=P.lineSums||{};let g=P.lineSums[L.ck];if(!g)g=P.lineSums[L.ck]={sum:null,elim:[]};return g}
-function lineCalcTarget(){return (selCage()>=0||selGroup())?null:lineOfSel()}
+// Σ target: one caged cell → the whole cage; an exact uncaged group (double-tap) or an
+// exact whole cage → that group/cage; 2+ cells all in one cage or all on one line → just
+// those cells (typed sum). Anything else → disabled.
+function calcTarget(){
+ if(!sel.size)return null;
+ if(sel.size===1){const k=cageOfCells([[...sel][0]]);return k>=0?{type:'cage',k}:null}
+ const G=selGroup();if(G)return {type:'group',G};
+ const k=exactCageOfSel();if(k>=0)return {type:'cage',k};
+ const L=setOfSel();return L?{type:'set',L}:null}
 
 // ---------- Storage ----------
 let DB=LS('sdk_puzzles')||{};let curId=LS('sdk_cur');
@@ -238,15 +250,18 @@ function renderLines(){
  g+='<rect x="2.5" y="2.5" width="895" height="895" fill="none" stroke="#111827" stroke-width="5"/>';
  $('#lines').innerHTML=g}
 function selGroup(){if(!sel.size)return null;const b=BOX([...sel][0]);const G=groupOf(P,b);if(!G||G.cells.length!==sel.size||!G.cells.every(i=>sel.has(i)))return null;return G}
-function selCage(){if(!sel.size)return -1;const ks=cagesOf[[...sel][0]];for(const k of ks)if([...sel].every(i=>cagesOf[i].includes(k)))return k;return -1}
-// Total is known only when every selected cell is accounted for:
-//  • if the selection exactly matches a stored line-sum (or is a full row/column), that sum is used alone
-//  • otherwise each fully-selected cage contributes its cage sum
+// Total follows the Σ target when there is one, so a single caged cell uses the cage
+// sum (and the cage's size) rather than that one cell's digit. An exact typed set-sum
+// (line or cage subset) is used alone, never added to cage or group totals. Otherwise:
+//  • each fully-selected cage contributes its cage sum
 //  • each fully-selected uncaged group with a known sum (derived or typed) contributes that sum
 //  • any leftover selected cell (partial cage, or uncaged without a group total) contributes its placed digit
 function selTotal(){
  const n=sel.size;if(!n)return {n:0,sum:null,known:false};
- const L=lineOfSel();if(L&&L.sum!=null)return {n,sum:L.sum,known:true};
+ const T=calcTarget();
+ if(T&&T.type==='cage'){const c=P.cages[T.k];return {n:c.cells.length,sum:c.sum,known:true}}
+ if(T&&T.type==='group'&&T.G.sum!=null)return {n,sum:T.G.sum,known:true};
+ if(T&&T.type==='set'&&T.L.sum!=null)return {n,sum:T.L.sum,known:true};
  const covered=new Set();let sum=0;
  for(const c of P.cages)if(c.cells.every(i=>sel.has(i))){sum+=c.sum;c.cells.forEach(i=>covered.add(i))}
  for(let b=0;b<9;b++){const G=groupOf(P,b);if(!G||G.sum==null||!G.cells.every(i=>sel.has(i)))continue;
@@ -262,8 +277,8 @@ function selInfoText(){
  if(!sel.size)return numSel?`Number ${numSel} — tap ${numSel} again to clear`:'Tap a cell to select';
  const t=selTotal();
  if(t.known)return `Total ${t.sum} (${t.n} cell${t.n>1?'s':''})  ${near45(t.sum)}`;
- if(lineCalcTarget())return `${t.n} cells — Σ to enter a sum`;
- return `${t.n} cell${t.n>1?'s':''}`}
+ if(calcTarget())return `${sel.size} cell${sel.size>1?'s':''} — Σ to enter a sum`;
+ return `${sel.size} cell${sel.size>1?'s':''}`}
 function fitInfo(){const el=$('#infoTxt');el.style.fontSize='';let fs=15;while(el.scrollWidth>el.clientWidth&&fs>11){fs--;el.style.fontSize=fs+'px'}}
 // Number selection (digit highlight): numSel is 1–9 or 0.
 // It turns on when you tap a cell that already has a given or placed digit, when you
@@ -290,9 +305,8 @@ function renderSel(){
  pad.classList.toggle('hlmode',!editing&&mode!=='k'&&!sel.size);
  if(editing){$('#bPick').classList.add('hidden');$('#infoTxt').textContent=sel.size?`${sel.size} cell${sel.size>1?'s':''} selected`:'Drag across cells to make a cage';$('#bCalc').classList.add('hidden');return}
  $('#bCalc').classList.toggle('hidden',!FEATURES.calculator||mode==='k');$('#bPick').classList.toggle('hidden',mode!=='k');
- const k=selCage(),G=k<0?selGroup():null,L=(k<0&&!G)?lineOfSel():null;
  $('#infoTxt').textContent=selInfoText();
- $('#bCalc').disabled=!(G||k>=0||L);
+ $('#bCalc').disabled=!calcTarget();
  fitInfo();
 }
 function renderControls(){
@@ -376,6 +390,7 @@ function endCeleb(){
  grid.classList.remove('celeb-wave');cells.forEach(c=>c.style.removeProperty('--wave'));
  const fx=$('#celebFx');if(fx){const c=fx.getContext('2d');c&&c.clearRect(0,0,fx.width,fx.height)}
  const el=$('#celeb');if(!el)return;el.classList.add('hidden');el.classList.remove('shown','card-on');el.setAttribute('aria-hidden','true')}
+const CELEB_WAVE_STEP=110,CELEB_CARD_PAD=2000,CELEB_FX_MS=7000;
 function startConfetti(){
  const canvas=$('#celebFx');if(!canvas)return;const ctx=canvas.getContext('2d');
  const rec=canvas.getBoundingClientRect(),dpr=Math.min(window.devicePixelRatio||1,2);
@@ -383,22 +398,37 @@ function startConfetti(){
  ctx.setTransform(dpr,0,0,dpr,0,0);
  const w=rec.width,h=rec.height;
  const g=grid.getBoundingClientRect();
- const ox=g.left-rec.left+g.width/2,oy=g.top-rec.top+g.height/2;
+ const cellXY=i=>({x:g.left-rec.left+(COL(i)+.5)*g.width/9,y:g.top-rec.top+(ROW(i)+.5)*g.height/9});
+ const origin=cellXY(lastPlace);
  const cols=['#1e3a8a','#f59e0b','#fde68a','#2563eb','#ffffff','#b91c1c','#93c5fd'];
  const parts=[];
- for(let i=0;i<90;i++){
-  const a=-Math.PI/2+(Math.random()-.5)*Math.PI,sp=7+Math.random()*11;
-  parts.push({x:ox+(Math.random()-.5)*36,y:oy+(Math.random()-.5)*18,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp-2,w:4+Math.random()*4,h:6+Math.random()*7,rot:Math.random()*Math.PI,vr:(Math.random()-.5)*.28,col:cols[i%cols.length]});
- }
- const t0=performance.now();
+ const fountain=(ox,oy,n,born)=>{
+  for(let i=0;i<n;i++){
+   const a=-Math.PI/2+(Math.random()-.5)*Math.PI,sp=7+Math.random()*11;
+   parts.push({x:ox+(Math.random()-.5)*36,y:oy+(Math.random()-.5)*18,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp-2,w:4+Math.random()*4,h:6+Math.random()*7,rot:Math.random()*Math.PI,vr:(Math.random()-.5)*.28,col:cols[i%cols.length],born,life:2400});
+  }
+ };
+ const firework=(ox,oy,n,born)=>{
+  for(let i=0;i<n;i++){
+   const a=Math.random()*Math.PI*2,sp=3+Math.random()*10;
+   parts.push({x:ox,y:oy,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp-1.2,w:3+Math.random()*4,h:5+Math.random()*7,rot:Math.random()*Math.PI,vr:(Math.random()-.5)*.35,col:cols[(i+3)%cols.length],born,life:2600});
+  }
+ };
+ fountain(origin.x,origin.y,110,0);
+ const t0=performance.now();let b2=false,b3=false;
  const tick=t=>{
-  const age=(t-t0)/2200;ctx.clearRect(0,0,w,h);
+  const age=t-t0;
+  if(!b2&&age>1500){b2=true;firework(origin.x,origin.y-24,90,age);firework(w*0.28,h*0.32,55,age)}
+  if(!b3&&age>2900){b3=true;firework(w*0.5,h*0.26,80,age);firework(w*0.72,h*0.36,55,age)}
+  ctx.clearRect(0,0,w,h);
   for(const p of parts){
+   if(age<p.born)continue;
+   const local=age-p.born;
    p.vy+=0.18;p.x+=p.vx;p.y+=p.vy;p.rot+=p.vr;p.vx*=0.995;
-   const a=age<0.7?1:Math.max(0,1-(age-0.7)/0.3);if(a<=0)continue;
+   const fade=p.life*0.68,a=local<fade?1:Math.max(0,1-(local-fade)/(p.life-fade));if(a<=0)continue;
    ctx.save();ctx.translate(p.x,p.y);ctx.rotate(p.rot);ctx.globalAlpha=a;ctx.fillStyle=p.col;ctx.fillRect(-p.w/2,-p.h/2,p.w,p.h);ctx.restore();
   }
-  if(age<1)celebRAF=requestAnimationFrame(tick);else{ctx.clearRect(0,0,w,h);celebRAF=0}
+  if(age<CELEB_FX_MS)celebRAF=requestAnimationFrame(tick);else{ctx.clearRect(0,0,w,h);celebRAF=0}
  };
  celebRAF=requestAnimationFrame(tick)}
 function celebrate(){
@@ -414,9 +444,9 @@ function celebrate(){
  el.classList.remove('hidden');el.setAttribute('aria-hidden','false');
  if(reducedMotion()){el.classList.add('shown');showCard();return}
  const or=ROW(lastPlace),oc=COL(lastPlace);let max=0;
- for(let i=0;i<81;i++){const d=Math.max(Math.abs(ROW(i)-or),Math.abs(COL(i)-oc));cells[i].style.setProperty('--wave',(d*55)+'ms');if(d>max)max=d}
+ for(let i=0;i<81;i++){const d=Math.max(Math.abs(ROW(i)-or),Math.abs(COL(i)-oc));cells[i].style.setProperty('--wave',(d*CELEB_WAVE_STEP)+'ms');if(d>max)max=d}
  grid.classList.add('celeb-wave');startConfetti();
- celebT=setTimeout(showCard,max*55+750)}
+ celebT=setTimeout(showCard,max*CELEB_WAVE_STEP+CELEB_CARD_PAD)}
 $('#celebClose').onclick=()=>endCeleb();
 $('#celebList').onclick=()=>{endCeleb();showList()};
 
@@ -509,12 +539,21 @@ givPad.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)ret
 
 // ---------- Cage-sum calculator ----------
 function combos(n,sum){const out=[];(function rec(start,left,acc,s){if(left===0){if(s===sum)out.push(acc.join(''));return}for(let d=start;d<=9;d++){if(s+d>sum)break;rec(d+1,left-1,[...acc,d],s+d)}})(1,n,[],0);return out}
-// spec: {cells, sum (null = unknown), editable, elim(), toggle(x), setSum(n)}
+// A subset combo fits its parent cage if some remaining cage combo contains those digits
+// and the leftover digits can hold any digits already placed in the rest of the cage.
+function subsetFitsCage(cage,cells,combo){
+ if(!cage)return true;
+ const need=[...combo],rest=cage.cells.filter(i=>!cells.includes(i)).map(valAt).filter(Boolean).map(String);
+ const list=combos(cage.cells.length,cage.sum).filter(x=>!(cage.elim||[]).includes(x));
+ return list.some(c=>need.every(d=>c.includes(d))&&rest.every(d=>[...c].filter(x=>!need.includes(x)).includes(d)))
+}
+// spec: {cells, sum (null = unknown), editable, elim(), toggle(x), setSum(n), allow?(combo)}
 function openCalc(spec){
  const placed=[...new Set(spec.cells.map(valAt).filter(Boolean))],n=spec.cells.length;
- const ok=x=>placed.every(d=>x.includes(String(d)));
+ const ok=x=>placed.every(d=>x.includes(String(d)))&&(!spec.allow||spec.allow(x));
+ const grey=spec.allow?" Grey = can't contain the digits already placed, or doesn't fit the cage.":" Grey = can't contain the digits already placed.";
  $('#mbox').innerHTML=`<h2 class="ch">SUM: ${spec.editable?`<input id="cSum" inputmode="numeric" pattern="[0-9]*" maxlength="2" value="${spec.sum||''}" placeholder="?">`:spec.sum}</h2><div class="muted" id="cMeta"></div><div id="cList"></div>
- <p class="muted cnote">Tap to rule out (tap again to restore). Grey = can't contain the digits already placed.${spec.note||''}</p><div class="r"><button class="btn" id="mClose">Close</button></div>`;
+ <p class="muted cnote">Tap to rule out (tap again to restore).${grey}${spec.note||''}</p><div class="r"><button class="btn" id="mClose">Close</button></div>`;
  const draw=()=>{const sum=spec.sum,list=sum?combos(n,sum):[],el=spec.elim();
   const live=list.filter(x=>!el.includes(x)&&ok(x)).length;
   $('#cMeta').textContent=`${n} cell${n>1?'s':''}`+(sum?` · ${list.length} combination${list.length===1?'':'s'}${list.length?` · ${live} still possible`:''}`:'');
@@ -532,11 +571,12 @@ function openGroupCalc(G){const spec={cells:G.cells,sum:G.sum,editable:!G.derive
  toggle:x=>{const g=ensureGroup(P,G);g.elim.includes(x)?g.elim.splice(g.elim.indexOf(x),1):g.elim.push(x)},
  setSum:nv=>{const g=ensureGroup(P,G);if(g.sum!==nv){g.sum=nv;g.elim=[]}spec.sum=nv}};openCalc(spec)}
 function openLineCalc(L){const spec={cells:L.cells,sum:L.sum,editable:!L.derived,
- note:L.derived?'':' Type the sum for these cells — it is used in Total only when you select this exact set again.',
+ note:L.derived?'':(L.cage?' Type the sum for these cells of the cage — used in Total only when you select this exact set again.':' Type the sum for these cells — it is used in Total only when you select this exact set again.'),
+ allow:L.cage?x=>subsetFitsCage(L.cage,L.cells,x):null,
  elim:()=>{const g=P.lineSums&&P.lineSums[L.ck];return (g&&g.elim)||[]},
  toggle:x=>{const g=ensureLine(L);g.elim.includes(x)?g.elim.splice(g.elim.indexOf(x),1):g.elim.push(x)},
  setSum:nv=>{const g=ensureLine(L);if(g.sum!==nv){g.sum=nv;g.elim=[]}spec.sum=nv}};openCalc(spec)}
-$('#bCalc').onclick=()=>{const k=selCage();if(k>=0)return openCalculator(k);const G=selGroup();if(G)openGroupCalc(G);const L=lineOfSel();if(L)openLineCalc(L)};
+$('#bCalc').onclick=()=>{const T=calcTarget();if(!T)return;if(T.type==='cage')openCalculator(T.k);else if(T.type==='group')openGroupCalc(T.G);else openLineCalc(T.L)};
 function showModal(){$('#modal').classList.remove('hidden')}
 function closeModal(){if(document.activeElement)document.activeElement.blur();$('#modal').classList.add('hidden');$('#mbox').onclick=null;$('#mbox').innerHTML=''}
 $('#modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal()});

@@ -11,7 +11,7 @@ Live: https://davidjohnharries.github.io/sudoku-app/
 - **Colour:** up to 3 colours per cell, drawn as pie slices in a fixed palette order (red before orange before yellow, and so on). At most one colour may be **boosted** so it takes 2/3 of the pie; the others share the remaining 1/3 equally (two colours: 2/3 + 1/3; three: 2/3 + 1/6 + 1/6). With no boost the shares are equal. In Colour mode each colour key is split: **+** on the right adds that colour, or boosts it if it's already in the cell (moving the boost off any other colour); **−** on the left un-boosts a boosted colour, or removes an unboosted one. A 4th colour is ignored (with a message) — remove one first. **Clear colours** removes all colours from the selected cells.
 - **Erase** clears digits first, then notes (then colours). **Undo/Redo** covers everything, including cage edits and ruled-out combos.
 - **Conflicts:** repeated digits in a row/column/box/cage turn red; a cage whose digits go over its sum, or that's full with the wrong sum, gets a red sum label. If the puzzle includes a `solution` line, a digit you placed that doesn't match it is also red. Givens are never flagged this way.
-- **Σ Combos:** select a cage (any of its cells) → lists every set of different digits that makes the sum. Tap a row to rule it out (saved with the puzzle). Rows that don't include the digits already placed in the cage are greyed "not possible".
+- **Σ Combos:** enabled when exactly one selected cell is in a cage (opens the whole cage), or when two or more selected cells all sit in the same cage or all sit on the same row or column (opens just those cells; type a sum if it isn't already known). Selecting an exact uncaged box-group still opens that group. Lists every set of different digits that makes the sum. Tap a row to rule it out (saved with the puzzle). Rows that don't include the digits already placed, or that can't fit a parent cage, are greyed "not possible".
 - **✎ Edit puzzle:** Cages tab — drag cells, type the sum, Create cage; tap a cage to change its sum or Delete it. Givens tab — set the printed digits. Warnings: cells in two cages, cages not joined up, impossible sums for the cage size, totals ≠ 405 once every cell is caged.
 - **☰ Puzzles:** list (autosaved, resumes where you left off), Paste puzzle, New blank, Copy (puzzle only, or with progress), Rename, Restart, Delete. Tap the timer to pause.
 
@@ -32,8 +32,8 @@ colour r5c5 1 4               # colour numbers 1-9, up to 3, in palette order; 1
 elim r3c7 12479 12389          # ruled-out combos for the cage whose top-left cell is r3c7
 elim box5 1259                 # ruled-out combos for box 5's uncaged cells
 groupsum box5 23               # typed sum for box 5's uncaged cells (only when it can't be worked out)
-linesum 16 r1c1 r1c3 r1c5      # typed sum for an exact row/column cell set (Copy with progress)
-elim line r1c1 r1c3 r1c5 259   # ruled-out combos for that same line selection
+linesum 16 r1c1 r1c3 r1c5      # typed sum for an exact cell set — a line, or a 2+ cell subset of a cage (Copy with progress)
+elim line r1c1 r1c3 r1c5 259   # ruled-out combos for that same cell set
 time 754                       # seconds on the clock
 solved
 ```
@@ -101,3 +101,9 @@ A published hard killer is in `puzzles/escape-room-sujoyku.txt` — *Escape Room
 ## Line sums and a tighter double-tap (v11)
 - **Line sums:** if you select two or more cells that all lie in the same row or the same column — even if they sit in different boxes, skip cells, or some of them belong to cages — **Σ Combos** lets you type a sum for that exact set. The sum is remembered and shown in **Total** only when you select those same cells again (a larger or smaller selection does not use it, so it is never mixed with cage or group totals). Double-tap is unchanged: it still selects a cage or the uncaged cells of a box, not a row or column. A full row or column is 45 automatically. Existing typed sums for uncaged box groups still work, and old saved puzzles load as before.
 - **Double-tap window:** shortened from 350ms to 250ms, measured as the gap between consecutive taps on the same cell (from lifting the finger to putting it down again). A slightly slower second tap now deselects instead of selecting the cage.
+
+## Cage subsets, set sums, longer celebration (v12)
+- **Σ rules:** one selected cell inside a cage opens the calculator for the *entire* cage. Two or more selected cells that all belong to the same cage, or all lie on the same row or the same column, open the calculator for *just those cells*. Selecting a cage exactly still uses the printed cage sum (not a typed set-sum). Double-tap is unchanged: an exact uncaged box-group still has its own sum and combos. Anything else leaves Σ disabled.
+- **Cage-subset sums** are typed and remembered like line sums (same `linesum` / `elim line` lines, keyed by the exact cells), including L-shaped subsets that are not on a line. The combo list is for the subset's size and sum; combinations that cannot appear inside a remaining combo of the parent cage are greyed.
+- **Total** follows the Σ target when there is one: a single caged cell shows the cage sum and the cage's cell count (the cell's own digit is not also added). An exact typed set-sum is used alone, never added on top of cage or group totals. Mixed selections (two cages, a cage plus leftover digits, and so on) still add up as before when they are not a single Σ target.
+- **Celebration** lasts longer: a slower gold ripple, digits that glow with a second pulse, and three bursts of confetti (an opening fountain from the last-placed cell, then two firework bursts), with the solved card arriving while the last burst is still falling. Reduced-motion devices still skip the animation and show the card at once. Opening an already-solved puzzle still does not replay it.
