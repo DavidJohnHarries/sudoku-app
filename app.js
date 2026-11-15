@@ -303,10 +303,11 @@ function renderSel(){
  for(let i=0;i<81;i++){cells[i].classList.toggle('sel',sel.has(i));cells[i].classList.toggle('same',!!numSel&&valAt(i)===numSel);cells[i].classList.toggle('nmark',hasPencil(i,numSel));cells[i].classList.toggle('blocked',blocked.has(i))}
  padBtns.forEach((b,k)=>b.classList.toggle('nsel',mode!=='k'&&!editing&&numSel===k+1));
  pad.classList.toggle('hlmode',!editing&&mode!=='k'&&!sel.size);
- if(editing){$('#bPick').classList.add('hidden');$('#infoTxt').textContent=sel.size?`${sel.size} cell${sel.size>1?'s':''} selected`:'Drag across cells to make a cage';$('#bCalc').classList.add('hidden');return}
+ if(editing){$('#bPick').classList.add('hidden');$('#infoTxt').textContent=sel.size?`${sel.size} cell${sel.size>1?'s':''} selected`:'Drag across cells to make a cage';$('#bCalc').classList.add('hidden');$('#bTest').disabled=true;return}
  $('#bCalc').classList.toggle('hidden',!FEATURES.calculator||mode==='k');$('#bPick').classList.toggle('hidden',mode!=='k');
  $('#infoTxt').textContent=selInfoText();
  $('#bCalc').disabled=!calcTarget();
+ $('#bTest').disabled=!canTest();
  fitInfo();
 }
 function renderControls(){
@@ -344,6 +345,27 @@ function renderWarn(){const {w,caged,total}=cageWarnings();
 const editable=()=>[...sel].filter(i=>!P.givens[i]);
 function nudge(el){el.classList.remove('nudge');void el.offsetWidth;el.classList.add('nudge')}
 function toast(m){$$('.toast').forEach(x=>x.remove());const d=document.createElement('div');d.className='toast';d.textContent=m;document.body.appendChild(d);setTimeout(()=>d.remove(),1600)}
+// Test: for each selected empty cell with centre marks, flash whether the solution digit is among them.
+// Enabled only when the puzzle has a solution line and at least one such cell is selected. Does not change state.
+function hasSolution(){return !!(P.sol&&P.sol.some(x=>x))}
+function canTest(){return !editing&&hasSolution()&&[...sel].some(i=>!valAt(i)&&P.mn[i])}
+let testT=0;
+function clearTestFx(){if(testT){clearTimeout(testT);testT=0}$$('.testFx').forEach(x=>x.remove())}
+function runTest(){
+ if(!canTest()){nudge($('#bTest'));return}
+ clearTestFx();
+ const cs=[...sel].filter(i=>!valAt(i)&&P.mn[i]&&P.sol&&P.sol[i]);
+ let ok=0,miss=0;
+ for(const i of cs){
+  const good=P.mn[i].includes(String(P.sol[i]));
+  if(good)ok++;else miss++;
+  const m=document.createElement('div');m.className='testFx '+(good?'ok':'bad');m.textContent=good?'✓':'✕';
+  cells[i].appendChild(m);
+ }
+ const msg=cs.length?(miss?`Test: ${ok} ok, ${miss} missing`:`Test: ${ok} ok`):'Test: nothing to check';
+ $('#infoTxt').textContent=msg;fitInfo();
+ testT=setTimeout(()=>{const keep=$('#infoTxt').textContent===msg;clearTestFx();if(keep)renderSel()},1500);
+}
 function pressDigit(d,el){
  // No cell selected (and not in Colour mode): the pad selects / toggles that number's highlight.
  if(!editing&&!sel.size&&mode!=='k'){numSel=numSel===d?0:d;render();return}
@@ -450,11 +472,16 @@ function celebrate(){
 $('#celebClose').onclick=()=>endCeleb();
 $('#celebList').onclick=()=>{endCeleb();showList()};
 
+// A cell is "fully" one colour when it has exactly one colour (no other slices). Boost does not matter.
+function fullColour(i){const o=normCol(P.col[i]);return o.c.length===1?o.c[0]:0}
+function cellsOfFullColour(d){const h=[];if(!d)return h;for(let i=0;i<81;i++)if(fullColour(i)===d)h.push(i);return h}
+
 // ---------- Grid pointer: tap / drag select, double/triple tap, multi-select ----------
 // Single tap acts instantly; a 2nd tap on the same cell within TAP_MS of the previous tap
 // (gap from the previous pointerup to this pointerdown) upgrades to the cage (or box if no cage),
-// a 3rd upgrades to the 3x3 box. In Multi mode taps toggle cells; double/triple taps add the group — unless
-// the double-tapped cell was already selected *before* the first tap, in which case the cage/uncaged group is removed.
+// a 3rd upgrades to the 3x3 box. In Colour mode, a double-tap on a cell that is fully one colour
+// selects every cell fully shaded that same colour instead. In Multi mode taps toggle cells; double/triple taps add the group — unless
+// the double-tapped cell was already selected *before* the first tap, in which case the group is removed.
 const TAP_MS=250;
 let gp=null,multi=false,tapSeq={cell:-1,t:0,n:0,base:null};
 const BOXCELLS=i=>HOUSES[BOX(i)*3+2];
@@ -479,7 +506,9 @@ grid.addEventListener('pointermove',e=>{if(!gp||e.pointerId!==gp.id)return;const
 function endGP(e){if(!gp||(e&&e.pointerId!=null&&e.pointerId!==gp.id))return;const g=gp;gp=null;
  if(g.moved){if(editing&&editCage>=0){editCage=-1;sumBuf='';renderLines();renderControls()}renderSel();return}
  if(g.rep){tapSeq.n++;tapSeq.t=Date.now();const i=g.start,ks=cagesOf[i];let grp;
-  if(tapSeq.n===1&&ks.length)grp=P.cages[ks[0]].cells;else if(tapSeq.n===1)grp=BOXCELLS(i).filter(j=>!cagesOf[j].length);else grp=BOXCELLS(i);
+  const full=(mode==='k'&&tapSeq.n===1)?fullColour(i):0;
+  if(full)grp=cellsOfFullColour(full);
+  else if(tapSeq.n===1&&ks.length)grp=P.cages[ks[0]].cells;else if(tapSeq.n===1)grp=BOXCELLS(i).filter(j=>!cagesOf[j].length);else grp=BOXCELLS(i);
   // Use tapSeq.base (selection before the first tap): the first tap of a double-tap may already have toggled/deselected the cell.
   if(multi&&tapSeq.n===1&&tapSeq.base.has(i)){sel=new Set(tapSeq.base);for(const j of grp)sel.delete(j)}
   else sel=new Set([...(multi?tapSeq.base:[]),...grp]);
@@ -523,7 +552,7 @@ padBtns.forEach(b=>b.onclick=e=>{if(b.dataset.lp){delete b.dataset.lp;return}if(
  if(mode==='k'){pressColour(+b.dataset.d,!e.target.closest('.cpm.minus'),b);return}
  pressDigit(+b.dataset.d,b)});
 actBtn.onclick=()=>mode==='k'?clearColours():erase();
-$('#bErase').onclick=erase;$('#bUndo').onclick=$('#eUndo').onclick=undo;$('#bRedo').onclick=$('#eRedo').onclick=redo;
+$('#bErase').onclick=erase;$('#bTest').onclick=runTest;$('#bUndo').onclick=$('#eUndo').onclick=undo;$('#bRedo').onclick=$('#eRedo').onclick=redo;
 $('#bEdit').onclick=()=>setEditing(!editing);$('#bDone').onclick=()=>setEditing(false);
 function setEditing(on){editing=on;editCage=-1;sumBuf='';if(on)sel.clear();render()}
 $$('.tabs button').forEach(b=>b.onclick=()=>{etab=b.dataset.t;editCage=-1;sumBuf='';render()});

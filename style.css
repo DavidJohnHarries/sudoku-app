@@ -45,7 +45,7 @@ header{display:flex;align-items:center;gap:6px;height:50px}
 .pad button.act{font-size:15px;font-weight:600}
 .pad.cmode button.act{font-size:13px}
 .pad.nmode button{font-size:20px;color:#374151}
-.tools{display:flex;gap:6px;margin-top:6px}.tools button{flex:1;height:46px;box-shadow:0 1px 2px #0002;font-size:16px}
+.tools{display:flex;gap:6px;margin-top:6px}.tools button{flex:1;height:46px;box-shadow:0 1px 2px #0002;font-size:15px;padding:0 4px}
 .btn{background:#1e3a8a;color:#fff;font-weight:600;padding:0 14px;min-height:44px}.btn.sec{background:#fff;color:#1e3a8a;box-shadow:inset 0 0 0 2px #1e3a8a}.btn.danger{background:#b91c1c}
 .tabs{display:flex;gap:6px;margin:10px 0 6px}.tabs button{flex:1;height:40px;box-shadow:0 1px 2px #0002}.tabs button.on{background:#1e3a8a;color:#fff}
 .sumrow{display:flex;align-items:center;gap:8px;margin-bottom:6px}#sumBuf{flex:1;font-size:26px;font-weight:700;background:#fff;border-radius:10px;height:44px;display:flex;align-items:center;padding:0 12px}
@@ -96,6 +96,13 @@ header{display:flex;align-items:center;gap:6px;height:50px}
 .pad.hlmode button.nsel{background:#1e3a8a;color:#fff;box-shadow:0 0 0 2px #93c5fd}
 .pad.hlmode.nmode button:not(.act){font-size:18px}
 
+
+/* Test: a brief tick / cross over centre-note cells, then fade. */
+.cell .testFx{position:absolute;inset:0;z-index:6;display:flex;align-items:center;justify-content:center;font-size:72cqh;font-weight:800;line-height:1;pointer-events:none;animation:testFade 1.5s ease forwards}
+.cell .testFx.ok{color:#15803d;text-shadow:0 1px 0 #fff,0 0 8px #fff,0 0 14px #fff}
+.cell .testFx.bad{color:#b91c1c;text-shadow:0 1px 0 #fff,0 0 8px #fff,0 0 14px #fff}
+@keyframes testFade{0%{opacity:0;transform:scale(.55)}12%{opacity:1;transform:scale(1.12)}55%{opacity:1;transform:scale(1)}100%{opacity:0;transform:scale(1)}}
+@media (prefers-reduced-motion:reduce){.cell .testFx{animation:none;opacity:1}}
 /* Solved celebration (v10, longer in v12): ripple from the last-placed cell, glowing digits, then a card. */
 #celeb{position:fixed;inset:0;z-index:40;display:flex;align-items:flex-end;justify-content:center;padding:16px 16px calc(20px + env(safe-area-inset-bottom));background:transparent;transition:background .45s ease}
 #celeb.card-on{background:rgba(17,24,39,.38)}
