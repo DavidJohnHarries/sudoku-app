@@ -1,0 +1,24 @@
+SUDOKU v1
+name Stretching Squares
+givens .................................................................................
+solution 498135672 765928314 321467895 653814927 249753186 187692543 834571269 576289431 912346758
+cage 13 r4c4 r4c5 r4c6
+cage 17 r6c4 r6c5 r6c6
+cage 10 r7c4 r8c4 r9c4
+cage 20 r1c6 r2c6 r3c6
+cage 9 r2c3 r3c3 r4c3
+cage 16 r2c1 r3c1 r4c1
+cage 17 r1c8 r2c8 r3c8
+cage 11 r7c2 r8c2 r9c2
+cage 11 r6c7 r7c7 r8c7
+cage 13 r6c9 r7c9 r8c9
+thermo r6c4 r5c4 r4c4
+thermo r6c6 r5c6 r4c6
+thermo r7c2 r7c3 r7c4
+thermo r9c2 r9c3 r9c4
+thermo r1c6 r1c7 r1c8
+thermo r3c6 r3c7 r3c8
+thermo r2c3 r2c2 r2c1
+thermo r4c3 r4c2 r4c1
+thermo r6c9 r6c8 r6c7
+thermo r8c9 r8c8 r8c7

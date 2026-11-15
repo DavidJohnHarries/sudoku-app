@@ -125,3 +125,21 @@ header{display:flex;align-items:center;gap:6px;height:50px}
   #grid.celeb-wave .cell,#grid.celeb-wave .cell .val{animation:none}
   #celeb.card-on .celeb-card{animation:none;opacity:1;transform:none}
 }
+
+/* Thermometers (v14): own SVG layer, multiplied so digits/notes/colours show through; cage lines draw above. */
+#thermo{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;mix-blend-mode:multiply}
+.tlist{margin:10px 0 4px;display:flex;flex-direction:column;gap:6px}
+.trow{display:flex;align-items:center;gap:10px;background:#eef2ff;border-radius:10px;padding:8px 12px;font-size:17px;font-variant-numeric:tabular-nums}
+.trow .tpos{width:56px;font-weight:700;color:#1e3a8a}.trow .tcell{width:48px;color:#6b7280;font-size:14px}.trow .trng{flex:1;text-align:right}
+.trow.tbad{background:#fee2e2;color:#b91c1c}
+.ehint{font-size:13px;margin:4px 2px}
+.tabs button{font-size:15px}
+/* Help sheet */
+.box.help{max-height:88vh}
+.hgrp{font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#6b7280;margin:12px 0 4px}
+.hs{border-radius:10px;background:#f3f4f6;margin:6px 0}
+.hs summary{padding:10px 12px;font-weight:600;font-size:16px;cursor:pointer;list-style:none}
+.hs summary::-webkit-details-marker{display:none}
+.hs summary::before{content:'›';display:inline-block;width:16px;transition:transform .15s}.hs[open] summary::before{transform:rotate(90deg)}
+.hb2{padding:0 12px 10px;font-size:15px;line-height:1.4;color:#1f2937}.hb2 p{margin:4px 0 8px}.hb2 ul{margin:4px 0;padding-left:20px}.hb2 li{margin:3px 0}
+.lbtns button{padding:0 10px}

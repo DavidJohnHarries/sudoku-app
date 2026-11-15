@@ -8,7 +8,7 @@ const RC=i=>`r${Math.floor(i/9)+1}c${i%9+1}`;
 const COLOURS=['#fca5a5','#fdba74','#fde047','#86efac','#5eead4','#93c5fd','#c4b5fd','#f9a8d4','#cbd5e1'];
 const MAXCOL=3;
 // Feature flags / hooks for later variants (thermometers, arrows, kropki...): add a parser section + a draw layer.
-const FEATURES={calculator:true};
+const FEATURES={calculator:true,thermo:true};
 // Colours: up to 3 per cell, drawn in palette order. At most one may be boosted
 // (2/3 of the pie; the others share the remaining 1/3 equally). No boost = equal shares.
 function normCol(x){
@@ -67,7 +67,7 @@ cage 8 r8c9 r9c9
 cage 4 r9c3`;
 
 // ---------- Puzzle format (see README) ----------
-function blankPuzzle(name){return {id:uid(),name:name||'Untitled',givens:Array(81).fill(0),sol:null,cages:[],v:Array(81).fill(0),cn:Array(81).fill(''),mn:Array(81).fill(''),col:Array.from({length:81},()=>({c:[],b:0})),time:0,solved:false,extra:[],groups:{},lineSums:{},updated:Date.now()}}
+function blankPuzzle(name){return {id:uid(),name:name||'Untitled',givens:Array(81).fill(0),sol:null,cages:[],thermos:[],v:Array(81).fill(0),cn:Array(81).fill(''),mn:Array(81).fill(''),col:Array.from({length:81},()=>({c:[],b:0})),time:0,solved:false,extra:[],groups:{},lineSums:{},updated:Date.now()}}
 function parseCell(t){const m=/^r([1-9])c([1-9])$/i.exec(t);return m?(m[1]-1)*9+(m[2]-1):-1}
 function parseGrid81(s){s=s.replace(/[\s|]/g,'');if(s.length!==81||/[^.0-9]/.test(s))return null;return [...s].map(ch=>ch==='.'?0:+ch)}
 function parsePuzzle(text){
@@ -87,6 +87,9 @@ function parsePuzzle(text){
   else if(kw==='cage'){const sum=+toks[0];const cells=toks.slice(1).map(parseCell);
    if(!Number.isInteger(sum)||sum<1||sum>45||!cells.length||cells.some(c=>c<0)){errs.push(`Line ${ln}: expected "cage SUM r1c1 r1c2 ..."`);continue}
    const cg={sum,cells:[...new Set(cells)].sort((a,b)=>a-b),elim:[]};p.cages.push(cg);cageByAnchor[cg.cells[0]]=cg}
+  else if(kw==='thermo'){const cs=toks.map(parseCell);
+   if(cs.length<2||cs.some(c=>c<0)){errs.push(`Line ${ln}: expected "thermo BULB r1c2 r1c3 ..." (2+ cells, bulb first)`);continue}
+   const why=thermoProblem(cs);if(why)errs.push(`Line ${ln}: ${why} (kept anyway)`);p.thermos.push({cells:cs})}
   else if(kw==='colour'||kw==='color'){const c=parseCell(toks[0]||'');
    if(c<0){errs.push(`Line ${ln}: expected "${kw} r1c1 COLOURS"`);continue}
    p.col[c]=parseColourToks(toks.slice(1))}
@@ -117,11 +120,17 @@ function parsePuzzle(text){
  for(let k=0;k<81;k++)if(p.givens[k])p.v[k]=0;
  return {p,errs};
 }
+// Thermometer cells are kept in order, bulb first. Each step must be to a king-move neighbour.
+const kingAdj=(a,b)=>a!==b&&Math.abs(Math.floor(a/9)-Math.floor(b/9))<=1&&Math.abs(a%9-b%9)<=1;
+function thermoProblem(cs){if(cs.length<2)return 'a thermo needs at least 2 cells';if(cs.length>9)return `thermo at ${RC(cs[0])} has ${cs.length} cells (max 9)`;
+ if(new Set(cs).size<cs.length)return `thermo at ${RC(cs[0])} visits a cell twice`;
+ for(let k=1;k<cs.length;k++)if(!kingAdj(cs[k-1],cs[k]))return `thermo at ${RC(cs[0])}: ${RC(cs[k-1])} → ${RC(cs[k])} aren't neighbours`;return ''}
 function gridStr(a){let s='';for(let r=0;r<9;r++)s+=(r?' ':'')+a.slice(r*9,r*9+9).map(x=>x||'.').join('');return s}
 function exportPuzzle(p,state){
  const L=['SUDOKU v1','name '+p.name,'givens '+gridStr(p.givens)];
  if(p.sol&&p.sol.some(x=>x))L.push('solution '+gridStr(p.sol));
  for(const c of p.cages)L.push(`cage ${c.sum} `+c.cells.map(RC).join(' '));
+ for(const t of p.thermos||[])L.push('thermo '+t.cells.map(RC).join(' '));
  L.push(...p.extra);
  if(state){
   if(p.v.some(x=>x))L.push('values '+gridStr(p.v));
@@ -165,17 +174,21 @@ function ensureLine(L){P.lineSums=P.lineSums||{};let g=P.lineSums[L.ck];if(!g)g=
 // Σ target: one caged cell → the whole cage; an exact uncaged group (double-tap) or an
 // exact whole cage → that group/cage; 2+ cells all in one cage or all on one line → just
 // those cells (typed sum). Anything else → disabled.
+// Thermos: an exact thermo selection (or one uncaged cell on a thermo) → the thermo's range sheet.
+// Checked after exact cages/groups and before line/cage-subset sets.
+function exactThermoOfSel(){if(sel.size<2)return -1;const i0=[...sel][0];for(const k of thermosOf[i0]||[]){const t=P.thermos[k];if(t.cells.length===sel.size&&t.cells.every(i=>sel.has(i)))return k}return -1}
 function calcTarget(){
  if(!sel.size)return null;
- if(sel.size===1){const k=cageOfCells([[...sel][0]]);return k>=0?{type:'cage',k}:null}
+ if(sel.size===1){const i=[...sel][0],k=cageOfCells([i]);if(k>=0)return {type:'cage',k};const th=(thermosOf[i]||[])[0];return th!=null?{type:'thermo',k:th}:null}
  const G=selGroup();if(G)return {type:'group',G};
  const k=exactCageOfSel();if(k>=0)return {type:'cage',k};
+ const th=exactThermoOfSel();if(th>=0)return {type:'thermo',k:th};
  const L=setOfSel();return L?{type:'set',L}:null}
 
 // ---------- Storage ----------
 let DB=LS('sdk_puzzles')||{};let curId=LS('sdk_cur');
 if(!Object.keys(DB).length){const {p}=parsePuzzle(SAMPLE);DB[p.id]=p;curId=p.id}
-for(const p of Object.values(DB)){p.extra=p.extra||[];p.groups=p.groups||{};p.lineSums=p.lineSums||{};p.sol=p.sol||null;p.cages.forEach(c=>c.elim=c.elim||[]);if(p.col)for(let i=0;i<81;i++)p.col[i]=normCol(p.col[i])}
+for(const p of Object.values(DB)){p.extra=p.extra||[];p.thermos=p.thermos||[];p.groups=p.groups||{};p.lineSums=p.lineSums||{};p.sol=p.sol||null;p.cages.forEach(c=>c.elim=c.elim||[]);if(p.col)for(let i=0;i<81;i++)p.col[i]=normCol(p.col[i])}
 if(!DB[curId])curId=Object.values(DB).sort((a,b)=>b.updated-a.updated)[0].id;
 let P=DB[curId];
 let saveT=null;const saveNow=()=>{clearTimeout(saveT);saveT=null;SV('sdk_puzzles',DB);SV('sdk_cur',curId)};
@@ -184,18 +197,18 @@ const save=()=>{P.updated=Date.now();saveNow()};
 // ---------- Geometry / peers ----------
 const ROW=i=>Math.floor(i/9),COL=i=>i%9,BOX=i=>Math.floor(ROW(i)/3)*3+Math.floor(COL(i)/3);
 const HOUSES=[];for(let k=0;k<9;k++){HOUSES.push([...Array(9)].map((_,j)=>k*9+j));HOUSES.push([...Array(9)].map((_,j)=>j*9+k));HOUSES.push([...Array(9)].map((_,j)=>(Math.floor(k/3)*3+Math.floor(j/3))*9+(k%3)*3+j%3))}
-let cagesOf=[];function indexCages(){cagesOf=Array.from({length:81},()=>[]);P.cages.forEach((c,k)=>c.cells.forEach(i=>cagesOf[i].push(k)))}
-function peers(i){const s=new Set();for(let j=0;j<81;j++)if(j!==i&&(ROW(j)===ROW(i)||COL(j)===COL(i)||BOX(j)===BOX(i)))s.add(j);for(const k of cagesOf[i])for(const j of P.cages[k].cells)if(j!==i)s.add(j);return s}
+let cagesOf=[],thermosOf=[];function indexCages(){cagesOf=Array.from({length:81},()=>[]);thermosOf=Array.from({length:81},()=>[]);P.cages.forEach((c,k)=>c.cells.forEach(i=>cagesOf[i].push(k)));(P.thermos||[]).forEach((t,k)=>t.cells.forEach(i=>{if(!thermosOf[i].includes(k))thermosOf[i].push(k)}))}
+function peers(i){const s=new Set();for(let j=0;j<81;j++)if(j!==i&&(ROW(j)===ROW(i)||COL(j)===COL(i)||BOX(j)===BOX(i)))s.add(j);for(const k of cagesOf[i])for(const j of P.cages[k].cells)if(j!==i)s.add(j);for(const k of thermosOf[i]||[])for(const j of P.thermos[k].cells)if(j!==i)s.add(j);return s}
 const valAt=i=>P.givens[i]||P.v[i];
 
 // ---------- UI state ----------
-let sel=new Set(),mode='v',editing=false,etab='cage',sumBuf='',editCage=-1,paused=false,numSel=0;
+let sel=new Set(),mode='v',editing=false,etab='cage',sumBuf='',editCage=-1,editThermo=-1,paused=false,numSel=0;
 let undoS=[],redoS=[];
-const snap=()=>JSON.stringify({gr:P.groups,ls:P.lineSums,g:P.givens,c:P.cages,v:P.v,cn:P.cn,mn:P.mn,col:P.col,s:P.solved});
-function restore(s){const o=JSON.parse(s);Object.assign(P,{groups:o.gr||{},lineSums:o.ls||{},givens:o.g,cages:o.c,v:o.v,cn:o.cn,mn:o.mn,col:o.col,solved:o.s})}
+const snap=()=>JSON.stringify({th:P.thermos,gr:P.groups,ls:P.lineSums,g:P.givens,c:P.cages,v:P.v,cn:P.cn,mn:P.mn,col:P.col,s:P.solved});
+function restore(s){const o=JSON.parse(s);Object.assign(P,{thermos:o.th||[],groups:o.gr||{},lineSums:o.ls||{},givens:o.g,cages:o.c,v:o.v,cn:o.cn,mn:o.mn,col:o.col,solved:o.s})}
 function act(fn){const before=snap();fn();const after=snap();if(after!==before){undoS.push(before);if(undoS.length>500)undoS.shift();redoS=[];save()}render()}
-function undo(){if(!undoS.length)return;redoS.push(snap());restore(undoS.pop());save();editCage=-1;render()}
-function redo(){if(!redoS.length)return;undoS.push(snap());restore(redoS.pop());save();editCage=-1;render()}
+function undo(){if(!undoS.length)return;redoS.push(snap());restore(undoS.pop());save();editCage=-1;editThermo=-1;render()}
+function redo(){if(!redoS.length)return;undoS.push(snap());restore(redoS.pop());save();editCage=-1;editThermo=-1;render()}
 
 // ---------- Build static DOM (never rebuilt mid-tap) ----------
 const grid=$('#grid'),cells=[];
@@ -215,8 +228,15 @@ function pie(o){o=normCol(o);const cs=o.c;if(!cs.length)return'transparent';if(c
  let acc=0;const stops=cs.map((id,k)=>{const a=acc;acc+=share(id);return `${COLOURS[id-1]} ${a*100}% ${k===cs.length-1?100:acc*100}%`});
  // Start 30° clockwise from 12 o'clock so a 50-50 split has its dividing line 30° from vertical; all pies use this start.
  return 'conic-gradient(from 30deg,'+stops.join(',')+')'}
-let bad=new Set(),cageBad=new Set();
-function computeConflicts(){bad=new Set();cageBad=new Set();
+let bad=new Set(),cageBad=new Set(),thermoBad=new Set();
+// Thermo: digits at positions a<b need v[b]-v[a] >= b-a, and position k (of n) can only hold k+1 .. 9-(n-1-k).
+function thermoConflicts(t,out){const cs=t.cells,n=cs.length;let broke=false;
+ for(let a=0;a<n;a++){const va=valAt(cs[a]);if(!va)continue;
+  if(va<a+1||va>9-(n-1-a)){out.add(cs[a]);broke=true}
+  for(let b=a+1;b<n;b++){const vb=valAt(cs[b]);if(vb&&vb-va<b-a){out.add(cs[a]);out.add(cs[b]);broke=true}}}
+ return broke}
+function computeConflicts(){bad=new Set();cageBad=new Set();thermoBad=new Set();
+ (P.thermos||[]).forEach((t,k)=>{if(thermoConflicts(t,bad))thermoBad.add(k)});
  const units=HOUSES.concat(P.cages.map(c=>c.cells));
  for(const u of units){const m={};for(const i of u){const v=valAt(i);if(v)(m[v]=m[v]||[]).push(i)}for(const k in m)if(m[k].length>1)m[k].forEach(i=>bad.add(i))}
  P.cages.forEach((c,k)=>{let s=0,f=0;for(const i of c.cells){const v=valAt(i);if(v){s+=v;f++}}if(s>c.sum||(f===c.cells.length&&s!==c.sum))cageBad.add(k)})}
@@ -249,6 +269,15 @@ function renderLines(){
  for(let k=1;k<9;k++){const w=k%3?1.5:5,c=k%3?'#9ca3af':'#111827';g+=`<path d="M${k*S} 0V900M0 ${k*S}H900" stroke="${c}" stroke-width="${w}"/>`}
  g+='<rect x="2.5" y="2.5" width="895" height="895" fill="none" stroke="#111827" stroke-width="5"/>';
  $('#lines').innerHTML=g}
+// Thermometers: a grey bulb + rounded line through cell centres, in their own SVG layer above the
+// cells with mix-blend-mode:multiply (so digits, notes and colours show through) and below the cage outlines.
+function thermoPath(cs){return cs.map((i,k)=>`${k?'L':'M'}${COL(i)*100+50} ${ROW(i)*100+50}`).join('')}
+function thermoSVG(cs,col,op){if(!cs.length)return '';const b=cs[0];
+ return `<g opacity="${op}"><circle cx="${COL(b)*100+50}" cy="${ROW(b)*100+50}" r="33" fill="${col}"/>`+(cs.length>1?`<path d="${thermoPath(cs)}" fill="none" stroke="${col}" stroke-width="24" stroke-linecap="round" stroke-linejoin="round"/>`:'')+'</g>'}
+function renderThermos(){const el=$('#thermo');if(!el)return;let g='';
+ (P.thermos||[]).forEach((t,k)=>{const hot=editing&&etab==='thermo'&&k===editThermo;g+=thermoSVG(t.cells,hot?'#93c5fd':thermoBad.has(k)?'#fca5a5':'#c8ccd2',1)});
+ if(editing&&etab==='thermo'&&sel.size&&editThermo<0)g+=thermoSVG([...sel],'#93c5fd',1);
+ el.innerHTML=g}
 function selGroup(){if(!sel.size)return null;const b=BOX([...sel][0]);const G=groupOf(P,b);if(!G||G.cells.length!==sel.size||!G.cells.every(i=>sel.has(i)))return null;return G}
 // Total follows the Σ target when there is one, so a single caged cell uses the cage
 // sum (and the cage's size) rather than that one cell's digit. An exact typed set-sum
@@ -275,7 +304,8 @@ function near45(sum){
  return `${lo}+${sum-lo} · ${hi}−${hi-sum}`}
 function selInfoText(){
  if(!sel.size)return numSel?`Number ${numSel} — tap ${numSel} again to clear`:'Tap a cell to select';
- const t=selTotal();
+ const t=selTotal(),T0=calcTarget();
+ if(T0&&T0.type==='thermo'&&!(t.known&&sel.size>1))return `Thermo (${P.thermos[T0.k].cells.length} cells) — Σ for ranges`;
  if(t.known)return `Total ${t.sum} (${t.n} cell${t.n>1?'s':''})  ${near45(t.sum)}`;
  if(calcTarget())return `${sel.size} cell${sel.size>1?'s':''} — Σ to enter a sum`;
  return `${sel.size} cell${sel.size>1?'s':''}`}
@@ -292,7 +322,8 @@ function syncNumSel(){
 function blockedCells(){const s=new Set();if(!numSel)return s;
  for(let i=0;i<81;i++)if(valAt(i)===numSel){
   for(let j=0;j<81;j++)if(j!==i&&(ROW(j)===ROW(i)||COL(j)===COL(i)||BOX(j)===BOX(i)))s.add(j);
-  for(const k of cagesOf[i])for(const j of P.cages[k].cells)if(j!==i)s.add(j)}
+  for(const k of cagesOf[i])for(const j of P.cages[k].cells)if(j!==i)s.add(j);
+  for(const k of thermosOf[i])for(const j of P.thermos[k].cells)if(j!==i)s.add(j)}
  for(let i=0;i<81;i++)if(valAt(i)===numSel)s.delete(i);return s}
 function hasPencil(i,n){if(!n||valAt(i))return false;const d=String(n);return P.cn[i].includes(d)||P.mn[i].includes(d)}
 let paintedNum=-1;
@@ -303,7 +334,7 @@ function renderSel(){
  for(let i=0;i<81;i++){cells[i].classList.toggle('sel',sel.has(i));cells[i].classList.toggle('same',!!numSel&&valAt(i)===numSel);cells[i].classList.toggle('nmark',hasPencil(i,numSel));cells[i].classList.toggle('blocked',blocked.has(i))}
  padBtns.forEach((b,k)=>b.classList.toggle('nsel',mode!=='k'&&!editing&&numSel===k+1));
  pad.classList.toggle('hlmode',!editing&&mode!=='k'&&!sel.size);
- if(editing){$('#bPick').classList.add('hidden');$('#infoTxt').textContent=sel.size?`${sel.size} cell${sel.size>1?'s':''} selected`:'Drag across cells to make a cage';$('#bCalc').classList.add('hidden');$('#bTest').disabled=true;return}
+ if(editing){if(etab==='thermo')renderThermos();$('#bPick').classList.add('hidden');$('#infoTxt').textContent=etab==='thermo'?(sel.size?(editThermo>=0?`Editing thermo: ${sel.size} cells — tap cells to extend`:`${sel.size} cell${sel.size>1?'s':''} · bulb ${RC([...sel][0])}`):'Drag from the bulb to the tip'):sel.size?`${sel.size} cell${sel.size>1?'s':''} selected`:'Drag across cells to make a cage';$('#bCalc').classList.add('hidden');$('#bTest').disabled=true;return}
  $('#bCalc').classList.toggle('hidden',!FEATURES.calculator||mode==='k');$('#bPick').classList.toggle('hidden',mode!=='k');
  $('#infoTxt').textContent=selInfoText();
  $('#bCalc').disabled=!calcTarget();
@@ -318,13 +349,14 @@ function renderControls(){
  $('#play').classList.toggle('hidden',editing);$('#edit').classList.toggle('hidden',!editing);
  $('#bEdit').textContent=editing?'✓':'✎';
  $$('.tabs button').forEach(b=>b.classList.toggle('on',b.dataset.t===etab));
- $('#eCage').classList.toggle('hidden',etab!=='cage');$('#eGiv').classList.toggle('hidden',etab!=='giv');
+ $('#eCage').classList.toggle('hidden',etab!=='cage');$('#eThermo').classList.toggle('hidden',etab!=='thermo');
+ $('#bThCreate').textContent=editThermo>=0?'Update thermo':'Create thermo';$('#bThDel').classList.toggle('hidden',editThermo<0);$('#eGiv').classList.toggle('hidden',etab!=='giv');
  $('#sumBuf').textContent=sumBuf||'–';
  $('#bCreate').textContent=editCage>=0?'Update cage':'Create cage';$('#bDelCage').classList.toggle('hidden',editCage<0);
  $('#bUndo').disabled=$('#eUndo').disabled=!undoS.length;$('#bRedo').disabled=$('#eRedo').disabled=!redoS.length;
  $('#pname').textContent=P.name;
 }
-function render(){indexCages();syncNumSel();renderCells();paintedNum=numSel;renderLines();renderSel();renderControls();if(editing)renderWarn();checkSolved()}
+function render(){indexCages();syncNumSel();renderCells();paintedNum=numSel;renderLines();renderThermos();renderSel();renderControls();if(editing)renderWarn();checkSolved()}
 
 // ---------- Cage validation ----------
 const minSum=n=>n*(n+1)/2,maxSum=n=>n*(19-n)/2;
@@ -337,9 +369,10 @@ function cageWarnings(){const w=[];let caged=0,total=0;
   if(n>9)w.push(`Cage at ${a} has ${n} cells (max 9)`);else if(c.sum<minSum(n)||c.sum>maxSum(n))w.push(`Cage at ${a}: ${n} cells can't make ${c.sum} (range ${minSum(n)}–${maxSum(n)})`);
   const gv=c.cells.map(i=>P.givens[i]).filter(Boolean);if(new Set(gv).size<gv.length)w.push(`Cage ${c.sum} at ${a} repeats a given`)});
  if(caged===81&&!over.length&&total!==405)w.push(`Cage sums total ${total}, should be 405`);
+ (P.thermos||[]).forEach(t=>{const why=thermoProblem(t.cells);if(why)w.push(why[0].toUpperCase()+why.slice(1))});
  return {w,caged,total}}
 function renderWarn(){const {w,caged,total}=cageWarnings();
- $('#warn').innerHTML=w.map(x=>`<div>⚠️ ${esc(x)}</div>`).join('')+`<div class="${caged===81&&!w.length?'ok':'muted'}">${P.cages.length} cages · ${caged}/81 cells caged · sums total ${total}${caged===81&&!w.length?' ✓':''}</div>`}
+ $('#warn').innerHTML=w.map(x=>`<div>⚠️ ${esc(x)}</div>`).join('')+`<div class="${caged===81&&!w.length?'ok':'muted'}">${P.cages.length} cages${P.thermos.length?` · ${P.thermos.length} thermo${P.thermos.length>1?'s':''}`:''} · ${caged}/81 cells caged · sums total ${total}${caged===81&&!w.length?' ✓':''}</div>`}
 
 // ---------- Actions ----------
 const editable=()=>[...sel].filter(i=>!P.givens[i]);
@@ -483,10 +516,20 @@ function cellsOfFullColour(d){const h=[];if(!d)return h;for(let i=0;i<81;i++)if(
 // selects every cell fully shaded that same colour instead. In Multi mode taps toggle cells; double/triple taps add the group — unless
 // the double-tapped cell was already selected *before* the first tap, in which case the group is removed.
 const TAP_MS=250;
+// Groups reached by repeated taps on one cell, in order: its cage, then any thermo(s) through it,
+// then (for an uncaged cell) the box's uncaged group, then the whole box. Double-tap = first,
+// triple = second, and so on; extra taps stay on the last. Without thermos this is the old cage/group → box.
+function tapGroups(i){const L=[];for(const k of cagesOf[i])L.push(P.cages[k].cells);
+ for(const k of thermosOf[i])L.push(P.thermos[k].cells);
+ if(!cagesOf[i].length)L.push(BOXCELLS(i).filter(j=>!cagesOf[j].length));
+ L.push(BOXCELLS(i));const seen=new Set();return L.filter(g=>{const key=[...g].sort((a,b)=>a-b).join(',');if(seen.has(key))return false;seen.add(key);return true})}
 let gp=null,multi=false,tapSeq={cell:-1,t:0,n:0,base:null};
 const BOXCELLS=i=>HOUSES[BOX(i)*3+2];
 function cellAt(x,y){const r=grid.getBoundingClientRect();const c=Math.floor((x-r.left)/r.width*9),w=Math.floor((y-r.top)/r.height*9);return c<0||c>8||w<0||w>8?-1:w*9+c}
 grid.addEventListener('pointerdown',e=>{const i=cellAt(e.clientX,e.clientY);if(i<0)return;e.preventDefault();
+ if(editing&&etab==='thermo'){gp={id:e.pointerId,start:i,last:i,moved:false,thermo:true,fresh:!sel.size,added:false};try{grid.setPointerCapture(e.pointerId)}catch(_){}
+  if(!sel.size){editThermo=-1;sel=new Set([i])}else if(!sel.has(i)){sel.add(i);gp.added=true}
+  renderSel();renderControls();return}
  const add=multi||e.shiftKey||e.metaKey||e.ctrlKey;const now=Date.now();
  const rep=!editing&&tapSeq.cell===i&&now-tapSeq.t<TAP_MS;
  // Tap an already-selected single cell (not Multi, not editing):
@@ -502,13 +545,21 @@ grid.addEventListener('pointerdown',e=>{const i=cellAt(e.clientX,e.clientY);if(i
  if(!add)sel=new Set();sel.add(i);
  if(!editing&&!add)numSel=valAt(i)||0; // selecting a cell that already has a digit turns highlight on
  renderSel()});
-grid.addEventListener('pointermove',e=>{if(!gp||e.pointerId!==gp.id)return;const i=cellAt(e.clientX,e.clientY);if(i<0||i===gp.last)return;gp.last=i;if(i!==gp.start){gp.moved=true;tapSeq.cell=-1}if(!sel.has(i)){sel.add(i);renderSel()}});
+// Thermo drawing only takes a cell when the finger is near its centre, so a diagonal drag doesn't clip the corner cells.
+function nearCentre(x,y){const r=grid.getBoundingClientRect(),fx=(x-r.left)/r.width*9,fy=(y-r.top)/r.height*9;return Math.hypot(fx-Math.floor(fx)-.5,fy-Math.floor(fy)-.5)<.36}
+grid.addEventListener('pointermove',e=>{if(!gp||e.pointerId!==gp.id)return;const i=cellAt(e.clientX,e.clientY);
+ if(gp.thermo){if(i<0||i===gp.last||!nearCentre(e.clientX,e.clientY))return;gp.last=i;gp.moved=true;if(!sel.has(i)){sel.add(i);renderSel()}return}if(i<0||i===gp.last)return;gp.last=i;if(i!==gp.start){gp.moved=true;tapSeq.cell=-1}if(!sel.has(i)){sel.add(i);renderSel()}});
 function endGP(e){if(!gp||(e&&e.pointerId!=null&&e.pointerId!==gp.id))return;const g=gp;gp=null;
+ if(g.thermo){const i=g.start;
+  if(!g.moved){
+   if(g.fresh&&thermosOf[i].length){const k=thermosOf[i][0];editThermo=k;sel=new Set(P.thermos[k].cells)}
+   else if(!g.added&&!g.fresh&&[...sel].pop()===i){sel.delete(i);if(!sel.size)editThermo=-1}}
+  renderThermos();renderSel();renderControls();return}
  if(g.moved){if(editing&&editCage>=0){editCage=-1;sumBuf='';renderLines();renderControls()}renderSel();return}
  if(g.rep){tapSeq.n++;tapSeq.t=Date.now();const i=g.start,ks=cagesOf[i];let grp;
   const full=(mode==='k'&&tapSeq.n===1)?fullColour(i):0;
   if(full)grp=cellsOfFullColour(full);
-  else if(tapSeq.n===1&&ks.length)grp=P.cages[ks[0]].cells;else if(tapSeq.n===1)grp=BOXCELLS(i).filter(j=>!cagesOf[j].length);else grp=BOXCELLS(i);
+  else{const L=tapGroups(i);grp=L[Math.min(tapSeq.n-1,L.length-1)]}
   // Use tapSeq.base (selection before the first tap): the first tap of a double-tap may already have toggled/deselected the cell.
   if(multi&&tapSeq.n===1&&tapSeq.base.has(i)){sel=new Set(tapSeq.base);for(const j of grp)sel.delete(j)}
   else sel=new Set([...(multi?tapSeq.base:[]),...grp]);
@@ -554,8 +605,12 @@ padBtns.forEach(b=>b.onclick=e=>{if(b.dataset.lp){delete b.dataset.lp;return}if(
 actBtn.onclick=()=>mode==='k'?clearColours():erase();
 $('#bErase').onclick=erase;$('#bTest').onclick=runTest;$('#bUndo').onclick=$('#eUndo').onclick=undo;$('#bRedo').onclick=$('#eRedo').onclick=redo;
 $('#bEdit').onclick=()=>setEditing(!editing);$('#bDone').onclick=()=>setEditing(false);
-function setEditing(on){editing=on;editCage=-1;sumBuf='';if(on)sel.clear();render()}
-$$('.tabs button').forEach(b=>b.onclick=()=>{etab=b.dataset.t;editCage=-1;sumBuf='';render()});
+function setEditing(on){editing=on;editCage=-1;editThermo=-1;sumBuf='';if(on)sel.clear();render()}
+$$('.tabs button').forEach(b=>b.onclick=()=>{etab=b.dataset.t;editCage=-1;editThermo=-1;sumBuf='';sel.clear();render()});
+$('#bThCreate').onclick=()=>{const cs=[...sel],why=thermoProblem(cs);if(why){nudge($('#bThCreate'));toast(cs.length<2?'Drag from the bulb to the tip first':why);return}
+ const k=editThermo;act(()=>{if(k>=0)P.thermos[k].cells=cs;else P.thermos.push({cells:cs})});sel.clear();editThermo=-1;render()};
+$('#bThDel').onclick=()=>{if(editThermo<0)return;const k=editThermo;act(()=>P.thermos.splice(k,1));editThermo=-1;sel.clear();render()};
+$('#bThClear').onclick=()=>{sel.clear();editThermo=-1;render()};
 sumPad.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;const s=b.dataset.s;
  if(s==='bk')sumBuf=sumBuf.slice(0,-1);else if(sumBuf.length<2&&!(sumBuf===''&&s==='0'))sumBuf+=s;else nudge(b);renderControls()});
 $('#bCreate').onclick=()=>{const n=+sumBuf;if(!sel.size||!n||n>45){nudge($('#bCreate'));toast(!sel.size?'Select cells first':'Enter a sum (1–45)');return}
@@ -605,9 +660,21 @@ function openLineCalc(L){const spec={cells:L.cells,sum:L.sum,editable:!L.derived
  elim:()=>{const g=P.lineSums&&P.lineSums[L.ck];return (g&&g.elim)||[]},
  toggle:x=>{const g=ensureLine(L);g.elim.includes(x)?g.elim.splice(g.elim.indexOf(x),1):g.elim.push(x)},
  setSum:nv=>{const g=ensureLine(L);if(g.sum!==nv){g.sum=nv;g.elim=[]}spec.sum=nv}};openCalc(spec)}
-$('#bCalc').onclick=()=>{const T=calcTarget();if(!T)return;if(T.type==='cage')openCalculator(T.k);else if(T.type==='group')openGroupCalc(T.G);else openLineCalc(T.L)};
+// Thermo sheet: each cell's possible range from its position (bulb of n cells: 1..10-n), narrowed by
+// digits already placed on the thermo (each step up needs at least +1).
+function thermoRanges(t){const cs=t.cells,n=cs.length,lo=[],hi=[];
+ for(let k=0;k<n;k++){lo[k]=k+1;hi[k]=9-(n-1-k);const v=valAt(cs[k]);if(v){lo[k]=Math.max(lo[k],v);hi[k]=Math.min(hi[k],v)}}
+ for(let k=1;k<n;k++)lo[k]=Math.max(lo[k],lo[k-1]+1);
+ for(let k=n-2;k>=0;k--)hi[k]=Math.min(hi[k],hi[k+1]-1);
+ return cs.map((i,k)=>({i,lo:lo[k],hi:hi[k],v:valAt(i)}))}
+function openThermoCalc(k){const t=P.thermos[k];if(!t)return;const rs=thermoRanges(t),bad=rs.some(r=>r.lo>r.hi);
+ const row=(r,k)=>`<div class="trow${r.lo>r.hi?' tbad':''}"><span class="tpos">${k===0?'Bulb':k===rs.length-1?'Tip':'Cell '+(k+1)}</span><span class="tcell">${RC(r.i)}</span><span class="trng">${r.v?`<b>${r.v}</b> placed`:r.lo>r.hi?'no digit fits':r.lo===r.hi?`must be <b>${r.lo}</b>`:`<b>${r.lo}–${r.hi}</b>`}</span></div>`;
+ $('#mbox').innerHTML=`<h2>THERMO</h2><div class="muted">${rs.length} cells · digits increase from the bulb</div><div class="tlist">${rs.map(row).join('')}</div>
+ <p class="muted cnote">Ranges come from the thermo's length and the digits already placed on it.${bad?' <b style="color:#b91c1c">Placed digits break the thermo.</b>':''}</p><div class="r"><button class="btn" id="mClose">Close</button></div>`;
+ showModal();$('#mClose').onclick=closeModal}
+$('#bCalc').onclick=()=>{const T=calcTarget();if(!T)return;if(T.type==='thermo'){openThermoCalc(T.k);return}if(T.type==='cage')openCalculator(T.k);else if(T.type==='group')openGroupCalc(T.G);else openLineCalc(T.L)};
 function showModal(){$('#modal').classList.remove('hidden')}
-function closeModal(){if(document.activeElement)document.activeElement.blur();$('#modal').classList.add('hidden');$('#mbox').onclick=null;$('#mbox').innerHTML=''}
+function closeModal(){if(document.activeElement)document.activeElement.blur();$('#modal').classList.add('hidden');$('#mbox').onclick=null;$('#mbox').classList.remove('help');$('#mbox').innerHTML=''}
 $('#modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal()});
 
 // ---------- Timer ----------
@@ -625,7 +692,7 @@ function showGame(){$('#list').classList.add('hidden');$('#game').classList.remo
 function progress(p){let f=0,g=0;for(let i=0;i<81;i++){if(p.givens[i])g++;else if(p.v[i])f++}return Math.round(100*(f+g)/81)}
 function showList(){endCeleb();saveNow();$('#game').classList.add('hidden');$('#list').classList.remove('hidden');
  const ps=Object.values(DB).sort((a,b)=>b.updated-a.updated);
- $('#items').innerHTML=ps.map(p=>`<div class="item${p.id===curId?' cur':''}" data-id="${p.id}"><div class="t">${esc(p.name)}</div><div class="s">${p.solved?'Solved ✓':progress(p)+'% filled'} · ${fmtT(p.time)} · ${p.cages.length} cages · ${new Date(p.updated).toLocaleDateString('en-US',{month:'short',day:'numeric'})}</div>
+ $('#items').innerHTML=ps.map(p=>`<div class="item${p.id===curId?' cur':''}" data-id="${p.id}"><div class="t">${esc(p.name)}</div><div class="s">${p.solved?'Solved ✓':progress(p)+'% filled'} · ${fmtT(p.time)} · ${p.cages.length} cages${(p.thermos||[]).length?` · ${p.thermos.length} thermos`:''} · ${new Date(p.updated).toLocaleDateString('en-US',{month:'short',day:'numeric'})}</div>
  <div class="r"><button class="open" data-a="open">Open</button><button data-a="copy">Copy</button><button data-a="ren">Rename</button><button data-a="restart">Restart</button><button class="del" data-a="del">Delete</button></div></div>`).join('')}
 $('#items').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;const id=b.closest('.item').dataset.id,p=DB[id],a=b.dataset.a;
  if(a==='open')openPuzzle(id);
@@ -648,6 +715,29 @@ function exportDialog(p){
  showModal();$('#xX').onclick=closeModal;
  const go=async st=>{const t=exportPuzzle(p,st);$('#xOut').value=t;try{await navigator.clipboard.writeText(t);toast('Copied')}catch(e){$('#xOut').select();toast('Select all and copy')}};
  $('#xP').onclick=()=>go(false);$('#xS').onclick=()=>go(true);$('#xOut').value=exportPuzzle(p,false)}
+
+// ---------- Help (opened from the ☰ puzzle list) ----------
+// One entry per section. To document a new element (arrows, kropki…), add an object to HELP_ELEMENTS;
+// app controls live in HELP_CONTROLS. Each body is a small HTML string.
+const HELP_ELEMENTS=[
+ {id:'rules',title:'Sudoku rules',body:`<p>Place 1–9 once in every row, column and 3×3 box.</p>`},
+ {id:'cage',title:'Killer cages',body:`<p>A dashed outline is a <b>cage</b>. Its digits add up to the small number in its top-left corner, and no digit repeats inside a cage.</p><p>Σ Combos lists every set of different digits that makes the sum. Tap a combo to rule it out; grey ones can't fit the digits already placed.</p>`},
+ {id:'45',title:'Uncaged sums and the rule of 45',body:`<p>Every row, column and box adds up to <b>45</b>. If a box's other cells are all in cages that stay inside it, the leftover cells must make 45 minus those cages. Double-tap an uncaged cell to select that leftover group and see its sum.</p><p>You can also select 2+ cells on one row or column (or part of a cage) and type a sum for them with Σ. The status line shows the total and how far it is from a multiple of 45.</p>`},
+ {id:'thermo',title:'Thermometers',body:`<p>A grey line with a round <b>bulb</b> is a thermometer. Digits must <b>strictly increase</b> from the bulb to the far end, so no digit repeats on a thermo.</p><p>On a 4-cell thermo the bulb can only be 1–6 and the tip 4–9. Select a thermo (or one uncaged cell on it) and press Σ to see each cell's possible range, narrowed by digits you've placed. Digits that break the order turn red.</p>`},
+];
+const HELP_CONTROLS=[
+ {id:'select',title:'Selecting cells',body:`<ul><li><b>Tap</b> a cell to select it; tap it again to deselect.</li><li><b>Double-tap</b> selects the cell's cage (or the uncaged cells of its box).</li><li>On a thermo, the next tap selects the thermo: <b>double</b> = cage, <b>triple</b> = thermo, then the box. An uncaged thermo cell goes thermo → uncaged group → box.</li><li>Otherwise <b>triple-tap</b> selects the whole box.</li><li><b>Drag</b> to select several cells, or turn on <b>Multi</b> to add/remove cells with taps (double-tapping a selected cell removes its group).</li><li>Tap the status line to clear the selection.</li></ul>`},
+ {id:'modes',title:'Digit, Corner, Centre',body:`<p>Pick a mode, then a number. Digit places a value; Corner and Centre add pencil marks. Placing a digit clears that digit's marks from the same row, column, box, cage and thermo.</p><p>With nothing selected, the number keys <b>highlight</b> that number: its cells and pencil marks light up and the places it can't go are greyed. Tap the key again to clear.</p>`},
+ {id:'colour',title:'Colours',body:`<p>In Colour mode each key has a <b>+</b> half and a <b>−</b> half. + adds a colour (up to 3 per cell); + on a colour already there makes it 2/3 of the cell. − shrinks or removes it. Long-press a key, or use ◎ Select colour, to select every cell with that colour. Double-tap a cell that is one solid colour to select all cells of that colour.</p>`},
+ {id:'sigma',title:'Σ Combos and Total',body:`<p>Σ works on: one cell in a cage (the whole cage), an uncaged box group, 2+ cells all in one cage or on one row/column (type their sum), or a thermo (ranges). The status line adds up whole cages, known groups and placed digits.</p>`},
+ {id:'test',title:'Test',body:`<p>For puzzles that come with a solution, select cells with centre marks and press <b>Test</b>: a green ✓ means the right digit is among the marks, a red ✕ means it's missing. Wrong placed digits also show red.</p>`},
+ {id:'other',title:'Timer, edit, puzzles',body:`<p>Tap the timer to pause. ✎ opens the editor for cages, thermos and givens. ☰ lists puzzles: paste a new one, copy, rename, restart or delete.</p>`},
+];
+function showHelp(){
+ const sec=h=>`<details class="hs" id="help-${h.id}"><summary>${esc(h.title)}</summary><div class="hb2">${h.body}</div></details>`;
+ $('#mbox').innerHTML=`<h2>Help</h2><div class="hgrp">Puzzle elements</div>${HELP_ELEMENTS.map(sec).join('')}<div class="hgrp">Using the app</div>${HELP_CONTROLS.map(sec).join('')}<div class="r"><button class="btn" id="hClose">Close</button></div>`;
+ $('#mbox').classList.add('help');showModal();$('#hClose').onclick=closeModal}
+$('#bHelp').onclick=showHelp;
 
 // ---------- Keyboard (handy on a Mac/iPad keyboard) ----------
 document.addEventListener('keydown',e=>{if(!$('#celeb').classList.contains('hidden')){if(e.key==='Escape'){e.preventDefault();endCeleb()}return}if(!$('#modal').classList.contains('hidden')||!$('#list').classList.contains('hidden'))return;

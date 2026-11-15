@@ -25,6 +25,7 @@ name Sample killer
 givens 53..7.... 6..195... ... # 81 chars, 1-9 or . (0 also = empty); spaces/| ignored; may wrap over lines
 solution 534678912 6..        # optional published solution, same layout as givens; mismatching user digits draw red
 cage 21 r1c1 r1c2 r2c1         # cage SUM CELL...
+thermo r1c1 r1c2 r2c3          # thermometer, bulb first; each step to a neighbour (diagonals ok); digits strictly increase
 # --- optional solving state (Copy with progress) ---
 values ..1...... ......... ... # player digits, same layout as givens
 corner r1c3 125                # corner (edge) notes
@@ -39,7 +40,7 @@ time 754                       # seconds on the clock
 solved
 ```
 
-Extending: new constraints get new keywords, e.g. `thermo r1c1 r1c2 r1c3` (bulb first), `arrow r2c2 > r2c3 r2c4`, `kropki white r1c1 r1c2`, `xv x r1c1 r1c2`. Unknown keywords are kept (re-exported unchanged) and reported as "not supported yet", so older versions of the app don't lose data.
+Extending: new constraints get new keywords, e.g. `arrow r2c2 > r2c3 r2c4`, `kropki white r1c1 r1c2`, `xv x r1c1 r1c2`. Unknown keywords are kept (re-exported unchanged) and reported as "not supported yet", so older versions of the app don't lose data.
 Bump the header to `v2` only for a change that older parsers would misread.
 
 Palette: 1 red · 2 orange · 3 yellow · 4 green · 5 teal · 6 blue · 7 purple · 8 pink · 9 grey.
@@ -112,3 +113,13 @@ A published hard killer is in `puzzles/escape-room-sujoyku.txt` — *Escape Room
 ## Test centre marks and colour double-tap (v13)
 - **Test** sits at the right of the bottom toolbar (Undo, Redo, Multi, Erase, Test). It is enabled only when the imported puzzle includes a `solution` line and at least one selected cell is empty and has centre pencil marks. Pressing it checks just those cells: a green tick if the solution digit is among the centre marks, a red ✕ if it is missing. The marks fade after about 1.5 seconds. The status line shows a count such as `Test: 5 ok, 1 missing`. Corner marks, placed digits, and unselected cells are not checked, and the puzzle state is not changed.
 - **Colour mode, double-tap:** if the cell is fully shaded a single colour, the double-tap (same 250ms window) selects every cell that is also fully that colour. Mixed or empty cells still select the cage or the uncaged cells of the box, as before. In Multi mode the same-colour cells are added, or removed if the double-tapped cell was already selected before the first tap. Triple-tap still selects the 3×3 box. **◎ Select colour** / long-press is unchanged: it still includes cells that only have that colour as one slice of several.
+
+## Thermometers and Help (v14)
+- **Format:** `thermo BULB CELL...` — 2–9 cells in order from the bulb, each a king-move neighbour of the previous one. Problems (gaps, repeats) import with a warning and show in the editor.
+- **Drawing:** grey bulb + rounded line in its own SVG layer (`#thermo`, `mix-blend-mode:multiply`) above the cells and below the cage outlines, so digits, notes, colours and highlights show through. A thermo whose placed digits break the order turns light red; offending digits turn red like other conflicts (and block the solved check).
+- **Rule:** digits strictly increase from the bulb. Thermo cells count as peers: placing a digit removes it from notes on the same thermo, and the number highlight greys them.
+- **Repeated taps** walk a list: cage → thermo(s) → (uncaged cells only) box's uncaged group → box. So a plain cage cell is unchanged (double = cage, triple = box); a caged thermo cell is double = cage, triple = thermo, 4 taps = box; an uncaged thermo cell is double = thermo, triple = uncaged group, 4 taps = box.
+- **Σ on a thermo** (exact thermo selection, or a single uncaged thermo cell) opens a range sheet: position k of n allows k..9−(n−1−k), narrowed by placed digits along the thermo. Exact cage/group selections still win; a thermo beats a line/cage-subset set with the same cells.
+- **Editor:** new Thermos tab. Drag (or tap cells) from bulb to tip; a drag only picks up a cell near its centre so diagonals don't clip corners. Tap the last cell again to drop it. With nothing selected, tap a thermo to edit (extend/update) or delete it.
+- **Help:** a Help button in the ☰ puzzle list opens collapsible sections. Add a new element by appending to `HELP_ELEMENTS` in app.js (controls are in `HELP_CONTROLS`).
+- `tools/solve_cp.py` handles `thermo` lines and checks the `solution` line.
