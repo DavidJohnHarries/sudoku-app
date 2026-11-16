@@ -112,6 +112,8 @@ function parsePuzzle(text){
  for(const [ln,toks,kw] of pend){const bm=/^box([1-9])$/i.exec(toks[0]||'');
   if(bm){const G=groupOf(p,bm[1]-1);if(!G){errs.push(`Line ${ln}: box${bm[1]} has no uncaged cells`);continue}const g=ensureGroup(p,G);
    if(kw==='groupsum'){const n=parseInt(toks[1]);if(n>=1&&n<=45&&!G.derived)g.sum=n}else g.elim=toks.slice(1).filter(t=>/^[1-9]+$/.test(t));continue}
+  if(kw==='elim'&&/^arrow$/i.test(toks[0]||'')){const c=parseCell(toks[1]||''),a=p.arrows.find(x=>x.cells[0]===c);if(!a){errs.push(`Line ${ln}: "elim arrow" must name an arrow's circle cell`);continue}
+   a.elim=toks.slice(2).filter(t=>/^\d+(:[1-9](\+[1-9])*)?$/.test(t));continue}
   if(kw==='linesum'||(kw==='elim'&&/^line$/i.test(toks[0]||''))){
    const src=kw==='elim'?toks.slice(1):toks,cells=[],rest=[];
    for(const t of src){const c=parseCell(t);if(c>=0)cells.push(c);else rest.push(t)}
@@ -167,6 +169,7 @@ function exportPuzzle(p,state){
   if(p.v.some(x=>x))L.push('values '+gridStr(p.v));
   for(let i=0;i<81;i++){if(p.cn[i])L.push(`corner ${RC(i)} ${p.cn[i]}`);if(p.mn[i])L.push(`centre ${RC(i)} ${p.mn[i]}`);const co=normCol(p.col[i]);if(co.c.length)L.push(`colour ${RC(i)} ${fmtColour(co)}`)}
   for(const c of p.cages)if(c.elim&&c.elim.length)L.push(`elim ${RC(c.cells[0])} ${c.elim.join(' ')}`);
+  for(const a of p.arrows||[])if(a.elim&&a.elim.length)L.push(`elim arrow ${RC(a.cells[0])} ${a.elim.join(' ')}`);
   for(let b=0;b<9;b++){const G=groupOf(p,b);if(!G||!G.stored)continue;if(!G.derived&&G.sum)L.push(`groupsum ${G.key} ${G.sum}`);if(G.elim.length)L.push(`elim ${G.key} ${G.elim.join(' ')}`)}
   const ls=p.lineSums||{};for(const ck of Object.keys(ls).sort()){const g=ls[ck],cells=ck.split(',').map(Number);
    if(g.sum)L.push(`linesum ${g.sum} `+cells.map(RC).join(' '));if(g.elim&&g.elim.length)L.push(`elim line `+cells.map(RC).join(' ')+' '+g.elim.join(' '))}
@@ -223,7 +226,7 @@ function calcTarget(){
 // ---------- Storage ----------
 let DB=LS('sdk_puzzles')||{};let curId=LS('sdk_cur');
 if(!Object.keys(DB).length){const {p}=parsePuzzle(SAMPLE);DB[p.id]=p;curId=p.id}
-for(const p of Object.values(DB)){p.extra=p.extra||[];p.thermos=p.thermos||[];p.arrows=(p.arrows||[]).map(a=>({cells:a.cells,b:a.b||1}));p.kropki=p.kropki||[];p.kropkiNeg=!!p.kropkiNeg;p.groups=p.groups||{};p.lineSums=p.lineSums||{};p.sol=p.sol||null;p.cages.forEach(c=>c.elim=c.elim||[]);if(p.col)for(let i=0;i<81;i++)p.col[i]=normCol(p.col[i])}
+for(const p of Object.values(DB)){p.extra=p.extra||[];p.thermos=p.thermos||[];p.arrows=(p.arrows||[]).map(a=>({cells:a.cells,b:a.b||1,elim:a.elim||[]}));p.kropki=p.kropki||[];p.kropkiNeg=!!p.kropkiNeg;p.groups=p.groups||{};p.lineSums=p.lineSums||{};p.sol=p.sol||null;p.cages.forEach(c=>c.elim=c.elim||[]);if(p.col)for(let i=0;i<81;i++)p.col[i]=normCol(p.col[i])}
 if(!DB[curId])curId=Object.values(DB).sort((a,b)=>b.updated-a.updated)[0].id;
 let P=DB[curId];
 let saveT=null;const saveNow=()=>{clearTimeout(saveT);saveT=null;SV('sdk_puzzles',DB);SV('sdk_cur',curId)};
@@ -669,7 +672,7 @@ grid.addEventListener('touchstart',e=>e.preventDefault(),{passive:false});
 document.addEventListener('dblclick',e=>e.preventDefault(),{passive:false});
 document.addEventListener('touchmove',e=>{if(e.touches.length>1)e.preventDefault()},{passive:false});
 let lastTE=0;document.addEventListener('touchend',e=>{const now=Date.now();
- if(now-lastTE<400&&!e.target.closest('textarea,input')){e.preventDefault();const b=e.target.closest('button,.combo,#infoTxt');if(b&&!b.disabled&&!b.dataset.lp){const inner=e.target.closest('.cpm');(inner||b).click()}}
+ if(now-lastTE<400&&!e.target.closest('textarea,input')){e.preventDefault();const b=e.target.closest('button,.combo,.arow,#infoTxt');if(b&&!b.disabled&&!b.dataset.lp){const inner=e.target.closest('.cpm');(inner||b).click()}}
  lastTE=now},{passive:false});
 
 // ---------- Multi-select + select-by-colour ----------
@@ -786,14 +789,29 @@ function arrowOptions(a){const b=a.b||1,cs=a.cells,n=cs.length;
   if(k===n){const key=asg.slice(b).slice().sort((p,q)=>p-q).join('+');if(!res.has(circle))res.set(circle,new Set());res.get(circle).add(key);return}
   for(const d of cand[k]){if(S[k].some(y=>asg[y]===d))continue;asg[k]=d;rec(k+1,circle,sum+d)}})(0,0,0);
  return {res,capped}}
+// Crossings are manual and stored per arrow in a.elim: "9" = the whole circle value 9 crossed out,
+// "9:1+2+6" = just that shaft set. Keyed by value + digits, so they survive placed digits changing the list.
 function openArrowCalc(k){const a=P.arrows[k];if(!a)return;const b=a.b||1,shN=a.cells.length-b,{res,capped}=arrowOptions(a);
- const vals=[...res.keys()].sort((x,y)=>x-y),MAXC=8;
- const row=v=>{const L=[...res.get(v)].sort((p,q)=>{const P2=p.split('+').map(Number),Q=q.split('+').map(Number);for(let x=0;x<P2.length;x++)if(P2[x]!==Q[x])return P2[x]-Q[x];return 0});
-  return `<div class="arow"><span class="av">${v}</span><span class="ac">${L.slice(0,MAXC).map(x=>`<span>${x}</span>`).join('')}${L.length>MAXC?`<span class="more">+${L.length-MAXC} more</span>`:''}</span></div>`};
- $('#mbox').innerHTML=`<h2>ARROW</h2><div class="muted">${b>1?`${b}-cell circle (${b}-digit number)`:'Circle'} ${a.cells.slice(0,b).map(RC).join(' ')} · shaft ${shN} cell${shN>1?'s':''}</div>
- <div class="tlist">${vals.length?vals.map(row).join(''):'<div class="trow tbad">No circle value works with the digits placed.</div>'}</div>
- <p class="muted cnote">Circle value, then each set of shaft digits that adds up to it. Uses digits already placed on the arrow and in each cell's row, column, box and cage; shaft cells that see each other can't repeat.${capped?' <b>Too many options to list them all.</b>':''}</p><div class="r"><button class="btn" id="mClose">Close</button></div>`;
- showModal();$('#mClose').onclick=closeModal}
+ a.elim=a.elim||[];const vals=[...res.keys()].sort((x,y)=>x-y),MAXC=8,open=new Set();
+ const lists=new Map(vals.map(v=>[v,[...res.get(v)].sort((p,q)=>{const P2=p.split('+').map(Number),Q=q.split('+').map(Number);for(let x=0;x<P2.length;x++)if(P2[x]!==Q[x])return P2[x]-Q[x];return 0})]));
+ const E=()=>P.arrows[k].elim||(P.arrows[k].elim=[]);
+ const comboOff=(v,c)=>E().includes(String(v))||E().includes(v+':'+c);
+ const valOff=v=>E().includes(String(v))||lists.get(v).every(c=>E().includes(v+':'+c));
+ const row=v=>{const L=lists.get(v),show=open.has(v)?L:L.slice(0,MAXC),off=valOff(v);
+  return `<div class="arow${off?' off':''}" data-v="${v}"><button class="av" data-v="${v}">${v}</button><span class="ac">${show.map(x=>`<button class="acb${comboOff(v,x)?' off':''}" data-v="${v}" data-c="${x}">${x}</button>`).join('')}${L.length>show.length?`<button class="more" data-more="${v}">+${L.length-show.length} more</button>`:''}</span></div>`};
+ const draw=()=>{const live=vals.filter(v=>!valOff(v));$('#aList').innerHTML=vals.length?vals.map(row).join(''):'<div class="trow tbad">No circle value works with the digits placed.</div>';
+  $('#aMeta').textContent=`${b>1?`${b}-cell circle (${b}-digit number)`:'Circle'} ${a.cells.slice(0,b).map(RC).join(' ')} · shaft ${shN} cell${shN>1?'s':''}`+(vals.length?` · ${live.length} of ${vals.length} values left`:'')};
+ const change=fn=>{const before=snap();fn(P.arrows[k]);if(snap()!==before){undoS.push(before);redoS=[];save()}draw()};
+ $('#mbox').innerHTML=`<h2>ARROW</h2><div class="muted" id="aMeta"></div><div class="tlist" id="aList"></div>
+ <p class="muted cnote">Circle value, then each set of shaft digits that adds up to it. Tap a value to cross out the whole row, or one set to cross out just that set; tap again to restore. Uses digits already placed on the arrow and in each cell's row, column, box and cage; shaft cells that see each other can't repeat.${capped?' <b>Too many options to list them all.</b>':''}</p><div class="r"><button class="btn" id="mClose">Close</button></div>`;
+ draw();showModal();$('#mClose').onclick=closeModal;
+ $('#aList').onclick=e=>{const t=e.target.closest('button,.arow');if(!t)return;
+  if(t.dataset.more){open.add(+t.dataset.more);draw();return}
+  const v=+t.dataset.v,c=t.dataset.c,V=String(v),pre=V+':';
+  if(c)change(a2=>{const el=a2.elim||(a2.elim=[]);
+    if(el.includes(V)){a2.elim=el.filter(x=>x!==V&&!x.startsWith(pre));for(const o of lists.get(v))if(o!==c)a2.elim.push(pre+o)} // whole value crossed: restore just this set
+    else{const key=pre+c,ix=el.indexOf(key);ix>=0?el.splice(ix,1):el.push(key)}});
+  else change(a2=>{const el=a2.elim||[];const was=valOff(v);a2.elim=el.filter(x=>x!==V&&!x.startsWith(pre));if(!was)a2.elim.push(V)})}}
 function showModal(){$('#modal').classList.remove('hidden')}
 function closeModal(){if(document.activeElement)document.activeElement.blur();$('#modal').classList.add('hidden');$('#mbox').onclick=null;$('#mbox').classList.remove('help');$('#mbox').innerHTML=''}
 $('#modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal()});
@@ -819,7 +837,7 @@ $('#items').addEventListener('click',e=>{const b=e.target.closest('button');if(!
  if(a==='open')openPuzzle(id);
  else if(a==='copy')exportDialog(p);
  else if(a==='ren'){const n=prompt('Puzzle name',p.name);if(n&&n.trim()){p.name=n.trim();saveNow();showList()}}
- else if(a==='restart'){if(confirm(`Restart "${p.name}"? Your digits, notes, colours, ruled-out combos and time will be cleared.`)){Object.assign(p,{v:Array(81).fill(0),cn:Array(81).fill(''),mn:Array(81).fill(''),col:Array.from({length:81},()=>({c:[],b:0})),time:0,solved:false});p.cages.forEach(c=>c.elim=[]);p.groups={};p.lineSums={};if(id===curId){undoS=[];redoS=[];cellCache=Array(81).fill(null)}saveNow();showList()}}
+ else if(a==='restart'){if(confirm(`Restart "${p.name}"? Your digits, notes, colours, ruled-out combos and time will be cleared.`)){Object.assign(p,{v:Array(81).fill(0),cn:Array(81).fill(''),mn:Array(81).fill(''),col:Array.from({length:81},()=>({c:[],b:0})),time:0,solved:false});p.cages.forEach(c=>c.elim=[]);(p.arrows||[]).forEach(a=>a.elim=[]);p.groups={};p.lineSums={};if(id===curId){undoS=[];redoS=[];cellCache=Array(81).fill(null)}saveNow();showList()}}
  else if(a==='del'){if(confirm(`Delete "${p.name}"? This can't be undone.`)){delete DB[id];if(!Object.keys(DB).length){const n=blankPuzzle('Untitled');DB[n.id]=n}if(id===curId){curId=Object.values(DB).sort((a,b)=>b.updated-a.updated)[0].id;P=DB[curId];undoS=[];redoS=[];cellCache=Array(81).fill(null)}saveNow();showList()}}});
 $('#bList').onclick=showList;$('#bBack').onclick=()=>{showGame();render()};
 $('#bNew').onclick=()=>{const n=prompt('Name for the new puzzle','Puzzle '+(Object.keys(DB).length+1));if(n===null)return;const p=blankPuzzle(n.trim()||'Untitled');DB[p.id]=p;openPuzzle(p.id);setEditing(true)};
@@ -846,7 +864,7 @@ const HELP_ELEMENTS=[
  {id:'45',title:'Uncaged sums and the rule of 45',body:`<p>Every row, column and box adds up to <b>45</b>. If a box's other cells are all in cages that stay inside it, the leftover cells must make 45 minus those cages. Double-tap an uncaged cell to select that leftover group and see its sum.</p><p>You can also select 2+ cells on one row or column (or part of a cage) and type a sum for them with Σ. The status line shows the total and how far it is from a multiple of 45.</p>`},
  {id:'kropki',title:'Kropki dots',body:`<p>A dot on the line between two cells links their digits.</p><ul><li><span class="hdots"></span> <b>White</b>: the digits are <b>consecutive</b> (differ by 1), e.g. 4 and 5.</li><li><span class="hdots b"></span> <b>Black</b>: one digit is <b>double</b> the other, e.g. 3 and 6. Possible pairs: 1–2, 2–4, 3–6, 4–8.</li><li>1 and 2 fit either colour.</li></ul><p>Usually <b>not all dots are given</b>: a missing dot tells you nothing. If a puzzle says <b>all dots are given</b>, two neighbours with no dot can be neither consecutive nor double.</p><p>Tips: 9 can't be on a black dot, and 5 or 7 only pair with 1 less or 1 more. A dot turns red when the digits beside it break its rule.</p>`},
  {id:'thermo',title:'Thermometers',body:`<p>A grey line with a round <b>bulb</b> is a thermometer. Digits must <b>strictly increase</b> from the bulb to the far end, so no digit repeats on a thermo.</p><p>On a 4-cell thermo the bulb can only be 1–6 and the tip 4–9. Select a thermo (or one uncaged cell on it) and press Σ to see each cell's possible range, narrowed by digits you've placed. Digits that break the order turn red.</p>`},
- {id:'arrow',title:'Arrows',body:`<p>A grey <b>circle</b> with a line and an arrowhead is an arrow. The digits along the line (the <b>shaft</b>) <b>add up to the digit in the circle</b>.</p><p>Digits <b>can repeat</b> on an arrow, as long as the repeats aren't in the same row, column, box or cage. A 2-cell oval circle is read as a 2-digit number (left to right, or top to bottom).</p><p>Tips: the circle is at least the number of shaft cells, so a 3-cell shaft means the circle is 6+ if its cells all see each other. Select an arrow (or one uncaged cell on it) and press Σ to list each possible circle value with the shaft digits that make it. Digits that can't add up turn the arrow red.</p>`},
+ {id:'arrow',title:'Arrows',body:`<p>A grey <b>circle</b> with a line and an arrowhead is an arrow. The digits along the line (the <b>shaft</b>) <b>add up to the digit in the circle</b>.</p><p>Digits <b>can repeat</b> on an arrow, as long as the repeats aren't in the same row, column, box or cage. A 2-cell oval circle is read as a 2-digit number (left to right, or top to bottom).</p><p>Tips: the circle is at least the number of shaft cells, so a 3-cell shaft means the circle is 6+ if its cells all see each other. Select an arrow (or one uncaged cell on it) and press Σ to list each possible circle value with the shaft digits that make it. Tap a value to cross out that whole row, or tap one set of digits to cross out just that set; tap again to restore. Crossings are yours — the app never crosses anything out for you. Digits that can't add up turn the arrow red.</p>`},
 ];
 const HELP_CONTROLS=[
  {id:'select',title:'Selecting cells',body:`<ul><li><b>Tap</b> a cell to select it; tap it again to deselect.</li><li><b>Double-tap</b> selects the cell's cage (or the uncaged cells of its box).</li><li>On a thermo or arrow, the next tap selects the thermo/arrow: <b>double</b> = cage, <b>triple</b> = thermo or arrow, then the box. An uncaged thermo or arrow cell goes thermo/arrow → uncaged group → box.</li><li>Otherwise <b>triple-tap</b> selects the whole box.</li><li><b>Drag</b> to select several cells, or turn on <b>Multi</b> to add/remove cells with taps (double-tapping a selected cell removes its group).</li><li>While <b>Multi</b> is on, the number highlight is <b>locked</b>: selecting cells won't change it. To change it, clear the selection (tap the status line) and tap a number key; tap the same key to turn it off.</li><li>Tap the status line to clear the selection.</li></ul>`},

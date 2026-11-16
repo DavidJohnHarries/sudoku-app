@@ -170,5 +170,11 @@ header{display:flex;align-items:center;gap:6px;height:50px}
 /* Arrows (v16): own SVG layer under the cage lines, multiplied like thermos so digits show through. */
 #arrows{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;mix-blend-mode:multiply}
 .arow{display:flex;gap:10px;align-items:baseline;background:#eef2ff;border-radius:10px;padding:8px 12px;font-size:17px;font-variant-numeric:tabular-nums}
-.arow .av{flex:none;min-width:30px;font-weight:800;color:#1e3a8a;font-size:20px}.arow .ac{flex:1;line-height:1.45}
-.arow .ac span{display:inline-block;margin-right:10px;white-space:nowrap}.arow .more{color:#6b7280;font-size:14px}
+.arow{cursor:pointer;align-items:center}
+.arow .av{flex:none;min-width:36px;min-height:36px;font-weight:800;color:#1e3a8a;font-size:20px;background:#fff;border-radius:8px;box-shadow:0 1px 2px #0002;padding:0}
+.arow .ac{flex:1;display:flex;flex-wrap:wrap;gap:6px}
+.arow .acb{background:#fff;border-radius:8px;padding:6px 9px;font-size:17px;font-variant-numeric:tabular-nums;box-shadow:0 1px 2px #0002;white-space:nowrap;line-height:1.1}
+.arow .more{background:transparent;color:#1e3a8a;font-size:14px;padding:6px 4px;text-decoration:underline}
+/* Crossed out (v18): same look as ruled-out cage combos. */
+.arow .acb.off{opacity:.3;text-decoration:line-through}
+.arow.off{background:#f3f4f6}.arow.off .av{opacity:.35;text-decoration:line-through}
