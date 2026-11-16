@@ -3,24 +3,27 @@
 <meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#f3f4f6"><title>Sudoku</title>
 <link rel="manifest" href="manifest.json"><link rel="apple-touch-icon" href="icon-180.png">
-<link rel="stylesheet" href="style.css?v=14">
+<link rel="stylesheet" href="style.css?v=15">
 </head><body>
 <div id="game">
  <header><button id="bList" class="hb" aria-label="Puzzles">☰</button><div id="pname"></div><button id="timer" class="hb tm">0:00</button><button id="bEdit" class="hb" aria-label="Edit puzzle">✎</button></header>
  <div id="info"><span id="infoTxt">No cage selected</span><span class="ib"><button id="bPick" class="calc pick hidden">◎ Select colour</button><button id="bCalc" class="calc" disabled>Σ Combos</button></span></div>
- <div id="gridWrap"><div id="grid"></div><svg id="thermo" viewBox="0 0 900 900" preserveAspectRatio="none"></svg><svg id="lines" viewBox="0 0 900 900" preserveAspectRatio="none"></svg></div>
+ <div id="gridWrap"><div id="grid"></div><svg id="thermo" viewBox="0 0 900 900" preserveAspectRatio="none"></svg><svg id="lines" viewBox="0 0 900 900" preserveAspectRatio="none"></svg><svg id="dots" viewBox="0 0 900 900" preserveAspectRatio="none"></svg></div>
  <div id="play">
-  <div class="modes">
-   <button data-m="v" class="on"><b>1</b><small>Digit</small></button>
-   <button data-m="c"><span class="mc">1 2<br>3</span><small>Corner</small></button>
-   <button data-m="m"><span class="mm">12</span><small>Centre</small></button>
-   <button data-m="k"><span class="mk"></span><small>Colour</small></button>
+   <div class="modebar">
+   <div class="modes" role="radiogroup" aria-label="Entry mode">
+    <button data-m="v" class="on" role="radio"><span class="mi mv">1</span><span class="ml">Digit</span></button>
+    <button data-m="c" role="radio"><span class="mi mc">1 2<br>3</span><span class="ml">Corner</span></button>
+    <button data-m="m" role="radio"><span class="mi mm">12</span><span class="ml">Centre</span></button>
+    <button data-m="k" role="radio"><span class="mi mk"></span><span class="ml">Colour</span></button>
+   </div>
+   <button id="bMulti" class="multi" aria-pressed="false"><span class="mbx"></span>Multi</button>
   </div>
   <div class="pad" id="pad"></div>
-  <div class="tools"><button id="bUndo">↶ Undo</button><button id="bRedo">↷ Redo</button><button id="bMulti" class="multi">☐ Multi</button><button id="bErase">⌫ Erase</button><button id="bTest" disabled>Test</button></div>
+  <div class="tools"><button id="bUndo">↶ Undo</button><button id="bRedo">↷ Redo</button><button id="bErase">⌫ Erase</button><button id="bTest" disabled>Test</button></div>
  </div>
  <div id="edit" class="hidden">
-  <div class="tabs"><button data-t="cage" class="on">Cages</button><button data-t="thermo">Thermos</button><button data-t="giv">Givens</button></div>
+  <div class="tabs"><button data-t="cage" class="on">Cages</button><button data-t="thermo">Thermos</button><button data-t="kropki">Dots</button><button data-t="giv">Givens</button></div>
   <div id="eCage">
    <div class="sumrow"><span class="muted">Sum</span><div id="sumBuf">–</div><button id="bCreate" class="btn">Create cage</button><button id="bDelCage" class="btn danger hidden">Delete</button></div>
    <div class="pad sumpad" id="sumPad"></div>
@@ -28,6 +31,10 @@
   <div id="eThermo" class="hidden">
    <div class="sumrow"><button id="bThClear" class="btn sec">Clear</button><button id="bThCreate" class="btn">Create thermo</button><button id="bThDel" class="btn danger hidden">Delete</button></div>
    <p class="muted ehint">Drag (or tap cells one by one) from the bulb to the tip. Tap the last cell again to remove it. With nothing selected, tap a thermo to edit or delete it.</p>
+  </div>
+  <div id="eKropki" class="hidden">
+   <div class="sumrow"><button id="bKNeg" class="btn sec kneg" aria-pressed="false"><span class="mbx"></span>All dots given</button></div>
+   <p class="muted ehint">Tap near the line between two cells to cycle: no dot → white (consecutive) → black (one is double the other) → none. Turn on “All dots given” if cells with no dot can't be consecutive or double.</p>
   </div>
   <div id="eGiv" class="hidden"><div class="pad" id="givPad"></div></div>
   <div id="warn"></div>
@@ -54,4 +61,4 @@
   </div>
  </div>
 </div>
-<script src="app.js?v=14"></script></body></html>
+<script src="app.js?v=15"></script></body></html>

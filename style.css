@@ -33,12 +33,23 @@ header{display:flex;align-items:center;gap:6px;height:50px}
 .cn.top-only{justify-content:flex-start}
 .mn{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:26cqh;color:#374151;letter-spacing:-.02em;text-align:center;padding:0 4%;word-break:break-all;line-height:1}
 .mn.m5{font-size:22cqh}.mn.m6{font-size:19cqh}.mn.m7,.mn.m8,.mn.m9{font-size:16cqh}
-.modes{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin:10px 0 6px}
-.modes button{height:54px;display:flex;flex-direction:column;align-items:center;justify-content:center;box-shadow:0 1px 2px #0002;line-height:1.1}
-.modes button small{font-size:11px;color:#6b7280;margin-top:2px}.modes button b{font-size:22px}
-.modes button.on{background:#1e3a8a;color:#fff}.modes button.on small{color:#c7d2fe}
-.mc{font-size:11px;width:26px;text-align:left;line-height:1.2}.mm{font-size:13px}
-.mk{width:22px;height:22px;border-radius:50%;background:conic-gradient(#fca5a5 0 33%,#86efac 0 66%,#93c5fd 0)}
+/* Mode bar (v15): a compact segmented control + a Multi toggle, deliberately unlike the big white
+   number keys — grey track, short, small icon beside a text label, active segment raised in white. */
+.modebar{display:flex;gap:8px;align-items:stretch;margin:10px 0 8px}
+.modes{flex:1;display:grid;grid-template-columns:repeat(4,1fr);gap:2px;background:#d9dde3;border-radius:21px;padding:3px;min-width:0}
+.modes button{height:36px;border-radius:18px;background:transparent;display:flex;align-items:center;justify-content:center;gap:4px;padding:0 2px;color:#4b5563;font-size:13px;font-weight:600;line-height:1;min-width:0;white-space:nowrap}
+.modes button.on{background:#fff;color:#1e3a8a;box-shadow:0 1px 3px #0003}
+.modes .ml{overflow:hidden;text-overflow:ellipsis}
+.mi{flex:none;display:inline-flex;align-items:center;justify-content:center;width:17px;height:17px;border-radius:4px;box-shadow:inset 0 0 0 1.5px currentColor;font-weight:700}
+.mi.mv{font-size:11px}.mi.mc{font-size:6.5px;line-height:1.05;text-align:left;align-items:flex-start;justify-content:flex-start;padding:1.5px 2px;letter-spacing:-.02em}.mi.mm{font-size:8px;letter-spacing:-.03em}
+.mi.mk{box-shadow:none;border-radius:50%;width:15px;height:15px;background:conic-gradient(#f87171 0 33%,#4ade80 0 66%,#60a5fa 0)}
+.modebar .multi{flex:none;height:42px;border-radius:21px;padding:0 12px 0 10px;display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600;background:transparent;color:#4b5563;box-shadow:inset 0 0 0 2px #c3c8d0}
+.mbx{display:inline-block;width:14px;height:14px;border-radius:4px;box-shadow:inset 0 0 0 1.5px currentColor;position:relative}
+.modebar .multi.on{background:#f59e0b;color:#111827;box-shadow:none}
+.multi.on .mbx,.kneg.on .mbx{background:currentColor}
+.multi.on .mbx::after,.kneg.on .mbx::after{content:'';position:absolute;left:4.5px;top:1.5px;width:3px;height:7px;border:solid #fff;border-width:0 2px 2px 0;transform:rotate(45deg)}
+.multi.on .mbx::after{border-color:#f59e0b}
+@media (max-width:350px){.modes .mi{display:none}}
 .pad{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}
 .pad button{height:58px;font-size:28px;box-shadow:0 1px 2px #0002;position:relative}
 .pad.cmode button{font-size:0}.pad .sw{position:absolute;inset:8px;border-radius:9px}
@@ -67,7 +78,6 @@ header{display:flex;align-items:center;gap:6px;height:50px}
 .toast{position:fixed;top:calc(4px + env(safe-area-inset-top));max-width:92vw;text-align:center;left:50%;transform:translateX(-50%);background:#111827;color:#fff;padding:10px 16px;border-radius:10px;z-index:30;font-size:15px}
 .nudge{animation:nudge .25s}@keyframes nudge{0%,100%{transform:none}30%{transform:translateX(-4px)}70%{transform:translateX(4px)}}
 
-.tools .multi.on{background:#1e3a8a;color:#fff;box-shadow:0 0 0 2px #93c5fd}
 .calc.pick{background:#fff;color:#1e3a8a;box-shadow:inset 0 0 0 2px #1e3a8a}.calc.pick.on{background:#f59e0b;color:#111;box-shadow:none}
 .pad.picking button:not(.act){box-shadow:0 0 0 2px #f59e0b}
 .ib{display:flex;gap:6px}
@@ -143,3 +153,8 @@ header{display:flex;align-items:center;gap:6px;height:50px}
 .hs summary::before{content:'›';display:inline-block;width:16px;transition:transform .15s}.hs[open] summary::before{transform:rotate(90deg)}
 .hb2{padding:0 12px 10px;font-size:15px;line-height:1.4;color:#1f2937}.hb2 p{margin:4px 0 8px}.hb2 ul{margin:4px 0;padding-left:20px}.hb2 li{margin:3px 0}
 .lbtns button{padding:0 10px}
+/* Kropki dots (v15): own SVG layer above cage lines, on the shared edge. */
+#dots{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+.kneg{display:flex;align-items:center;gap:8px}.kneg.on{background:#1e3a8a;color:#fff;box-shadow:none}
+.hdots{display:inline-block;width:12px;height:12px;border-radius:50%;border:2px solid #111827;vertical-align:-1px;margin:0 2px}.hdots.b{background:#111827}
+.kneg.on .mbx::after{border-color:#1e3a8a}

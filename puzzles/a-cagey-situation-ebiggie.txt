@@ -1,0 +1,26 @@
+SUDOKU v1
+name A Cagey Situation
+givens ......... ......... ......... ......... ......... ......... ......... ......... .........
+solution 619573842 723481569 584296731 862314975 971658324 435729186 358942617 147865293 296137458
+cage 32 r1c3 r1c4 r1c5 r1c6 r1c7
+cage 16 r3c2 r4c2 r4c3
+cage 8 r4c4 r4c5 r4c6
+cage 22 r3c6 r3c7 r4c7
+cage 18 r2c8 r2c9 r3c8
+cage 16 r4c8 r4c9 r5c9
+cage 16 r5c1 r6c1 r6c2
+cage 22 r6c3 r7c3 r7c4
+cage 13 r7c5 r8c5 r9c5
+cage 16 r8c6 r9c6 r9c7
+cage 25 r8c8 r8c9 r9c8 r9c9
+cage 15 r6c7 r6c8 r6c9
+cage 16 r8c1 r8c2 r9c1 r9c2
+kropki b r4c4 r5c4
+kropki b r4c6 r5c6
+kropki w r5c4 r6c4
+kropki w r5c6 r6c6
+kropki w r4c1 r5c1
+kropki w r3c6 r3c7
+kropki w r7c3 r7c4
+kropki w r9c7 r9c8
+kropki w r1c4 r2c4

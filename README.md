@@ -26,6 +26,9 @@ givens 53..7.... 6..195... ... # 81 chars, 1-9 or . (0 also = empty); spaces/| i
 solution 534678912 6..        # optional published solution, same layout as givens; mismatching user digits draw red
 cage 21 r1c1 r1c2 r2c1         # cage SUM CELL...
 thermo r1c1 r1c2 r2c3          # thermometer, bulb first; each step to a neighbour (diagonals ok); digits strictly increase
+kropki w r1c1 r1c2             # white Kropki dot: consecutive digits (cells must share an edge)
+kropki b r3c4 r4c4             # black Kropki dot: one digit is double the other
+kropki-negative                # optional: all dots are given (no dot = neither consecutive nor double)
 # --- optional solving state (Copy with progress) ---
 values ..1...... ......... ... # player digits, same layout as givens
 corner r1c3 125                # corner (edge) notes
@@ -123,3 +126,11 @@ A published hard killer is in `puzzles/escape-room-sujoyku.txt` — *Escape Room
 - **Editor:** new Thermos tab. Drag (or tap cells) from bulb to tip; a drag only picks up a cell near its centre so diagonals don't clip corners. Tap the last cell again to drop it. With nothing selected, tap a thermo to edit (extend/update) or delete it.
 - **Help:** a Help button in the ☰ puzzle list opens collapsible sections. Add a new element by appending to `HELP_ELEMENTS` in app.js (controls are in `HELP_CONTROLS`).
 - `tools/solve_cp.py` handles `thermo` lines and checks the `solution` line.
+
+## Kropki dots, mode bar (v15)
+- **Format:** `kropki w|b CELL CELL` (orthogonal neighbours, one dot per edge; a later line on the same edge replaces the colour) and an optional `kropki-negative` line meaning all dots are given. Both round-trip through Copy.
+- **Rule:** white = differ by 1; black = 1:2 ratio (1–2 fits either). Placed digits that break a dot turn red and the dot turns red. With `kropki-negative`, neighbours without a dot that are consecutive or 1:2 turn red and get a dashed red ring on that edge. Dots are not peers (no note clearing / no highlight greying).
+- **Drawing:** `#dots` SVG above the cage lines; r=10 of a 100-unit cell on the shared edge.
+- **Editor:** Dots tab. Tap near an interior edge to cycle none → white → black → none (blue ring marks the last edge touched). “All dots given” toggles `kropki-negative`. Undo/redo cover both.
+- **Mode bar:** Digit/Corner/Centre/Colour are now a short grey segmented control (small icon beside a label, active segment raised in white) and **Multi** moved out of the bottom toolbar onto the same row as a pill toggle (amber with a tick when on). Bottom toolbar: Undo, Redo, Erase, Test.
+- `tools/solve_cp.py` handles `kropki` and `kropki-negative`.
