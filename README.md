@@ -26,6 +26,8 @@ givens 53..7.... 6..195... ... # 81 chars, 1-9 or . (0 also = empty); spaces/| i
 solution 534678912 6..        # optional published solution, same layout as givens; mismatching user digits draw red
 cage 21 r1c1 r1c2 r2c1         # cage SUM CELL...
 thermo r1c1 r1c2 r2c3          # thermometer, bulb first; each step to a neighbour (diagonals ok); digits strictly increase
+arrow r1c1 r1c2 r1c3           # arrow: circle first, then the shaft in order to the arrowhead; shaft digits sum to the circle
+arrow r1c1 r1c2 > r2c3 r3c3    # 2-3 cell circle (read as a number) before ">", then the shaft
 kropki w r1c1 r1c2             # white Kropki dot: consecutive digits (cells must share an edge)
 kropki b r3c4 r4c4             # black Kropki dot: one digit is double the other
 kropki-negative                # optional: all dots are given (no dot = neither consecutive nor double)
@@ -134,3 +136,9 @@ A published hard killer is in `puzzles/escape-room-sujoyku.txt` — *Escape Room
 - **Editor:** Dots tab. Tap near an interior edge to cycle none → white → black → none (blue ring marks the last edge touched). “All dots given” toggles `kropki-negative`. Undo/redo cover both.
 - **Mode bar:** Digit/Corner/Centre/Colour are now a short grey segmented control (small icon beside a label, active segment raised in white) and **Multi** moved out of the bottom toolbar onto the same row as a pill toggle (amber with a tick when on). Bottom toolbar: Undo, Redo, Erase, Test.
 - `tools/solve_cp.py` handles `kropki` and `kropki-negative`.
+
+## 3×3 pad, highlight lock, arrows (v16)
+- **Pad:** digits 1–9 are a 3×3 keypad (1 2 3 / 4 5 6 / 7 8 9) on the right; Undo / Redo / Erase / Test sit in a grey column on the left. The old 10th key (⌫ / Clear colours) duplicated Erase and is gone; Erase reads "⌫ Colours" in Colour mode. Mode bar unchanged. Keys are 54px tall (50px on short screens).
+- **Highlight lock:** while Multi is on, selecting cells (tap, drag, double-tap groups, select-by-colour) never changes the number highlight, and placing a digit keeps it. With no cells selected the pad sets the highlight (same key again clears it). Multi off = old behaviour.
+- **Arrows:** `arrow CIRCLE SHAFT…` (or `arrow C1 C2 > SHAFT…` for a 2–3 cell pill read as a number). Drawn SudokuPad-style (grey ring/pill + line + open arrowhead) in `#arrows` (multiply, under cage lines). Red when the shaft can't match the circle (full and wrong, or already too big/small). Tap cycle: cage → thermo → arrow → uncaged group → box. Σ on an exact arrow or shaft (or one uncaged, non-thermo arrow cell) opens the ARROW sheet: each possible circle value with the shaft digit sets that make it, using placed digits and sudoku/cage visibility (repeats allowed where cells don't see each other). Editor tab "Arrows": tap circle then shaft; "Circle: N" sets pill size. `tools/solve_cp.py` supports `arrow`.
+

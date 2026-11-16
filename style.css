@@ -57,6 +57,15 @@ header{display:flex;align-items:center;gap:6px;height:50px}
 .pad.cmode button.act{font-size:13px}
 .pad.nmode button{font-size:20px;color:#374151}
 .tools{display:flex;gap:6px;margin-top:6px}.tools button{flex:1;height:46px;box-shadow:0 1px 2px #0002;font-size:15px;padding:0 4px}
+/* v16: number keys as a 3×3 phone-style pad on the right; Undo/Redo/Erase/Test in a column on the left. */
+.padrow{display:flex;gap:8px;align-items:stretch}
+#pad{flex:1;grid-template-columns:repeat(3,1fr);--kh:54px}
+@media (min-height:780px){#pad{--kh:60px}}
+#pad button{height:var(--kh)}
+.tools.side{flex:none;width:30%;flex-direction:column;margin-top:0;gap:6px}
+.tools.side button{flex:1;height:auto;min-height:38px;font-size:15px;background:#e9ecf1;color:#1f2937;box-shadow:none;border-radius:10px}
+/* Short screens (iPhone SE/8, 667pt): slightly shorter keys and gaps so the whole pad fits. */
+@media (max-height:700px){#pad{--kh:46px}.modebar{margin:6px 0}#info{height:36px}#gridWrap{width:min(100%,53vh)}.tools.side button{min-height:34px}}
 .btn{background:#1e3a8a;color:#fff;font-weight:600;padding:0 14px;min-height:44px}.btn.sec{background:#fff;color:#1e3a8a;box-shadow:inset 0 0 0 2px #1e3a8a}.btn.danger{background:#b91c1c}
 .tabs{display:flex;gap:6px;margin:10px 0 6px}.tabs button{flex:1;height:40px;box-shadow:0 1px 2px #0002}.tabs button.on{background:#1e3a8a;color:#fff}
 .sumrow{display:flex;align-items:center;gap:8px;margin-bottom:6px}#sumBuf{flex:1;font-size:26px;font-weight:700;background:#fff;border-radius:10px;height:44px;display:flex;align-items:center;padding:0 12px}
@@ -143,7 +152,7 @@ header{display:flex;align-items:center;gap:6px;height:50px}
 .trow .tpos{width:56px;font-weight:700;color:#1e3a8a}.trow .tcell{width:48px;color:#6b7280;font-size:14px}.trow .trng{flex:1;text-align:right}
 .trow.tbad{background:#fee2e2;color:#b91c1c}
 .ehint{font-size:13px;margin:4px 2px}
-.tabs button{font-size:15px}
+.tabs button{font-size:14px;padding:0 2px}
 /* Help sheet */
 .box.help{max-height:88vh}
 .hgrp{font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#6b7280;margin:12px 0 4px}
@@ -158,3 +167,8 @@ header{display:flex;align-items:center;gap:6px;height:50px}
 .kneg{display:flex;align-items:center;gap:8px}.kneg.on{background:#1e3a8a;color:#fff;box-shadow:none}
 .hdots{display:inline-block;width:12px;height:12px;border-radius:50%;border:2px solid #111827;vertical-align:-1px;margin:0 2px}.hdots.b{background:#111827}
 .kneg.on .mbx::after{border-color:#1e3a8a}
+/* Arrows (v16): own SVG layer under the cage lines, multiplied like thermos so digits show through. */
+#arrows{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;mix-blend-mode:multiply}
+.arow{display:flex;gap:10px;align-items:baseline;background:#eef2ff;border-radius:10px;padding:8px 12px;font-size:17px;font-variant-numeric:tabular-nums}
+.arow .av{flex:none;min-width:30px;font-weight:800;color:#1e3a8a;font-size:20px}.arow .ac{flex:1;line-height:1.45}
+.arow .ac span{display:inline-block;margin-right:10px;white-space:nowrap}.arow .more{color:#6b7280;font-size:14px}

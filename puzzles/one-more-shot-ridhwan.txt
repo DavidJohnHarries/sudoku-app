@@ -1,0 +1,18 @@
+SUDOKU v1
+name One More Shot
+givens ......... ......... ......... ......... ......... ......... ......... ......... .........
+solution 439157628 752698341 618342975 547869132 283415796 961723584 126974853 895231467 374586219
+cage 7 r1c1 r1c2
+cage 6 r1c4 r1c5
+cage 14 r5c4 r5c5 r6c4 r6c5
+cage 13 r9c4 r9c5
+cage 12 r3c8 r3c9
+cage 7 r4c1 r5c1
+cage 20 r4c8 r5c8 r6c8
+arrow r1c6 r2c7 r2c8
+arrow r4c6 r3c6 r3c5 r3c4
+arrow r4c3 r3c2 r3c1
+arrow r7c3 r8c4 r8c5 r8c6
+arrow r7c7 r6c6 r5c6
+arrow r5c2 r6c3 r6c4
+arrow r9c9 r9c8 r9c7 r9c6
