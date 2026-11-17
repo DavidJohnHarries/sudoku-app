@@ -153,3 +153,6 @@ A published hard killer is in `puzzles/escape-room-sujoyku.txt` — *Escape Room
 - **Σ:** exact whisper selection (or one uncaged, non-thermo, non-arrow whisper cell) opens a read-only WHISPER sheet with each cell's possible digits from the line alone, narrowed by placed digits along it. Nothing is auto-removed from pencil marks.
 - **Editor:** Whispers tab (tabs are now two rows of three). `tools/solve_cp.py` supports `whisper`.
 
+## Colour-mode selection (v21)
+- In Colour mode with cells selected, selected cells keep their colours at full brightness with a navy outline, and all other cells are dimmed (digits/marks still readable). No selection = no dimming. Other modes keep the blue selection wash.
+
