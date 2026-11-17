@@ -3,12 +3,12 @@
 <meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#f3f4f6"><title>Sudoku</title>
 <link rel="manifest" href="manifest.json"><link rel="apple-touch-icon" href="icon-180.png">
-<link rel="stylesheet" href="style.css?v=19">
+<link rel="stylesheet" href="style.css?v=20">
 </head><body>
 <div id="game">
  <header><button id="bList" class="hb" aria-label="Puzzles">☰</button><div id="pname"></div><button id="timer" class="hb tm">0:00</button><button id="bEdit" class="hb" aria-label="Edit puzzle">✎</button></header>
  <div id="info"><span id="infoTxt">No cage selected</span><span class="ib"><button id="bPick" class="calc pick hidden">◎ Select colour</button><button id="bCalc" class="calc" disabled>Σ Combos</button></span></div>
- <div id="gridWrap"><div id="grid"></div><svg id="thermo" viewBox="0 0 900 900" preserveAspectRatio="none"></svg><svg id="arrows" viewBox="0 0 900 900" preserveAspectRatio="none"></svg><svg id="lines" viewBox="0 0 900 900" preserveAspectRatio="none"></svg><svg id="dots" viewBox="0 0 900 900" preserveAspectRatio="none"></svg></div>
+ <div id="gridWrap"><div id="grid"></div><svg id="thermo" viewBox="0 0 900 900" preserveAspectRatio="none"></svg><svg id="whispers" viewBox="0 0 900 900" preserveAspectRatio="none"></svg><svg id="arrows" viewBox="0 0 900 900" preserveAspectRatio="none"></svg><svg id="lines" viewBox="0 0 900 900" preserveAspectRatio="none"></svg><svg id="dots" viewBox="0 0 900 900" preserveAspectRatio="none"></svg></div>
  <div id="play">
    <div class="modebar">
    <div class="modes" role="radiogroup" aria-label="Entry mode">
@@ -25,7 +25,7 @@
   </div>
  </div>
  <div id="edit" class="hidden">
-  <div class="tabs"><button data-t="cage" class="on">Cages</button><button data-t="thermo">Thermos</button><button data-t="arrow">Arrows</button><button data-t="kropki">Dots</button><button data-t="giv">Givens</button></div>
+  <div class="tabs"><button data-t="cage" class="on">Cages</button><button data-t="thermo">Thermos</button><button data-t="arrow">Arrows</button><button data-t="whisper">Whispers</button><button data-t="kropki">Dots</button><button data-t="giv">Givens</button></div>
   <div id="eCage">
    <div class="sumrow"><span class="muted">Sum</span><div id="sumBuf">–</div><button id="bCreate" class="btn">Create cage</button><button id="bDelCage" class="btn danger hidden">Delete</button></div>
    <div class="pad sumpad" id="sumPad"></div>
@@ -33,6 +33,10 @@
   <div id="eThermo" class="hidden">
    <div class="sumrow"><button id="bThClear" class="btn sec">Clear</button><button id="bThCreate" class="btn">Create thermo</button><button id="bThDel" class="btn danger hidden">Delete</button></div>
    <p class="muted ehint">Drag (or tap cells one by one) from the bulb to the tip. Tap the last cell again to remove it. With nothing selected, tap a thermo to edit or delete it.</p>
+  </div>
+  <div id="eWhisper" class="hidden">
+   <div class="sumrow"><button id="bWhClear" class="btn sec">Clear</button><button id="bWhCreate" class="btn">Create whisper</button><button id="bWhDel" class="btn danger hidden">Delete</button></div>
+   <p class="muted ehint">Drag (or tap cells one by one) along the green line, in order; diagonal steps are fine. Tap the last cell again to remove it. With nothing selected, tap a whisper to edit or delete it.</p>
   </div>
   <div id="eArrow" class="hidden">
    <div class="sumrow"><button id="bArClear" class="btn sec">Clear</button><button id="bArB" class="btn sec">Circle: 1</button><button id="bArCreate" class="btn">Create arrow</button><button id="bArDel" class="btn danger hidden">Delete</button></div>
@@ -67,4 +71,4 @@
   </div>
  </div>
 </div>
-<script src="app.js?v=19"></script></body></html>
+<script src="app.js?v=20"></script></body></html>

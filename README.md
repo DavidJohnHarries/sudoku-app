@@ -28,6 +28,7 @@ cage 21 r1c1 r1c2 r2c1         # cage SUM CELL...
 thermo r1c1 r1c2 r2c3          # thermometer, bulb first; each step to a neighbour (diagonals ok); digits strictly increase
 arrow r1c1 r1c2 r1c3           # arrow: circle first, then the shaft in order to the arrowhead; shaft digits sum to the circle
 arrow r1c1 r1c2 > r2c3 r3c3    # 2-3 cell circle (read as a number) before ">", then the shaft
+whisper r1c1 r1c2 r2c3         # German whisper: cells in order along the line; neighbours differ by 5+
 kropki w r1c1 r1c2             # white Kropki dot: consecutive digits (cells must share an edge)
 kropki b r3c4 r4c4             # black Kropki dot: one digit is double the other
 kropki-negative                # optional: all dots are given (no dot = neither consecutive nor double)
@@ -144,3 +145,11 @@ A published hard killer is in `puzzles/escape-room-sujoyku.txt` — *Escape Room
 
 ## Σ for box sets (v19)
 - 2+ selected cells all in one 3×3 box (caged or not) enable Σ for exactly those cells, like a row/column set: type a sum, rule out combos, stored per exact cell set (`linesum` / `elim line` now accept box sets). A whole box (e.g. triple-tap) is a derived 45. Exact cages, uncaged box groups, thermos and arrows still take priority.
+
+## German whispers (v20)
+- **Format:** `whisper CELL CELL…` in order along the line (diagonal steps OK; `whispers`/`gw` also accepted). Neighbours on the line differ by ≥5; 5 never fits; digits may repeat.
+- **Drawing:** thick translucent green line (`#whispers`, multiply, under arrows and cage lines). Turns red when placed neighbours are <5 apart or a 5 is on it; those digits go red and block the solved check.
+- **Taps:** whispers join the repeated-tap list after arrows (cage → thermo → arrow → whisper → uncaged group → box).
+- **Σ:** exact whisper selection (or one uncaged, non-thermo, non-arrow whisper cell) opens a read-only WHISPER sheet with each cell's possible digits from the line alone, narrowed by placed digits along it. Nothing is auto-removed from pencil marks.
+- **Editor:** Whispers tab (tabs are now two rows of three). `tools/solve_cp.py` supports `whisper`.
+

@@ -1,0 +1,21 @@
+SUDOKU v1
+name Green Deduction 2
+givens .................................................................................
+solution 728691354 315274698 946385172 169847235 534162987 872953461 283519746 697428513 451736829
+cage 17 r4c4 r5c4 r5c5 r5c6
+whisper r3c3 r2c2 r3c1 r3c2 r4c3 r5c3
+whisper r2c5 r2c4 r3c5 r3c4
+whisper r2c4 r1c5
+whisper r7c7 r8c8 r9c9 r9c8 r9c7 r8c8
+whisper r8c8 r7c9
+whisper r9c1 r8c2 r9c3 r8c3
+whisper r8c5 r8c6 r9c5
+whisper r8c6 r7c5
+whisper r1c9 r2c8 r3c7 r3c8 r3c9 r2c8
+whisper r2c8 r1c7
+whisper r3c9 r2c9
+whisper r7c6 r6c7 r5c7 r4c7 r5c8 r6c9 r6c8
+whisper r6c2 r6c3
+whisper r4c1 r4c2
+whisper r2c2 r1c1 r1c2 r1c3 r2c2
+whisper r8c2 r7c1 r7c2 r7c3 r8c2
