@@ -120,7 +120,8 @@ function parsePuzzle(text){
    const uniq=[...new Set(cells)].sort((a,b)=>a-b);
    const onLine=uniq.length>=2&&(uniq.every(i=>Math.floor(i/9)===Math.floor(uniq[0]/9))||uniq.every(i=>i%9===uniq[0]%9));
    const inCage=uniq.length>=2&&p.cages.some(c=>uniq.every(i=>c.cells.includes(i)));
-   if(!onLine&&!inCage){errs.push(`Line ${ln}: expected "${kw==='linesum'?'linesum SUM r1c1 r1c2 ...':'elim line r1c1 r1c2 ... COMBOS'}" (cells must share a row, a column, or a cage)`);continue}
+   const bx=i=>Math.floor(i/27)*3+Math.floor(i%9/3),inBox=uniq.length>=2&&uniq.every(i=>bx(i)===bx(uniq[0]));
+   if(!onLine&&!inCage&&!inBox){errs.push(`Line ${ln}: expected "${kw==='linesum'?'linesum SUM r1c1 r1c2 ...':'elim line r1c1 r1c2 ... COMBOS'}" (cells must share a row, a column, a box, or a cage)`);continue}
    if(kw==='linesum'){const n=parseInt(rest[0]);if(!(n>=1&&n<=45)||rest.length!==1){errs.push(`Line ${ln}: expected "linesum SUM r1c1 r1c2 ..."`);continue}
     if(uniq.length<9){p.lineSums=p.lineSums||{};const L=p.lineSums[uniq.join(',')]=p.lineSums[uniq.join(',')]||{sum:null,elim:[]};L.sum=n}}
    else{p.lineSums=p.lineSums||{};const L=p.lineSums[uniq.join(',')]=p.lineSums[uniq.join(',')]||{sum:null,elim:[]};L.elim=rest.filter(t=>/^[1-9]+$/.test(t))}
@@ -193,20 +194,22 @@ function ensureGroup(p,G){p.groups=p.groups||{};let g=p.groups[G.key];if(!g||g.c
 
 // ---------- Typed set sums (a line, or a 2+ cell subset of a cage) ----------
 // Stored in p.lineSums under the exact cell set (same key as v11 line sums) and only
-// used when that same set is selected again. A full row or column is 45.
+// used when that same set is selected again. A full row, column or box is 45 (v19: boxes count like lines).
 function cellsOnLine(cells){return cells.length>=2&&(cells.every(i=>ROW(i)===ROW(cells[0]))||cells.every(i=>COL(i)===COL(cells[0])))}
+// A "house" set: 2+ cells sharing a row, column or 3×3 box — digits can't repeat, so Σ works like a line.
+function cellsInHouse(cells){return cellsOnLine(cells)||(cells.length>=2&&cells.every(i=>BOX(i)===BOX(cells[0])))}
 function cageOfCells(cells){if(!cells.length)return -1;const ks=cagesOf[cells[0]]||[];for(const k of ks)if(cells.every(i=>cagesOf[i].includes(k)))return k;return -1}
 function exactCageOfSel(){if(!sel.size)return -1;const k=cageOfCells([...sel]);return k>=0&&P.cages[k].cells.length===sel.size?k:-1}
 function setOfSel(){
  if(sel.size<2)return null;
  const cells=[...sel].sort((a,b)=>a-b);
  const k=cageOfCells(cells);
- if(k<0&&!cellsOnLine(cells))return null;
- const ck=cells.join(','),derived=cellsOnLine(cells)&&cells.length===9?45:null,g=P.lineSums&&P.lineSums[ck];
+ if(k<0&&!cellsInHouse(cells))return null;
+ const ck=cells.join(','),derived=cellsInHouse(cells)&&cells.length===9?45:null,g=P.lineSums&&P.lineSums[ck];
  return {ck,cells,cageK:k,cage:k>=0?P.cages[k]:null,derived:derived!=null,sum:derived!=null?derived:(g&&g.sum!=null?g.sum:null),elim:(g&&g.elim)||[]}}
 function ensureLine(L){P.lineSums=P.lineSums||{};let g=P.lineSums[L.ck];if(!g)g=P.lineSums[L.ck]={sum:null,elim:[]};return g}
 // Σ target: one caged cell → the whole cage; an exact uncaged group (double-tap) or an
-// exact whole cage → that group/cage; 2+ cells all in one cage or all on one line → just
+// exact whole cage → that group/cage; 2+ cells all in one cage, line or box (v19) → just
 // those cells (typed sum). Anything else → disabled.
 // Thermos: an exact thermo selection (or one uncaged cell on a thermo) → the thermo's range sheet.
 // Checked after exact cages/groups and before line/cage-subset sets.
@@ -861,7 +864,7 @@ function exportDialog(p){
 const HELP_ELEMENTS=[
  {id:'rules',title:'Sudoku rules',body:`<p>Place 1–9 once in every row, column and 3×3 box.</p>`},
  {id:'cage',title:'Killer cages',body:`<p>A dashed outline is a <b>cage</b>. Its digits add up to the small number in its top-left corner, and no digit repeats inside a cage.</p><p>Σ Combos lists every set of different digits that makes the sum. Tap a combo to rule it out; grey ones can't fit the digits already placed.</p>`},
- {id:'45',title:'Uncaged sums and the rule of 45',body:`<p>Every row, column and box adds up to <b>45</b>. If a box's other cells are all in cages that stay inside it, the leftover cells must make 45 minus those cages. Double-tap an uncaged cell to select that leftover group and see its sum.</p><p>You can also select 2+ cells on one row or column (or part of a cage) and type a sum for them with Σ. The status line shows the total and how far it is from a multiple of 45.</p>`},
+ {id:'45',title:'Uncaged sums and the rule of 45',body:`<p>Every row, column and box adds up to <b>45</b>. If a box's other cells are all in cages that stay inside it, the leftover cells must make 45 minus those cages. Double-tap an uncaged cell to select that leftover group and see its sum.</p><p>You can also select 2+ cells in one row, column or box (or part of a cage) and type a sum for them with Σ. The status line shows the total and how far it is from a multiple of 45.</p>`},
  {id:'kropki',title:'Kropki dots',body:`<p>A dot on the line between two cells links their digits.</p><ul><li><span class="hdots"></span> <b>White</b>: the digits are <b>consecutive</b> (differ by 1), e.g. 4 and 5.</li><li><span class="hdots b"></span> <b>Black</b>: one digit is <b>double</b> the other, e.g. 3 and 6. Possible pairs: 1–2, 2–4, 3–6, 4–8.</li><li>1 and 2 fit either colour.</li></ul><p>Usually <b>not all dots are given</b>: a missing dot tells you nothing. If a puzzle says <b>all dots are given</b>, two neighbours with no dot can be neither consecutive nor double.</p><p>Tips: 9 can't be on a black dot, and 5 or 7 only pair with 1 less or 1 more. A dot turns red when the digits beside it break its rule.</p>`},
  {id:'thermo',title:'Thermometers',body:`<p>A grey line with a round <b>bulb</b> is a thermometer. Digits must <b>strictly increase</b> from the bulb to the far end, so no digit repeats on a thermo.</p><p>On a 4-cell thermo the bulb can only be 1–6 and the tip 4–9. Select a thermo (or one uncaged cell on it) and press Σ to see each cell's possible range, narrowed by digits you've placed. Digits that break the order turn red.</p>`},
  {id:'arrow',title:'Arrows',body:`<p>A grey <b>circle</b> with a line and an arrowhead is an arrow. The digits along the line (the <b>shaft</b>) <b>add up to the digit in the circle</b>.</p><p>Digits <b>can repeat</b> on an arrow, as long as the repeats aren't in the same row, column, box or cage. A 2-cell oval circle is read as a 2-digit number (left to right, or top to bottom).</p><p>Tips: the circle is at least the number of shaft cells, so a 3-cell shaft means the circle is 6+ if its cells all see each other. Select an arrow (or one uncaged cell on it) and press Σ to list each possible circle value with the shaft digits that make it. Tap a value to cross out that whole row, or tap one set of digits to cross out just that set; tap again to restore. Crossings are yours — the app never crosses anything out for you. Digits that can't add up turn the arrow red.</p>`},
@@ -870,7 +873,7 @@ const HELP_CONTROLS=[
  {id:'select',title:'Selecting cells',body:`<ul><li><b>Tap</b> a cell to select it; tap it again to deselect.</li><li><b>Double-tap</b> selects the cell's cage (or the uncaged cells of its box).</li><li>On a thermo or arrow, the next tap selects the thermo/arrow: <b>double</b> = cage, <b>triple</b> = thermo or arrow, then the box. An uncaged thermo or arrow cell goes thermo/arrow → uncaged group → box.</li><li>Otherwise <b>triple-tap</b> selects the whole box.</li><li><b>Drag</b> to select several cells, or turn on <b>Multi</b> to add/remove cells with taps (double-tapping a selected cell removes its group).</li><li>While <b>Multi</b> is on, the number highlight is <b>locked</b>: selecting cells won't change it. To change it, clear the selection (tap the status line) and tap a number key; tap the same key to turn it off.</li><li>Tap the status line to clear the selection.</li></ul>`},
  {id:'modes',title:'Digit, Corner, Centre',body:`<p>Pick a mode, then a number. Digit places a value; Corner and Centre add pencil marks. Placing a digit clears that digit's marks from the same row, column, box, cage and thermo.</p><p>With nothing selected, the number keys <b>highlight</b> that number: its cells and pencil marks light up and the places it can't go are greyed. Tap the key again to clear.</p>`},
  {id:'colour',title:'Colours',body:`<p>In Colour mode each key has a <b>+</b> half and a <b>−</b> half. + adds a colour (up to 3 per cell); + on a colour already there makes it 2/3 of the cell. − shrinks or removes it. Long-press a key, or use ◎ Select colour, to select every cell with that colour. Double-tap a cell that is one solid colour to select all cells of that colour.</p>`},
- {id:'sigma',title:'Σ Combos and Total',body:`<p>Σ works on: one cell in a cage (the whole cage), an uncaged box group, 2+ cells all in one cage or on one row/column (type their sum), a thermo (ranges), or an arrow (circle values and shaft digits). The status line adds up whole cages, known groups and placed digits.</p>`},
+ {id:'sigma',title:'Σ Combos and Total',body:`<p>Σ works on: one cell in a cage (the whole cage), an uncaged box group, 2+ cells all in one cage, row, column or 3×3 box (type their sum; a whole row, column or box is 45), a thermo (ranges), or an arrow (circle values and shaft digits). The status line adds up whole cages, known groups and placed digits.</p>`},
  {id:'test',title:'Test',body:`<p>For puzzles that come with a solution, select cells with centre marks and press <b>Test</b>: a green ✓ means the right digit is among the marks, a red ✕ means it's missing. Wrong placed digits also show red.</p>`},
  {id:'other',title:'Timer, edit, puzzles',body:`<p>Tap the timer to pause. ✎ opens the editor for cages, thermos, arrows, dots and givens. In the Arrows tab, tap the circle then the shaft cells in order. In the Dots tab, tap the line between two cells to cycle no dot → white → black. ☰ lists puzzles: paste a new one, copy, rename, restart or delete.</p>`},
 ];
