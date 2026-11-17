@@ -156,3 +156,6 @@ A published hard killer is in `puzzles/escape-room-sujoyku.txt` — *Escape Room
 ## Colour-mode selection (v21)
 - In Colour mode with cells selected, selected cells keep their colours at full brightness with a navy outline, and all other cells are dimmed (digits/marks still readable). No selection = no dimming. Other modes keep the blue selection wash.
 
+## Highlight style (v22)
+- ☰ → Highlight style: **Classic** (default, unchanged) or **Spotlight** (stored in localStorage `sdk_hlstyle`). Spotlight, outside Colour mode, keeps selected cells (navy outline) and cells with the highlighted number (amber outline: thick = placed, thin = pencilled) at full brightness and dims the rest; blocked cells dim further. Highlighted pencil digits become white-on-amber chips. Colour mode keeps the v21 look in both styles.
+

@@ -3,7 +3,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#f3f4f6"><title>Sudoku</title>
 <link rel="manifest" href="manifest.json"><link rel="apple-touch-icon" href="icon-180.png">
-<link rel="stylesheet" href="style.css?v=21">
+<link rel="stylesheet" href="style.css?v=22">
 </head><body>
 <div id="game">
  <header><button id="bList" class="hb" aria-label="Puzzles">☰</button><div id="pname"></div><button id="timer" class="hb tm">0:00</button><button id="bEdit" class="hb" aria-label="Edit puzzle">✎</button></header>
@@ -54,6 +54,7 @@
 <div id="list" class="hidden">
  <header><span class="lt">Puzzles</span><button id="bBack" class="hb">Back ›</button></header>
  <div class="lbtns"><button id="bPaste" class="btn">Paste puzzle</button><button id="bNew" class="btn sec">New blank</button><button id="bHelp" class="btn sec">Help</button></div>
+ <div class="setrow"><span>Highlight style</span><div class="seg" id="hlSeg" role="radiogroup"><button data-hs="classic">Classic</button><button data-hs="spot">Spotlight</button></div></div>
  <div id="items"></div>
 </div>
 <div id="modal" class="hidden"><div class="box" id="mbox"></div></div>
@@ -71,4 +72,4 @@
   </div>
  </div>
 </div>
-<script src="app.js?v=21"></script></body></html>
+<script src="app.js?v=22"></script></body></html>

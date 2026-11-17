@@ -188,3 +188,17 @@ header{display:flex;align-items:center;gap:6px;height:50px}
 #grid.ksel .cell.sel::after{content:'';position:absolute;inset:0;background:transparent;box-shadow:inset 0 0 0 3px #1e3a8a;z-index:3;pointer-events:none}
 #grid.ksel .cell:not(.sel)::after{content:'';position:absolute;inset:0;background:rgba(17,24,39,.45);z-index:1;pointer-events:none}
 #grid.ksel .cell:not(.sel)>span,#grid.ksel .cell:not(.sel)>div:not(.bg){opacity:.75}
+/* v22 Spotlight highlight style (☰ → Highlight style). Lit cells: no tint, an outline — amber for
+   cells with the highlighted number (thick if placed, thinner if pencilled), navy for selected cells.
+   Everything else dims under its digits; "can't go here" cells (blocked) dim a little more. */
+#grid.spot .cell::after{content:'';position:absolute;inset:0;background:rgba(17,24,39,.42);z-index:1;pointer-events:none;box-shadow:none}
+#grid.spot .cell:not(.sel):not(.same):not(.nmark)>span,#grid.spot .cell:not(.sel):not(.same):not(.nmark)>div:not(.bg){opacity:.75}
+#grid.spot .cell.nmark::after{background:transparent;box-shadow:inset 0 0 0 2.5px #d97706;z-index:3}
+#grid.spot .cell.same::after{background:transparent;box-shadow:inset 0 0 0 4px #d97706;z-index:3}
+#grid.spot .cell.sel::after{background:transparent;box-shadow:inset 0 0 0 3px #1e3a8a;z-index:3}
+#grid.spot .cell.same .val{text-shadow:0 0 3px #fff,0 0 6px #fff}
+#grid.spot .nh{background:#b45309;color:#fff;border-radius:3px;padding:0 2px;font-weight:800;box-shadow:0 0 0 1px #fff}
+.setrow{display:flex;align-items:center;justify-content:space-between;gap:10px;background:#fff;border-radius:12px;padding:6px 6px 6px 12px;margin:0 0 10px;box-shadow:0 1px 2px #0002;font-size:15px;font-weight:600}
+.seg{display:flex;background:#d9dde3;border-radius:18px;padding:3px;gap:2px}
+.seg button{height:32px;border-radius:15px;padding:0 12px;background:transparent;color:#4b5563;font-size:14px;font-weight:600}
+.seg button.on{background:#fff;color:#1e3a8a;box-shadow:0 1px 3px #0003}
