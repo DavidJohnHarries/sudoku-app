@@ -118,6 +118,8 @@ function parsePuzzle(text){
  for(const [ln,toks,kw] of pend){const bm=/^box([1-9])$/i.exec(toks[0]||'');
   if(bm){const G=groupOf(p,bm[1]-1);if(!G){errs.push(`Line ${ln}: box${bm[1]} has no uncaged cells`);continue}const g=ensureGroup(p,G);
    if(kw==='groupsum'){const n=parseInt(toks[1]);if(n>=1&&n<=45&&!G.derived)g.sum=n}else g.elim=toks.slice(1).filter(t=>/^[1-9]+$/.test(t));continue}
+  if(kw==='elim'&&/^kropki$/i.test(toks[0]||'')){const a=parseCell(toks[1]||''),b=parseCell(toks[2]||''),k=a>=0&&b>=0?dotAt(p,a,b):-1;if(k<0){errs.push(`Line ${ln}: "elim kropki" must name the two cells of a dot`);continue}
+   p.kropki[k].elim=toks.slice(3).filter(t=>/^[1-9]{2}$/.test(t));continue}
   if(kw==='elim'&&/^renban$/i.test(toks[0]||'')){const c=parseCell(toks[1]||''),r=p.renbans.find(x=>x.cells[0]===c);if(!r){errs.push(`Line ${ln}: "elim renban" must name a renban's first cell`);continue}
    r.elim=toks.slice(2).filter(t=>/^[1-9]+$/.test(t));continue}
   if(kw==='elim'&&/^arrow$/i.test(toks[0]||'')){const c=parseCell(toks[1]||''),a=p.arrows.find(x=>x.cells[0]===c);if(!a){errs.push(`Line ${ln}: "elim arrow" must name an arrow's circle cell`);continue}
@@ -147,7 +149,7 @@ const dotOK=(t,x,y)=>t==='w'?Math.abs(x-y)===1:(x===2*y||y===2*x);
 const dotAny=(x,y)=>dotOK('w',x,y)||dotOK('b',x,y);
 function dotAt(p,a,b){const lo=Math.min(a,b),hi=Math.max(a,b);return (p.kropki||[]).findIndex(d=>d.a===lo&&d.b===hi)}
 function setDot(p,a,b,t){p.kropki=p.kropki||[];const lo=Math.min(a,b),hi=Math.max(a,b),k=dotAt(p,lo,hi);
- if(k>=0){if(t)p.kropki[k].t=t;else p.kropki.splice(k,1)}else if(t)p.kropki.push({t,a:lo,b:hi});
+ if(k>=0){if(t){if(p.kropki[k].t!==t)p.kropki[k].elim=[];p.kropki[k].t=t}else p.kropki.splice(k,1)}else if(t)p.kropki.push({t,a:lo,b:hi,elim:[]});
  p.kropki.sort((x,y)=>x.a-y.a||x.b-y.b)}
 // Thermometer cells are kept in order, bulb first. Each step must be to a king-move neighbour.
 const kingAdj=(a,b)=>a!==b&&Math.abs(Math.floor(a/9)-Math.floor(b/9))<=1&&Math.abs(a%9-b%9)<=1;
@@ -190,6 +192,7 @@ function exportPuzzle(p,state){
   for(let i=0;i<81;i++){if(p.cn[i])L.push(`corner ${RC(i)} ${p.cn[i]}`);if(p.mn[i])L.push(`centre ${RC(i)} ${p.mn[i]}`);const co=normCol(p.col[i]);if(co.c.length)L.push(`colour ${RC(i)} ${fmtColour(co)}`)}
   for(const c of p.cages)if(c.elim&&c.elim.length)L.push(`elim ${RC(c.cells[0])} ${c.elim.join(' ')}`);
   for(const a of p.arrows||[])if(a.elim&&a.elim.length)L.push(`elim arrow ${RC(a.cells[0])} ${a.elim.join(' ')}`);
+  for(const d of p.kropki||[])if(d.elim&&d.elim.length)L.push(`elim kropki ${RC(d.a)} ${RC(d.b)} ${d.elim.join(' ')}`);
   for(const r of p.renbans||[])if(r.elim&&r.elim.length)L.push(`elim renban ${RC(r.cells[0])} ${r.elim.join(' ')}`);
   for(let b=0;b<9;b++){const G=groupOf(p,b);if(!G||!G.stored)continue;if(!G.derived&&G.sum)L.push(`groupsum ${G.key} ${G.sum}`);if(G.elim.length)L.push(`elim ${G.key} ${G.elim.join(' ')}`)}
   const ls=p.lineSums||{};for(const ck of Object.keys(ls).sort()){const g=ls[ck],cells=ck.split(',').map(Number);
@@ -249,12 +252,13 @@ function calcTarget(){
  const ar=exactArrowOfSel();if(ar>=0)return {type:'arrow',k:ar};
  const wh=exactWhisperOfSel();if(wh>=0)return {type:'whisper',k:wh};
  const rb=exactRenbanOfSel();if(rb>=0)return {type:'renban',k:rb};
+ if(sel.size===2){const [a,b]=[...sel],kd=dotAt(P,a,b);if(kd>=0)return {type:'kropki',k:kd}} // v27: exactly the two cells of a dot
  const L=setOfSel();return L?{type:'set',L}:null}
 
 // ---------- Storage ----------
 let DB=LS('sdk_puzzles')||{};let curId=LS('sdk_cur');
 if(!Object.keys(DB).length){const {p}=parsePuzzle(SAMPLE);DB[p.id]=p;curId=p.id}
-for(const p of Object.values(DB)){p.extra=p.extra||[];p.thermos=p.thermos||[];p.whispers=p.whispers||[];p.renbans=(p.renbans||[]).map(r=>({cells:r.cells,elim:r.elim||[]}));p.arrows=(p.arrows||[]).map(a=>({cells:a.cells,b:a.b||1,elim:a.elim||[]}));p.kropki=p.kropki||[];p.kropkiNeg=!!p.kropkiNeg;p.groups=p.groups||{};p.lineSums=p.lineSums||{};p.sol=p.sol||null;p.cages.forEach(c=>c.elim=c.elim||[]);if(p.col)for(let i=0;i<81;i++)p.col[i]=normCol(p.col[i])}
+for(const p of Object.values(DB)){p.extra=p.extra||[];p.thermos=p.thermos||[];p.whispers=p.whispers||[];p.renbans=(p.renbans||[]).map(r=>({cells:r.cells,elim:r.elim||[]}));p.arrows=(p.arrows||[]).map(a=>({cells:a.cells,b:a.b||1,elim:a.elim||[]}));p.kropki=(p.kropki||[]).map(d=>({...d,elim:d.elim||[]}));p.kropkiNeg=!!p.kropkiNeg;p.groups=p.groups||{};p.lineSums=p.lineSums||{};p.sol=p.sol||null;p.cages.forEach(c=>c.elim=c.elim||[]);if(p.col)for(let i=0;i<81;i++)p.col[i]=normCol(p.col[i])}
 if(!DB[curId])curId=Object.values(DB).sort((a,b)=>b.updated-a.updated)[0].id;
 let P=DB[curId];
 let saveT=null;const saveNow=()=>{clearTimeout(saveT);saveT=null;SV('sdk_puzzles',DB);SV('sdk_cur',curId)};
@@ -448,10 +452,13 @@ function near45(sum){
  if(sum<45)return `45−${45-sum}`;
  const lo=Math.floor(sum/45)*45,hi=lo+45;
  return `${lo}+${sum-lo} · ${hi}−${hi-sum}`}
+// v27: Σ button says what the sheet will show.
+const SIGMA_LABEL={cage:'Σ Combos',group:'Σ Combos',set:'Σ Combos',thermo:'Σ Ranges',arrow:'Σ Sums',whisper:'Σ Digits',renban:'Σ Runs',kropki:'Σ Pairs'};
 function selInfoText(){
  if(!sel.size)return numSel?(multi?`Number ${numSel} locked (Multi) — tap ${numSel} to clear`:`Number ${numSel} — tap ${numSel} again to clear`):(P.kropkiNeg?'Tap a cell · all dots given':'Tap a cell to select');
  const t=selTotal(),T0=calcTarget();
  if(T0&&T0.type==='thermo'&&!(t.known&&sel.size>1))return `Thermo (${P.thermos[T0.k].cells.length} cells) — Σ for ranges`;
+ if(T0&&T0.type==='kropki'){const d=P.kropki[T0.k];return `${d.t==='w'?'White':'Black'} dot — Σ for pairs`}
  if(T0&&T0.type==='renban'&&!(t.known&&sel.size>1))return `Renban (${P.renbans[T0.k].cells.length} cells) — Σ for runs`;
  if(T0&&T0.type==='whisper'&&!(t.known&&sel.size>1))return `Whisper (${P.whispers[T0.k].cells.length} cells) — Σ for options`;
  if(T0&&T0.type==='arrow'&&!(t.known&&sel.size>1)){const a=P.arrows[T0.k];return `Arrow (circle + ${a.cells.length-(a.b||1)}) — Σ for sums`}
@@ -501,7 +508,7 @@ function renderSel(){
  if(editing){if(etab==='thermo')renderThermos();if(etab==='arrow')renderArrows();if(etab==='whisper')renderWhispers();if(etab==='renban')renderRenbans();$('#bPick').classList.add('hidden');$('#infoTxt').textContent=etab==='kropki'?`${(P.kropki||[]).length} dot${(P.kropki||[]).length===1?'':'s'} — tap an edge to cycle`:etab==='thermo'?(sel.size?(editLine>=0?`Editing thermo: ${sel.size} cells — tap cells to extend`:`${sel.size} cell${sel.size>1?'s':''} · bulb ${RC([...sel][0])}`):'Drag from the bulb to the tip'):etab==='renban'?(sel.size?(editLine>=0?`Editing renban: ${sel.size} cells — tap cells to extend`:`${sel.size} cell${sel.size>1?'s':''} on the line`):'Drag along the renban line'):etab==='whisper'?(sel.size?(editLine>=0?`Editing whisper: ${sel.size} cells — tap cells to extend`:`${sel.size} cell${sel.size>1?'s':''} on the line`):'Drag along the whisper line'):etab==='arrow'?(sel.size?(editLine>=0?`Editing arrow: ${sel.size} cells — tap cells to extend`:sel.size<=arrowB?`Circle ${[...sel].map(RC).join(' ')} — now the shaft`:`Circle ${RC([...sel][0])} · shaft ${sel.size-arrowB}`):'Tap the circle, then the shaft'):sel.size?`${sel.size} cell${sel.size>1?'s':''} selected`:'Drag across cells to make a cage';$('#bCalc').classList.add('hidden');$('#bTest').disabled=true;return}
  $('#bCalc').classList.toggle('hidden',!FEATURES.calculator||mode==='k');$('#bPick').classList.toggle('hidden',mode!=='k');
  $('#infoTxt').textContent=selInfoText();
- $('#bCalc').disabled=!calcTarget();
+ {const T=calcTarget();$('#bCalc').disabled=!T;$('#bCalc').textContent=SIGMA_LABEL[T?T.type:'']||'Σ'}
  $('#bTest').disabled=!canTest();
  fitInfo();
 }
@@ -877,7 +884,7 @@ function openThermoCalc(k){const t=P.thermos[k];if(!t)return;const rs=thermoRang
  $('#mbox').innerHTML=`<h2>THERMO</h2><div class="muted">${rs.length} cells · digits increase from the bulb</div><div class="tlist">${rs.map(row).join('')}</div>
  <p class="muted cnote">Ranges come from the thermo's length and the digits already placed on it.${bad?' <b style="color:#b91c1c">Placed digits break the thermo.</b>':''}</p><div class="r"><button class="btn" id="mClose">Close</button></div>`;
  showModal();$('#mClose').onclick=closeModal}
-$('#bCalc').onclick=()=>{const T=calcTarget();if(!T)return;if(T.type==='thermo'){openThermoCalc(T.k);return}if(T.type==='arrow'){openArrowCalc(T.k);return}if(T.type==='whisper'){openWhisperCalc(T.k);return}if(T.type==='renban'){openRenbanCalc(T.k);return}if(T.type==='cage')openCalculator(T.k);else if(T.type==='group')openGroupCalc(T.G);else openLineCalc(T.L)};
+$('#bCalc').onclick=()=>{const T=calcTarget();if(!T)return;if(T.type==='thermo'){openThermoCalc(T.k);return}if(T.type==='arrow'){openArrowCalc(T.k);return}if(T.type==='whisper'){openWhisperCalc(T.k);return}if(T.type==='renban'){openRenbanCalc(T.k);return}if(T.type==='kropki'){openKropkiCalc(T.k);return}if(T.type==='cage')openCalculator(T.k);else if(T.type==='group')openGroupCalc(T.G);else openLineCalc(T.L)};
 // ARROW sheet: for each circle value still possible, the shaft digit sets that make it. Candidates
 // per cell are 1–9 minus digits already placed in its row, column, box, cage or thermo; shaft cells
 // that see each other (row/column/box/cage) must differ, others may repeat.
@@ -952,6 +959,23 @@ function openRenbanCalc(k){const r=P.renbans[k];if(!r)return;r.elim=r.elim||[];c
   $('#cList').innerHTML=runs.map(x=>`<button class="combo${el.includes(x.key)?' off':''}${x.ok?'':' imp'}" data-x="${x.key}">${x.run.map(d=>`<span>${d}</span>`).join('')}</button>`).join('')||'<p class="err">Too long for a renban.</p>';
   const must=live.length?[1,2,3,4,5,6,7,8,9].filter(d=>live.every(x=>x.run.includes(d))):[];
   $('#rbMust').innerHTML=!live.length?'<b style="color:#b91c1c">No run left.</b>':must.length?`Always on the line: <b>${must.join(' ')}</b>`:'No digit is on every remaining run yet.'};
+ draw();showModal();$('#mClose').onclick=closeModal;
+ $('#cList').onclick=e=>{const b=e.target.closest('.combo');if(!b)return;const before=snap();const el=E(),x=b.dataset.x,ix=el.indexOf(x);ix>=0?el.splice(ix,1):el.push(x);if(snap()!==before){undoS.push(before);redoS=[];save()}draw()}}
+// KROPKI sheet (v27): the unordered digit pairs a dot allows. Grey = impossible with the digits placed in the two
+// cells, or no way to put the pair in either order given what each cell's row, column, box, cage, thermo and renban
+// already hold. Tap a pair to cross it out (d.elim, saved, undoable); never crosses anything out by itself.
+const KPAIRS={w:['12','23','34','45','56','67','78','89'],b:['12','24','36','48']};
+function kropkiPairs(d){const cand=[d.a,d.b].map(i=>{const v=valAt(i);if(v)return new Set([v]);const used=new Set();for(const j of peers(i)){const w=valAt(j);if(w)used.add(w)}return new Set([1,2,3,4,5,6,7,8,9].filter(x=>!used.has(x)))});
+ return KPAIRS[d.t].map(key=>{const x=+key[0],y=+key[1];return {key,ok:(cand[0].has(x)&&cand[1].has(y))||(cand[0].has(y)&&cand[1].has(x))}})}
+function openKropkiCalc(k){const d=P.kropki[k];if(!d)return;d.elim=d.elim||[];const E=()=>P.kropki[k].elim||(P.kropki[k].elim=[]);
+ const white=d.t==='w';
+ $('#mbox').innerHTML=`<h2>${white?'WHITE':'BLACK'} DOT</h2><div class="muted" id="cMeta"></div><p style="margin:6px 0 2px;font-size:16px">${white?'The two digits are <b>consecutive</b> — they differ by 1.':'One digit is <b>double</b> the other.'}</p><div id="cList"></div><div class="muted" id="rbMust" style="font-size:15px;margin:2px 0 4px"></div>
+ <p class="muted cnote">Pairs in either order. Tap a pair to cross it out (tap again to restore). Grey = can't fit the digits already placed in these cells or in their rows, columns, boxes and cages.${white?' 1–2 also fits a black dot.':' 9 never sits on a black dot; 5 and 7 can only pair on a white dot.'}</p><div class="r"><button class="btn" id="mClose">Close</button></div>`;
+ const draw=()=>{const ps=kropkiPairs(P.kropki[k]),el=E(),live=ps.filter(x=>x.ok&&!el.includes(x.key));
+  $('#cMeta').textContent=`${RC(d.a)} – ${RC(d.b)} · ${ps.length} pairs · ${live.length} still possible`;
+  $('#cList').className='clist c'+(ps.length<=4?2:3);
+  $('#cList').innerHTML=ps.map(x=>`<button class="combo${el.includes(x.key)?' off':''}${x.ok?'':' imp'}" data-x="${x.key}">${[...x.key].map(c=>`<span>${c}</span>`).join('')}</button>`).join('');
+  const dg=[...new Set(live.flatMap(x=>[...x.key]))].sort();$('#rbMust').innerHTML=!live.length?'<b style="color:#b91c1c">No pair left.</b>':`Digits still possible here: <b>${dg.join(' ')}</b>`};
  draw();showModal();$('#mClose').onclick=closeModal;
  $('#cList').onclick=e=>{const b=e.target.closest('.combo');if(!b)return;const before=snap();const el=E(),x=b.dataset.x,ix=el.indexOf(x);ix>=0?el.splice(ix,1):el.push(x);if(snap()!==before){undoS.push(before);redoS=[];save()}draw()}}
 function showModal(){$('#modal').classList.remove('hidden')}
@@ -1031,7 +1055,7 @@ const HELP_ELEMENTS=[
  {id:'rules',title:'Sudoku rules',body:`<p>Place 1–9 once in every row, column and 3×3 box.</p>`},
  {id:'cage',title:'Killer cages',body:`<p>A dashed outline is a <b>cage</b>. Its digits add up to the small number in its top-left corner, and no digit repeats inside a cage.</p><p>Σ Combos lists every set of different digits that makes the sum. Tap a combo to rule it out; grey ones can't fit the digits already placed.</p>`},
  {id:'45',title:'Uncaged sums and the rule of 45',body:`<p>Every row, column and box adds up to <b>45</b>. If a box's other cells are all in cages that stay inside it, the leftover cells must make 45 minus those cages. Double-tap an uncaged cell to select that leftover group and see its sum.</p><p>You can also select 2+ cells in one row, column or box (or part of a cage) and type a sum for them with Σ. The status line shows the total and how far it is from a multiple of 45.</p>`},
- {id:'kropki',title:'Kropki dots',body:`<p>A dot on the line between two cells links their digits.</p><ul><li><span class="hdots"></span> <b>White</b>: the digits are <b>consecutive</b> (differ by 1), e.g. 4 and 5.</li><li><span class="hdots b"></span> <b>Black</b>: one digit is <b>double</b> the other, e.g. 3 and 6. Possible pairs: 1–2, 2–4, 3–6, 4–8.</li><li>1 and 2 fit either colour.</li></ul><p>Usually <b>not all dots are given</b>: a missing dot tells you nothing. If a puzzle says <b>all dots are given</b>, two neighbours with no dot can be neither consecutive nor double.</p><p>Tips: 9 can't be on a black dot, and 5 or 7 only pair with 1 less or 1 more. A dot turns red when the digits beside it break its rule.</p>`},
+ {id:'kropki',title:'Kropki dots',body:`<p>A dot on the line between two cells links their digits.</p><ul><li><span class="hdots"></span> <b>White</b>: the digits are <b>consecutive</b> (differ by 1), e.g. 4 and 5.</li><li><span class="hdots b"></span> <b>Black</b>: one digit is <b>double</b> the other, e.g. 3 and 6. Possible pairs: 1–2, 2–4, 3–6, 4–8.</li><li>1 and 2 fit either colour.</li></ul><p>Usually <b>not all dots are given</b>: a missing dot tells you nothing. If a puzzle says <b>all dots are given</b>, two neighbours with no dot can be neither consecutive nor double.</p><p>Tips: 9 can't be on a black dot, and 5 or 7 only pair with 1 less or 1 more. A dot turns red when the digits beside it break its rule.</p><p>Select exactly the two cells beside a dot and press <b>Σ Pairs</b> to list its pairs (white: 12 23 34 45 56 67 78 89; black: 12 24 36 48). Grey pairs can't fit; tap a pair to cross it out.</p>`},
  {id:'thermo',title:'Thermometers',body:`<p>A grey line with a round <b>bulb</b> is a thermometer. Digits must <b>strictly increase</b> from the bulb to the far end, so no digit repeats on a thermo.</p><p>On a 4-cell thermo the bulb can only be 1–6 and the tip 4–9. Select a thermo (or one uncaged cell on it) and press Σ to see each cell's possible range, narrowed by digits you've placed. Digits that break the order turn red.</p>`},
  {id:'arrow',title:'Arrows',body:`<p>A grey <b>circle</b> with a line and an arrowhead is an arrow. The digits along the line (the <b>shaft</b>) <b>add up to the digit in the circle</b>.</p><p>Digits <b>can repeat</b> on an arrow, as long as the repeats aren't in the same row, column, box or cage. A 2-cell oval circle is read as a 2-digit number (left to right, or top to bottom).</p><p>Tips: the circle is at least the number of shaft cells, so a 3-cell shaft means the circle is 6+ if its cells all see each other. Select an arrow (or one uncaged cell on it) and press Σ to list each possible circle value with the shaft digits that make it. Tap a value to cross out that whole row, or tap one set of digits to cross out just that set; tap again to restore. Crossings are yours — the app never crosses anything out for you. Digits that can't add up turn the arrow red.</p>`},
  {id:'whisper',title:'German whispers',body:`<p>A thick <b>green line</b> is a German whisper. Any two cells <b>next to each other on the line</b> must differ by <b>at least 5</b>.</p><ul><li><b>5</b> can never be on a whisper (nothing is 5 away from it).</li><li>So digits alternate <b>low</b> (1–4) and <b>high</b> (6–9) along the line.</li><li><b>4</b> only fits next to 9, and <b>6</b> only next to 1 — so a 4 or 6 can't sit between two cells that see each other.</li><li>Digits can repeat on a whisper if sudoku rules allow.</li></ul><p>Select a whisper (or one uncaged cell on it) and press Σ to see the digits each cell can take, given the digits already placed on the line. Neighbours that break the rule turn red.</p>`},
@@ -1042,7 +1066,7 @@ const HELP_CONTROLS=[
  {id:'modes',title:'Digit, Corner, Centre',body:`<p>Pick a mode, then a number. Digit places a value; Corner and Centre add pencil marks. Placing a digit clears that digit's marks from the same row, column, box, cage and thermo.</p><p>With nothing selected, the number keys <b>highlight</b> that number. Tap the key again to clear.</p>`},
  {id:'look',title:'Selection vs highlight',body:`<ul><li><b>Selected</b> cells get a navy outline drawn on the grid lines around the selection, and turn slightly brighter. Every unselected cell also darkens a little.</li><li><b>Highlighted</b> cells (holding the number, or a pencil mark of it — shown as an amber chip) have no border; every other cell darkens a little, and cells where the number can't go darken a bit more.</li><li>A cell that is both keeps the border and isn't darkened.</li><li>A cell that is neither selected nor highlighted gets both darkenings, so the three kinds stay easy to tell apart.</li><li><b>☰ → UI contrast</b> makes the border, brightening and darkening stronger or softer.</li></ul>`},
  {id:'colour',title:'Colours',body:`<p>In Colour mode each key has a <b>+</b> half and a <b>−</b> half. + adds a colour (up to 3 per cell); + on a colour already there makes it 2/3 of the cell. − shrinks or removes it.</p><p>Long-press a key, or use ◎ Select colour, to <b>select</b> every cell that is <b>fully</b> that colour; cells with only <b>part</b> of it are <b>highlighted</b>. Double-tap a cell that is one solid colour does the same for its colour.</p>`},
- {id:'sigma',title:'Σ Combos and Total',body:`<p>Σ works on: one cell in a cage (the whole cage), an uncaged box group, 2+ cells all in one cage, row, column or 3×3 box (type their sum; a whole row, column or box is 45), a thermo (ranges), an arrow (circle values and shaft digits), a whisper (each cell's possible digits), or a renban (the possible runs; tap to cross out). The status line adds up whole cages, known groups and placed digits.</p>`},
+ {id:'sigma',title:'Σ Combos and Total',body:`<p>Σ works on: one cell in a cage (the whole cage), an uncaged box group, 2+ cells all in one cage, row, column or 3×3 box (type their sum; a whole row, column or box is 45), a thermo (ranges), an arrow (circle values and shaft digits), a whisper (each cell's possible digits), a renban (the possible runs), or the two cells of a kropki dot (the possible pairs). The Σ button names what it will show (Combos, Ranges, Sums, Digits, Runs, Pairs). The status line adds up whole cages, known groups and placed digits.</p>`},
  {id:'test',title:'Test',body:`<p>For puzzles that come with a solution, select cells with centre marks and press <b>Test</b>: a green ✓ means the right digit is among the marks, a red ✕ means it's missing. Wrong placed digits also show red.</p>`},
  {id:'other',title:'Timer, edit, menus',body:`<p>Tap the timer to pause. ✎ opens the editor for cages, thermos, arrows, whispers, renbans, dots and givens. In the Arrows tab, tap the circle then the shaft cells in order. In the Dots tab, tap the line between two cells to cycle no dot → white → black.</p><p><b>☰</b> has UI contrast, Help and Main menu. The <b>main menu</b> has Continue (your current unsolved puzzle), Select puzzle (tap one to open; <b>⋯</b> to edit, copy its code, rename, restart or delete) and Add puzzle (paste a code or start a blank one). The app opens straight into your puzzle if it isn't solved yet.</p>`},
 ];
