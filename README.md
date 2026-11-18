@@ -175,3 +175,10 @@ A published hard killer is in `puzzles/escape-room-sujoyku.txt` — *Escape Room
 - The no-colour tint mode is gone: every grid uses the v24 coloured-grid look (selection darkens all unselected cells + perimeter outline; highlight darkens the rest; pencil chips).
 - UI contrast: slider S% now gives the strength the v24 slider gave at 0.7·S% (`K_SCALE` in app.js). Stored `sdk_contrast` values are not migrated.
 - New puzzles: `puzzles/grass-is-greener-sujoyku.txt` (killer + German whispers, LMD 000V1O, 2★) and `puzzles/octo-phoenixaki.txt` (killer + whispers + kropki, LMD 000USO, 1★). Both decoded from the setters' SudokuPad links; unique, solution matches.
+
+## v26: Renban lines
+- Format: `renban r1c1 r1c2 r2c3 ...` (2–9 cells in path order, king-adjacent steps). Cross-outs: `elim renban <first cell> 345 456`.
+- Drawn as a thick translucent pink-violet line (`#renbans` layer, multiplied). Renban cells count as peers (placing a digit clears it from the line's other cells; Σ/arrow candidates and "can't go here" use it). Conflicts: a repeat on the line, or placed digits spanning more than n−1 → line and digits turn red.
+- Repeated taps: cage → thermo → arrow → whisper → renban → uncaged group → box. Σ on a renban opens the RENBAN sheet: every run of n consecutive digits; grey = can't fit the placed digits / cell candidates (bipartite match); tap to cross out (undoable, saved, exported); "Always on the line" shows digits common to all live runs.
+- Editor: new Renban tab (tabs now 4 + 3). Help: new "Renban lines" section.
+- Puzzle: `puzzles/tumble-dumediat.txt` — Tumble by dumediat (LMD 000G13, 2★, renban + kropki), unique, matches the setter's solution.
