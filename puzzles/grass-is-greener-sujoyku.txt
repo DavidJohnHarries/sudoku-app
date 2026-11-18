@@ -1,0 +1,23 @@
+SUDOKU v1
+name The Grass is Always Greener in the Other Corners
+# Author: sujoyku
+# Source: https://logic-masters.de/Raetselportal/Raetsel/zeigen.php?id=000V1O
+# Source: https://sudokupad.app/xnocqe9cf6
+givens .................................................................................
+solution 245961873 371548629 869273154 984716235 536429718 712835496 453182967 197654382 628397541
+cage 12 r5c3 r6c3 r7c3 r7c4
+cage 13 r3c6 r3c7 r4c7 r5c7
+cage 6 r1c3 r2c3
+cage 8 r8c7 r9c7
+cage 14 r4c1 r5c1
+cage 14 r5c9 r6c9
+cage 8 r4c4 r4c5
+cage 8 r6c5 r6c6
+whisper r3c5 r3c4 r3c3 r4c3
+whisper r7c5 r7c6 r7c7 r6c7
+whisper r9c1 r8c1 r8c2 r9c2
+whisper r1c8 r2c8 r2c9 r1c9
+whisper r1c1 r2c2
+whisper r8c8 r9c9
+whisper r1c5 r1c6 r1c7
+whisper r9c5 r9c4 r9c3

@@ -262,16 +262,16 @@ let undoS=[],redoS=[];
 // non-highlighted cells darken and how strong the selection border / brightening is.
 try{localStorage.removeItem('sdk_hlstyle')}catch(e){} // v22 setting retired
 let uiK=(()=>{const v=+LS('sdk_contrast');return v>=.3&&v<=2?v:1})();
-function applyContrast(){const k=uiK,st=document.documentElement.style,a=(x,m)=>Math.min(m,x).toFixed(3);
+// v25: slider S% now gives the strength the v24 slider gave at 0.7*S% (David's 70% became the new 100%). Stored values are not migrated.
+const K_SCALE=.7;
+function applyContrast(){const k=uiK*K_SCALE,st=document.documentElement.style,a=(x,m)=>Math.min(m,x).toFixed(3);
  st.setProperty('--dim',`rgba(17,24,39,${a(.2*k,.55)})`);       // darkening of non-highlighted cells
  st.setProperty('--blk',`rgba(17,24,39,${a(.12*k,.35)})`);      // extra darkening where the number can't go
  st.setProperty('--selw',`rgba(255,255,255,${a(.24*k,.6)})`);   // selected: brighter
  st.setProperty('--selbw',(1+k).toFixed(2)+'px');               // selected: navy outline (preview swatch)
  st.setProperty('--selsw',(4.5+2.5*k).toFixed(2));              // selected: outline on the grid lines, in grid units (box lines are 5, cell lines 1.5)
- st.setProperty('--sdim',`rgba(17,24,39,${a(.17*k,.5)})`);      // v24: coloured grid with a selection — darken every unselected cell
- st.setProperty('--tsel',`rgba(37,99,235,${a(.18*k,.45)})`);    // tints, only on grids with no colours
- st.setProperty('--tsame',`rgba(217,119,6,${a(.36*k,.7)})`);
- st.setProperty('--tnm',`rgba(250,204,21,${a(.34*k,.7)})`)}
+ st.setProperty('--sdim',`rgba(17,24,39,${a(.17*k,.5)})`)}     // a selection darkens every unselected cell
+
 applyContrast();
 const snap=()=>JSON.stringify({wh:P.whispers,ar:P.arrows,kd:P.kropki,kn:P.kropkiNeg,th:P.thermos,gr:P.groups,ls:P.lineSums,g:P.givens,c:P.cages,v:P.v,cn:P.cn,mn:P.mn,col:P.col,s:P.solved});
 function restore(s){const o=JSON.parse(s);Object.assign(P,{whispers:o.wh||[],arrows:o.ar||[],kropki:o.kd||[],kropkiNeg:!!o.kn,thermos:o.th||[],groups:o.gr||{},lineSums:o.ls||{},givens:o.g,cages:o.c,v:o.v,cn:o.cn,mn:o.mn,col:o.col,solved:o.s})}
@@ -463,13 +463,13 @@ function renderSel(){
  // other cell darkens a little. Tints (blue selection, amber/yellow highlight) only when the grid
  // has no coloured cells at all — one rule for the whole grid.
  if(editing||mode!=='k'||!sel.size)colHl=0;
- const anyCol=P.col.some(o=>normCol(o).c.length>0),hlOn=!editing&&(numSel>0||colHl>0);
+ const hlOn=!editing&&(numSel>0||colHl>0);
  for(let i=0;i<81;i++){const same=!!numSel&&valAt(i)===numSel,nm=hasPencil(i,numSel),inCol=colHl>0&&normCol(P.col[i]).c.includes(colHl);
   const c=cells[i].classList;c.toggle('sel',sel.has(i));c.toggle('same',same);c.toggle('nmark',nm);c.toggle('hl',hlOn&&(colHl?inCol:same||nm));c.toggle('blocked',!colHl&&blocked.has(i))}
  padBtns.forEach((b,k)=>b.classList.toggle('nsel',mode!=='k'&&!editing&&numSel===k+1));
- grid.classList.toggle('tint',!anyCol);grid.classList.toggle('hlon',hlOn);
- // v24: with no tints available (any coloured cell), a selection also darkens every unselected cell; this stacks with the highlight darkening.
- grid.classList.toggle('sdim',anyCol&&sel.size>0);
+ grid.classList.toggle('hlon',hlOn);
+ // v24/v25: a selection darkens every unselected cell (every grid since v25: the tint mode is gone); this stacks with the highlight darkening.
+ grid.classList.toggle('sdim',!editing&&sel.size>0);
  drawSelOutline();
  pad.classList.toggle('hlmode',!editing&&mode!=='k'&&!sel.size);
  if(editing){if(etab==='thermo')renderThermos();if(etab==='arrow')renderArrows();if(etab==='whisper')renderWhispers();$('#bPick').classList.add('hidden');$('#infoTxt').textContent=etab==='kropki'?`${(P.kropki||[]).length} dot${(P.kropki||[]).length===1?'':'s'} — tap an edge to cycle`:etab==='thermo'?(sel.size?(editLine>=0?`Editing thermo: ${sel.size} cells — tap cells to extend`:`${sel.size} cell${sel.size>1?'s':''} · bulb ${RC([...sel][0])}`):'Drag from the bulb to the tip'):etab==='whisper'?(sel.size?(editLine>=0?`Editing whisper: ${sel.size} cells — tap cells to extend`:`${sel.size} cell${sel.size>1?'s':''} on the line`):'Drag along the whisper line'):etab==='arrow'?(sel.size?(editLine>=0?`Editing arrow: ${sel.size} cells — tap cells to extend`:sel.size<=arrowB?`Circle ${[...sel].map(RC).join(' ')} — now the shaft`:`Circle ${RC([...sel][0])} · shaft ${sel.size-arrowB}`):'Tap the circle, then the shaft'):sel.size?`${sel.size} cell${sel.size>1?'s':''} selected`:'Drag across cells to make a cage';$('#bCalc').classList.add('hidden');$('#bTest').disabled=true;return}
@@ -982,7 +982,7 @@ const HELP_ELEMENTS=[
 const HELP_CONTROLS=[
  {id:'select',title:'Selecting cells',body:`<ul><li><b>Tap</b> a cell to select it; tap it again to deselect.</li><li><b>Double-tap</b> selects the cell's cage (or the uncaged cells of its box).</li><li>On a thermo, arrow or whisper, the next tap selects that line: <b>double</b> = cage, <b>triple</b> = the line, then the box. An uncaged line cell goes line → uncaged group → box. (Order if a cell is on several: cage → thermo → arrow → whisper.)</li><li>Otherwise <b>triple-tap</b> selects the whole box.</li><li><b>Drag</b> to select several cells, or turn on <b>Multi</b> to add/remove cells with taps (double-tapping a selected cell removes its group).</li><li>While <b>Multi</b> is on, the number highlight is <b>locked</b>: selecting cells won't change it. To change it, clear the selection (tap the status line) and tap a number key; tap the same key to turn it off.</li><li>Tap the status line to clear the selection.</li></ul>`},
  {id:'modes',title:'Digit, Corner, Centre',body:`<p>Pick a mode, then a number. Digit places a value; Corner and Centre add pencil marks. Placing a digit clears that digit's marks from the same row, column, box, cage and thermo.</p><p>With nothing selected, the number keys <b>highlight</b> that number. Tap the key again to clear.</p>`},
- {id:'look',title:'Selection vs highlight',body:`<ul><li><b>Selected</b> cells get a navy outline drawn on the grid lines around the selection, and turn slightly brighter. On a grid with colours, every unselected cell also darkens a little.</li><li><b>Highlighted</b> cells (holding the number, or a pencil mark of it — shown as an amber chip) have no border; every other cell darkens a little, and cells where the number can't go darken a bit more.</li><li>A cell that is both keeps the border and isn't darkened.</li><li>On a grid with <b>no colours</b>, selected cells are also tinted blue and highlighted ones amber/yellow. Once <b>any</b> cell is coloured, the tints switch off for the whole grid so they don't mix with your colours.</li><li><b>☰ → UI contrast</b> makes the border, brightening and darkening stronger or softer.</li></ul>`},
+ {id:'look',title:'Selection vs highlight',body:`<ul><li><b>Selected</b> cells get a navy outline drawn on the grid lines around the selection, and turn slightly brighter. Every unselected cell also darkens a little.</li><li><b>Highlighted</b> cells (holding the number, or a pencil mark of it — shown as an amber chip) have no border; every other cell darkens a little, and cells where the number can't go darken a bit more.</li><li>A cell that is both keeps the border and isn't darkened.</li><li>A cell that is neither selected nor highlighted gets both darkenings, so the three kinds stay easy to tell apart.</li><li><b>☰ → UI contrast</b> makes the border, brightening and darkening stronger or softer.</li></ul>`},
  {id:'colour',title:'Colours',body:`<p>In Colour mode each key has a <b>+</b> half and a <b>−</b> half. + adds a colour (up to 3 per cell); + on a colour already there makes it 2/3 of the cell. − shrinks or removes it.</p><p>Long-press a key, or use ◎ Select colour, to <b>select</b> every cell that is <b>fully</b> that colour; cells with only <b>part</b> of it are <b>highlighted</b>. Double-tap a cell that is one solid colour does the same for its colour.</p>`},
  {id:'sigma',title:'Σ Combos and Total',body:`<p>Σ works on: one cell in a cage (the whole cage), an uncaged box group, 2+ cells all in one cage, row, column or 3×3 box (type their sum; a whole row, column or box is 45), a thermo (ranges), an arrow (circle values and shaft digits), or a whisper (each cell's possible digits). The status line adds up whole cages, known groups and placed digits.</p>`},
  {id:'test',title:'Test',body:`<p>For puzzles that come with a solution, select cells with centre marks and press <b>Test</b>: a green ✓ means the right digit is among the marks, a red ✕ means it's missing. Wrong placed digits also show red.</p>`},

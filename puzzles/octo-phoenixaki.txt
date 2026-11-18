@@ -1,0 +1,22 @@
+SUDOKU v1
+name Octo
+# Author: PhoenixAki
+# Source: https://logic-masters.de/Raetselportal/Raetsel/zeigen.php?id=000USO
+# Source: https://sudokupad.app/qt1kjz85ws
+givens .................................................................................
+solution 834756219 961238574 527194863 276583491 453917628 189642735 648371952 392465187 715829346
+cage 8 r1c7 r1c8 r2c7
+cage 8 r1c2 r1c3 r2c3
+cage 8 r8c3 r9c2 r9c3
+cage 8 r8c7 r9c7 r9c8
+cage 8 r1c5 r2c5
+cage 8 r8c5 r9c5
+cage 8 r5c7 r5c8
+cage 8 r5c2 r5c3
+whisper r4c5 r5c5 r5c6
+whisper r5c5 r5c4
+whisper r3c4 r3c3 r3c2
+kropki w r7c5 r8c5
+kropki w r6c6 r7c6
+kropki w r8c8 r8c9
+kropki b r7c1 r8c1

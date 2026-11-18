@@ -170,3 +170,8 @@ A published hard killer is in `puzzles/escape-room-sujoyku.txt` — *Escape Room
 ## v24: selection outline on the grid lines; selection darkening on coloured grids
 - The selection outline is an SVG path (`#selsvg`, above cage/box lines, below kropki dots) drawn centred on the grid lines, only around the outer perimeter of each connected selected region (edges shared by two selected cells stay normal grid lines). Edges on the outer frame are centred on the frame line. Width scales with UI contrast (`--selsw`, 7 grid units at 100%, never thinner than the box lines).
 - If any cell is coloured (no tints), a selection also darkens every unselected cell (`#grid.sdim`, `--sdim`); this stacks with the highlight darkening, so a cell that is neither selected nor highlighted gets both. Uncoloured grids keep the v23 tints and no selection darkening.
+
+## v25: one look for every grid; contrast rescaled
+- The no-colour tint mode is gone: every grid uses the v24 coloured-grid look (selection darkens all unselected cells + perimeter outline; highlight darkens the rest; pencil chips).
+- UI contrast: slider S% now gives the strength the v24 slider gave at 0.7·S% (`K_SCALE` in app.js). Stored `sdk_contrast` values are not migrated.
+- New puzzles: `puzzles/grass-is-greener-sujoyku.txt` (killer + German whispers, LMD 000V1O, 2★) and `puzzles/octo-phoenixaki.txt` (killer + whispers + kropki, LMD 000USO, 1★). Both decoded from the setters' SudokuPad links; unique, solution matches.
