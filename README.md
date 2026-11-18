@@ -14,7 +14,7 @@ Live: https://davidjohnharries.github.io/sudoku-app/
 - **Conflicts:** repeated digits in a row/column/box/cage turn red; a cage whose digits go over its sum, or that's full with the wrong sum, gets a red sum label. If the puzzle includes a `solution` line, a digit you placed that doesn't match it is also red. Givens are never flagged this way.
 - **Σ Combos:** enabled when exactly one selected cell is in a cage (opens the whole cage), or when two or more selected cells all sit in the same cage or all sit on the same row or column (opens just those cells; type a sum if it isn't already known). Selecting an exact uncaged box-group still opens that group. Lists every set of different digits that makes the sum. Tap a row to rule it out (saved with the puzzle). Rows that don't include the digits already placed, or that can't fit a parent cage, are greyed "not possible".
 - **✎ Edit puzzle:** Cages tab — drag cells, type the sum, Create cage; tap a cage to change its sum or Delete it. Givens tab — set the printed digits. Warnings: cells in two cages, cages not joined up, impossible sums for the cage size, totals ≠ 405 once every cell is caged.
-- **☰ Puzzles:** list (autosaved, resumes where you left off), Paste puzzle, New blank, Copy (puzzle only, or with progress), Rename, Restart, Delete. Tap the timer to pause.
+- **☰ menu:** UI contrast, Help, Main menu. **Main menu:** Continue (current unsolved puzzle), Select puzzle (tap to open; ⋯ = Open, Edit, Copy puzzle code, Rename, Restart, Delete), Add puzzle (Paste puzzle code, New blank). Launch opens the current puzzle if unsolved, else the main menu. Tap the timer to pause.
 
 ## Puzzle format (v1)
 Plain text, one item per line. Keyword first, then values. `#` starts a comment. Cells are `rRcC` (row, column 1–9).
@@ -102,7 +102,7 @@ Tapping the already-selected cell now also clears the number highlight (the v7 b
 Selecting a cell and placing a digit leaves the cell selected, but does not turn on number highlight (grey houses and amber cells). Tap that same cell again to turn highlight on for the digit; tap it again to deselect and clear highlight, as in v8. Highlight still turns on when you tap a cell that already has a given or placed digit, or when you tap a pad key with no cell selected. Placing a digit on several cells at once also stays out of highlight mode.
 
 ## Solved celebration and a harder puzzle (v10)
-Finishing a puzzle no longer shows a brief toast. A gold ripple spreads across the grid from the last digit you placed, the digits glow, and a short burst of confetti falls; then a card names the puzzle, shows your time, and offers a short "Nice."-style line, with **Close** and **Puzzle list**. The animation is skipped when the device asks for reduced motion (the card still appears). Opening an already-solved puzzle does not replay it.
+Finishing a puzzle no longer shows a brief toast. A gold ripple spreads across the grid from the last digit you placed, the digits glow, and a short burst of confetti falls; then a card names the puzzle, shows your time, and offers a short "Nice."-style line, with **Close** and **Main menu**. The animation is skipped when the device asks for reduced motion (the card still appears). Opening an already-solved puzzle does not replay it.
 
 A published hard killer is in `puzzles/escape-room-sujoyku.txt` — *Escape Room* by sujoyku (Logic Masters Deutschland, 8 Aug 2024). Plain killer rules, no givens, only 15 cages. Paste it in from the puzzle list.
 
@@ -127,7 +127,7 @@ A published hard killer is in `puzzles/escape-room-sujoyku.txt` — *Escape Room
 - **Repeated taps** walk a list: cage → thermo(s) → (uncaged cells only) box's uncaged group → box. So a plain cage cell is unchanged (double = cage, triple = box); a caged thermo cell is double = cage, triple = thermo, 4 taps = box; an uncaged thermo cell is double = thermo, triple = uncaged group, 4 taps = box.
 - **Σ on a thermo** (exact thermo selection, or a single uncaged thermo cell) opens a range sheet: position k of n allows k..9−(n−1−k), narrowed by placed digits along the thermo. Exact cage/group selections still win; a thermo beats a line/cage-subset set with the same cells.
 - **Editor:** new Thermos tab. Drag (or tap cells) from bulb to tip; a drag only picks up a cell near its centre so diagonals don't clip corners. Tap the last cell again to drop it. With nothing selected, tap a thermo to edit (extend/update) or delete it.
-- **Help:** a Help button in the ☰ puzzle list opens collapsible sections. Add a new element by appending to `HELP_ELEMENTS` in app.js (controls are in `HELP_CONTROLS`).
+- **Help:** Help (☰ menu, or the main menu) opens collapsible sections. Add a new element by appending to `HELP_ELEMENTS` in app.js (controls are in `HELP_CONTROLS`).
 - `tools/solve_cp.py` handles `thermo` lines and checks the `solution` line.
 
 ## Kropki dots, mode bar (v15)
@@ -159,3 +159,10 @@ A published hard killer is in `puzzles/escape-room-sujoyku.txt` — *Escape Room
 ## Highlight style (v22)
 - ☰ → Highlight style: **Classic** (default, unchanged) or **Spotlight** (stored in localStorage `sdk_hlstyle`). Spotlight, outside Colour mode, keeps selected cells (navy outline) and cells with the highlighted number (amber outline: thick = placed, thin = pencilled) at full brightness and dims the rest; blocked cells dim further. Highlighted pencil digits become white-on-amber chips. Colour mode keeps the v21 look in both styles.
 
+
+## Selection & highlight, main menu (v23)
+- The v22 Highlight style toggle is gone (`sdk_hlstyle` is removed on load). One system: **selected** = thin navy border + slightly brighter; **highlighted** (number highlight, or Colour-mode colour) = no border, every other cell darkens; "can't go here" cells darken a little more. Selected + highlighted = border, not darkened.
+- If **no** cell in the grid is coloured, selection is also tinted blue and highlighted cells amber (placed) / yellow (pencilled). If any cell is coloured, no tints anywhere. Matching pencil digits are white-on-amber chips.
+- Colour mode: ◎ Select colour / long-press / double-tap a solid cell selects cells **fully** that colour and highlights cells with **any part** of it.
+- ☰ → UI contrast slider (30–200%, localStorage `sdk_contrast`) scales darkening, brightening, border width and tints (CSS vars set by `applyContrast`). The menu is a sheet over the keypad so the board previews live.
+- Screens: game, home, list, add, with history entries (browser/Android back works). Puzzle data format and `sdk_puzzles`/`sdk_cur` are unchanged.

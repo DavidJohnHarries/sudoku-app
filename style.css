@@ -4,7 +4,7 @@ body{margin:0;font:16px -apple-system,system-ui,sans-serif;background:#f3f4f6;co
 button{font:inherit;border:0;border-radius:12px;cursor:pointer;color:inherit;background:#fff}
 button:disabled{opacity:.35}
 .hidden{display:none!important}.muted{color:#6b7280}
-#game,#list{max-width:520px;margin:0 auto;padding:0 8px}
+#game,.screen{max-width:520px;margin:0 auto;padding:0 8px}
 header{display:flex;align-items:center;gap:6px;height:50px}
 .hb{background:#fff;min-width:44px;height:40px;font-size:20px;padding:0 10px;box-shadow:0 1px 2px #0002}
 .hb.tm{font-size:16px;font-variant-numeric:tabular-nums;min-width:70px}.hb.tm.paused{background:#fde68a}
@@ -17,11 +17,6 @@ header{display:flex;align-items:center;gap:6px;height:50px}
 #lines{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
 .cell{position:relative;overflow:hidden;container-type:size}
 .cell .bg{position:absolute;inset:0;z-index:0}
-.cell.sel::after{content:'';position:absolute;inset:0;background:rgba(37,99,235,.22);z-index:1}
-/* Placed/given N: stronger amber wash. Pencil mark of N: a lighter whole-cell tint. Both
-   sit under the digits so pie colours and values stay readable. */
-.cell.same:not(.sel)::after{content:'';position:absolute;inset:0;background:rgba(217,119,6,.40);z-index:1}
-.cell.nmark:not(.sel):not(.same)::after{content:'';position:absolute;inset:0;background:rgba(250,204,21,.38);z-index:1}
 .cell>span,.cell>div:not(.bg){z-index:2}
 .val{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:66cqh;color:#2563eb;line-height:1}
 .cell.given .val{color:#111827}
@@ -71,10 +66,7 @@ header{display:flex;align-items:center;gap:6px;height:50px}
 .sumrow{display:flex;align-items:center;gap:8px;margin-bottom:6px}#sumBuf{flex:1;font-size:26px;font-weight:700;background:#fff;border-radius:10px;height:44px;display:flex;align-items:center;padding:0 12px}
 .sumpad button{height:48px;font-size:24px}
 #warn{font-size:14px;margin-top:6px;color:#92400e;min-height:20px}#warn div{margin:2px 0}#warn .ok{color:#15803d}
-.lt{flex:1;font-weight:700;font-size:22px}.lbtns{display:flex;gap:8px;margin:6px 0 10px}.lbtns button{flex:1}
-.item{background:#fff;border-radius:14px;padding:12px;margin:8px 0;box-shadow:0 1px 2px #0002}
-.item.cur{box-shadow:inset 0 0 0 2px #1e3a8a}.item .t{font-weight:700;font-size:17px}.item .s{color:#6b7280;font-size:14px;margin:2px 0 8px}
-.item .r{display:flex;gap:6px;flex-wrap:wrap}.item .r{flex-wrap:nowrap}.item .r button{background:#f3f4f6;height:40px;padding:0 9px;font-size:14px}.item .r .open{background:#1e3a8a;color:#fff;flex:1}.item .r .del{color:#b91c1c}
+.lt{flex:1;font-weight:700;font-size:22px}
 #modal{position:fixed;inset:0;background:#0008;z-index:20;display:flex;align-items:center;justify-content:center;padding:20px}
 .box{background:#fff;border-radius:16px;padding:16px;width:100%;max-width:440px;max-height:85vh;overflow:auto;-webkit-user-select:text;user-select:text}
 .box h2{margin:0 0 4px;font-size:22px}.box textarea{width:100%;min-height:220px;font:13px ui-monospace,Menlo,monospace;border:1px solid #d1d5db;border-radius:10px;padding:10px;-webkit-user-select:text;user-select:text}
@@ -94,10 +86,6 @@ header{display:flex;align-items:center;gap:6px;height:50px}
 .ch{display:flex;align-items:center;gap:8px}.ch input{width:72px;font:inherit;font-size:22px;padding:2px 8px;border:2px solid #1e3a8a;border-radius:8px;-webkit-user-select:text;user-select:text}
 .cnote{font-size:12px;margin:6px 0 0}.box .r{margin-top:8px}
 
-/* Number selection: cells where N can't go (row/col/box/cage of every placed N). Overlay is
-   light so pie-slice colours and the SVG cage outlines stay readable. */
-.cell.blocked::before{content:'';position:absolute;inset:0;background:rgba(55,65,81,.30);z-index:1;pointer-events:none}
-.nh{color:#1d4ed8;font-weight:800;background:#dbeafe;border-radius:2px;padding:0 1px;line-height:1}
 .pad button.nsel{background:#1e3a8a;color:#fff;box-shadow:0 0 0 2px #93c5fd}
 
 /* Colour mode: each key is split into − (left) and + (right) halves. Full-height
@@ -163,7 +151,6 @@ header{display:flex;align-items:center;gap:6px;height:50px}
 .hs summary::-webkit-details-marker{display:none}
 .hs summary::before{content:'›';display:inline-block;width:16px;transition:transform .15s}.hs[open] summary::before{transform:rotate(90deg)}
 .hb2{padding:0 12px 10px;font-size:15px;line-height:1.4;color:#1f2937}.hb2 p{margin:4px 0 8px}.hb2 ul{margin:4px 0;padding-left:20px}.hb2 li{margin:3px 0}
-.lbtns button{padding:0 10px}
 /* Kropki dots (v15): own SVG layer above cage lines, on the shared edge. */
 #dots{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
 .kneg{display:flex;align-items:center;gap:8px}.kneg.on{background:#1e3a8a;color:#fff;box-shadow:none}
@@ -183,22 +170,48 @@ header{display:flex;align-items:center;gap:6px;height:50px}
 /* German whispers (v20): thick translucent green line, multiplied under digits like thermos. */
 #whispers{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;mix-blend-mode:multiply}
 .wrow .trng{letter-spacing:.06em}
-/* v21 Colour-mode selection: no blue wash on selected cells (their colours stay bright) — a navy
-   inset outline marks them instead — and every other cell is dimmed under its digits/marks. */
-#grid.ksel .cell.sel::after{content:'';position:absolute;inset:0;background:transparent;box-shadow:inset 0 0 0 3px #1e3a8a;z-index:3;pointer-events:none}
-#grid.ksel .cell:not(.sel)::after{content:'';position:absolute;inset:0;background:rgba(17,24,39,.45);z-index:1;pointer-events:none}
-#grid.ksel .cell:not(.sel)>span,#grid.ksel .cell:not(.sel)>div:not(.bg){opacity:.75}
-/* v22 Spotlight highlight style (☰ → Highlight style). Lit cells: no tint, an outline — amber for
-   cells with the highlighted number (thick if placed, thinner if pencilled), navy for selected cells.
-   Everything else dims under its digits; "can't go here" cells (blocked) dim a little more. */
-#grid.spot .cell::after{content:'';position:absolute;inset:0;background:rgba(17,24,39,.42);z-index:1;pointer-events:none;box-shadow:none}
-#grid.spot .cell:not(.sel):not(.same):not(.nmark)>span,#grid.spot .cell:not(.sel):not(.same):not(.nmark)>div:not(.bg){opacity:.75}
-#grid.spot .cell.nmark::after{background:transparent;box-shadow:inset 0 0 0 2.5px #d97706;z-index:3}
-#grid.spot .cell.same::after{background:transparent;box-shadow:inset 0 0 0 4px #d97706;z-index:3}
-#grid.spot .cell.sel::after{background:transparent;box-shadow:inset 0 0 0 3px #1e3a8a;z-index:3}
-#grid.spot .cell.same .val{text-shadow:0 0 3px #fff,0 0 6px #fff}
-#grid.spot .nh{background:#b45309;color:#fff;border-radius:3px;padding:0 2px;font-weight:800;box-shadow:0 0 0 1px #fff}
-.setrow{display:flex;align-items:center;justify-content:space-between;gap:10px;background:#fff;border-radius:12px;padding:6px 6px 6px 12px;margin:0 0 10px;box-shadow:0 1px 2px #0002;font-size:15px;font-weight:600}
-.seg{display:flex;background:#d9dde3;border-radius:18px;padding:3px;gap:2px}
-.seg button{height:32px;border-radius:15px;padding:0 12px;background:transparent;color:#4b5563;font-size:14px;font-weight:600}
-.seg button.on{background:#fff;color:#1e3a8a;box-shadow:0 1px 3px #0003}
+
+/* ===== v23: one selection / highlight system (colours from JS: applyContrast, ☰ → UI contrast) =====
+   Selected: thin navy border + slightly brighter. Highlighted: no border, all other cells darken.
+   #grid.tint (no coloured cell anywhere) adds the old blue / amber / yellow tints. */
+.cell::after{content:'';position:absolute;inset:0;z-index:1;pointer-events:none;background:transparent}
+.cell.sel::after{background:var(--selw);box-shadow:inset 0 0 0 var(--selbw) #1e3a8a}
+#grid.tint .cell.sel::after{background:var(--tsel)}
+#grid.hlon .cell:not(.hl):not(.sel)::after{background:var(--dim)}
+#grid.hlon .cell.blocked:not(.sel)::before{content:'';position:absolute;inset:0;background:var(--blk);z-index:1;pointer-events:none}
+#grid.tint.hlon .cell.same:not(.sel)::after{background:var(--tsame)}
+#grid.tint.hlon .cell.nmark:not(.sel):not(.same)::after{background:var(--tnm)}
+#grid.hlon .cell.same .val{text-shadow:0 0 3px #fff,0 0 6px #fff}
+.nh{background:#b45309;color:#fff;border-radius:3px;padding:0 2px;font-weight:800;box-shadow:0 0 0 1px #fff;line-height:1}
+/* ☰ menu: a sheet over the keypad, no backdrop dimming, so the whole board stays visible as a live contrast preview. */
+#menu{position:fixed;inset:0;z-index:25}
+.mpop{position:absolute;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom) + 10px);width:min(504px,calc(100vw - 16px));background:#fff;border-radius:16px;box-shadow:0 10px 34px rgba(0,0,0,.25),0 0 0 1px rgba(0,0,0,.05);padding:8px}
+.mrow{padding:6px 8px 8px;border-bottom:1px solid #e5e7eb;margin-bottom:4px}
+.mlab{display:flex;justify-content:space-between;font-weight:600;font-size:16px}.mlab span:last-child{color:#6b7280;font-variant-numeric:tabular-nums;font-weight:500}
+#kSlider{width:100%;margin:6px 0 6px;accent-color:#1e3a8a;height:28px}
+.kprev{display:flex;gap:6px;justify-content:space-between}.kprev>div{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px}.kprev small{font-size:11px;color:#6b7280}
+.kc{position:relative;width:34px;height:34px;display:flex;align-items:center;justify-content:center;font-size:24px;color:#2563eb;background:#93c5fd;border-radius:3px;overflow:hidden}
+.kc::after{content:'';position:absolute;inset:0;border-radius:3px}
+.kc.ksel::after{background:var(--selw);box-shadow:inset 0 0 0 var(--selbw) #1e3a8a}.kc.kdim::after{background:var(--dim)}
+.mnote{font-size:12px;color:#6b7280;margin-top:6px}
+.mitem{display:block;width:100%;text-align:left;height:44px;padding:0 12px;font-size:17px;border-radius:10px;background:transparent}
+.mitem:active{background:#f3f4f6}
+/* Main menu / Select puzzle / Add puzzle screens */
+.screen{padding-top:6px}
+.hhead{text-align:center;margin:8vh 0 26px}.happ{font-size:34px;font-weight:800;color:#1e3a8a;letter-spacing:-.01em}.hsub{color:#6b7280;font-size:15px;margin-top:2px}
+.hcard{display:flex;flex-direction:column;align-items:flex-start;gap:3px;width:100%;text-align:left;padding:15px 16px;margin:0 0 10px;border-radius:16px;box-shadow:0 1px 3px #0002;min-height:64px}
+.hcard .hl1{font-size:19px;font-weight:700}.hcard .hl2{font-size:14px;color:#6b7280;line-height:1.3}
+.hcard.prim{background:#1e3a8a;color:#fff}.hcard.prim .hl2{color:#c7d2fe}
+.hcard:active{transform:scale(.99)}
+.hlink{display:block;margin:14px auto 0;background:transparent;color:#1e3a8a;font-weight:600;height:44px;padding:0 20px}
+.hb.back{font-size:16px;font-weight:600;color:#1e3a8a;min-width:auto}
+.item{display:flex;align-items:stretch;background:#fff;border-radius:14px;margin:8px 0;box-shadow:0 1px 2px #0002;overflow:hidden}
+.item.cur{box-shadow:inset 0 0 0 2px #1e3a8a}
+.iopen{flex:1;min-width:0;display:flex;flex-direction:column;align-items:flex-start;gap:3px;text-align:left;padding:12px 4px 12px 14px;background:transparent;border-radius:0}
+.iopen .t{font-weight:700;font-size:17px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.iopen .s{font-size:14px;color:#374151;display:flex;align-items:center;gap:6px;font-variant-numeric:tabular-nums}.iopen .s2{font-size:12px;color:#6b7280}
+.chip{font-size:12px;font-weight:700;padding:2px 8px;border-radius:10px;background:#e5e7eb;color:#374151}.chip.solved{background:#dcfce7;color:#166534}.chip.prog{background:#fef3c7;color:#92400e}
+.imore{flex:none;width:52px;font-size:24px;font-weight:700;color:#4b5563;background:transparent;border-radius:0;border-left:1px solid #f3f4f6}
+.sheet{display:flex;flex-direction:column;gap:6px}.sheet button{height:46px;text-align:left;padding:0 14px;background:#f3f4f6;font-size:16px}.sheet button.btn{background:#1e3a8a;color:#fff}.sheet .del{color:#b91c1c}.sheet .cx{text-align:center;background:#fff;box-shadow:inset 0 0 0 1px #d1d5db;margin-top:4px}
+.mitems{display:flex;gap:6px}.mitems .mitem{flex:1;text-align:center;background:#f3f4f6}
+.kc b{position:relative;z-index:1;font-weight:400}

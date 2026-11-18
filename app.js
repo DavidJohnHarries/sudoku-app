@@ -255,10 +255,22 @@ function peers(i){const s=new Set();for(let j=0;j<81;j++)if(j!==i&&(ROW(j)===ROW
 const valAt=i=>P.givens[i]||P.v[i];
 
 // ---------- UI state ----------
+let colHl=0; // v23: Colour-mode highlight — cells containing any of this colour
 let sel=new Set(),mode='v',editing=false,etab='cage',sumBuf='',editCage=-1,editLine=-1,arrowB=1,paused=false,numSel=0;let lastDotEdge=null;
 let undoS=[],redoS=[];
-let hlStyle=LS('sdk_hlstyle')==='spot'?'spot':'classic'; // v22: 'classic' (default) or 'spot'
-function setHlStyle(s){hlStyle=s==='spot'?'spot':'classic';SV('sdk_hlstyle',hlStyle);$$('#hlSeg button').forEach(b=>b.classList.toggle('on',b.dataset.hs===hlStyle));renderSel()}
+// v23 UI contrast (☰ menu slider, saved per device): one factor k scales how strongly
+// non-highlighted cells darken and how strong the selection border / brightening is.
+try{localStorage.removeItem('sdk_hlstyle')}catch(e){} // v22 setting retired
+let uiK=(()=>{const v=+LS('sdk_contrast');return v>=.3&&v<=2?v:1})();
+function applyContrast(){const k=uiK,st=document.documentElement.style,a=(x,m)=>Math.min(m,x).toFixed(3);
+ st.setProperty('--dim',`rgba(17,24,39,${a(.2*k,.55)})`);       // darkening of non-highlighted cells
+ st.setProperty('--blk',`rgba(17,24,39,${a(.12*k,.35)})`);      // extra darkening where the number can't go
+ st.setProperty('--selw',`rgba(255,255,255,${a(.24*k,.6)})`);   // selected: brighter
+ st.setProperty('--selbw',(1+k).toFixed(2)+'px');               // selected: thin navy border
+ st.setProperty('--tsel',`rgba(37,99,235,${a(.18*k,.45)})`);    // tints, only on grids with no colours
+ st.setProperty('--tsame',`rgba(217,119,6,${a(.36*k,.7)})`);
+ st.setProperty('--tnm',`rgba(250,204,21,${a(.34*k,.7)})`)}
+applyContrast();
 const snap=()=>JSON.stringify({wh:P.whispers,ar:P.arrows,kd:P.kropki,kn:P.kropkiNeg,th:P.thermos,gr:P.groups,ls:P.lineSums,g:P.givens,c:P.cages,v:P.v,cn:P.cn,mn:P.mn,col:P.col,s:P.solved});
 function restore(s){const o=JSON.parse(s);Object.assign(P,{whispers:o.wh||[],arrows:o.ar||[],kropki:o.kd||[],kropkiNeg:!!o.kn,thermos:o.th||[],groups:o.gr||{},lineSums:o.ls||{},givens:o.g,cages:o.c,v:o.v,cn:o.cn,mn:o.mn,col:o.col,solved:o.s})}
 function act(fn){const before=snap();fn();const after=snap();if(after!==before){undoS.push(before);if(undoS.length>500)undoS.shift();redoS=[];save()}render()}
@@ -445,13 +457,15 @@ function renderSel(){
  syncNumSel();
  if(paintedNum!==numSel){renderCells();paintedNum=numSel}
  const blocked=blockedCells();
- for(let i=0;i<81;i++){cells[i].classList.toggle('sel',sel.has(i));cells[i].classList.toggle('same',!!numSel&&valAt(i)===numSel);cells[i].classList.toggle('nmark',hasPencil(i,numSel));cells[i].classList.toggle('blocked',blocked.has(i))}
+ // v23 one system. Selection = thin navy border + slightly brighter. Highlight = no border, every
+ // other cell darkens a little. Tints (blue selection, amber/yellow highlight) only when the grid
+ // has no coloured cells at all — one rule for the whole grid.
+ if(editing||mode!=='k'||!sel.size)colHl=0;
+ const anyCol=P.col.some(o=>normCol(o).c.length>0),hlOn=!editing&&(numSel>0||colHl>0);
+ for(let i=0;i<81;i++){const same=!!numSel&&valAt(i)===numSel,nm=hasPencil(i,numSel),inCol=colHl>0&&normCol(P.col[i]).c.includes(colHl);
+  const c=cells[i].classList;c.toggle('sel',sel.has(i));c.toggle('same',same);c.toggle('nmark',nm);c.toggle('hl',hlOn&&(colHl?inCol:same||nm));c.toggle('blocked',!colHl&&blocked.has(i))}
  padBtns.forEach((b,k)=>b.classList.toggle('nsel',mode!=='k'&&!editing&&numSel===k+1));
- // v21: Colour mode with a selection → selected cells keep full colour (outlined), everything else dims.
- grid.classList.toggle('ksel',!editing&&mode==='k'&&sel.size>0);
- // v22 Spotlight style (☰ setting): outside Colour mode, selected cells and cells holding the highlighted
- // number (placed or pencilled) stay at full brightness with an outline; everything else dims.
- grid.classList.toggle('spot',hlStyle==='spot'&&!editing&&mode!=='k'&&(sel.size>0||numSel>0));
+ grid.classList.toggle('tint',!anyCol);grid.classList.toggle('hlon',hlOn);
  pad.classList.toggle('hlmode',!editing&&mode!=='k'&&!sel.size);
  if(editing){if(etab==='thermo')renderThermos();if(etab==='arrow')renderArrows();if(etab==='whisper')renderWhispers();$('#bPick').classList.add('hidden');$('#infoTxt').textContent=etab==='kropki'?`${(P.kropki||[]).length} dot${(P.kropki||[]).length===1?'':'s'} — tap an edge to cycle`:etab==='thermo'?(sel.size?(editLine>=0?`Editing thermo: ${sel.size} cells — tap cells to extend`:`${sel.size} cell${sel.size>1?'s':''} · bulb ${RC([...sel][0])}`):'Drag from the bulb to the tip'):etab==='whisper'?(sel.size?(editLine>=0?`Editing whisper: ${sel.size} cells — tap cells to extend`:`${sel.size} cell${sel.size>1?'s':''} on the line`):'Drag along the whisper line'):etab==='arrow'?(sel.size?(editLine>=0?`Editing arrow: ${sel.size} cells — tap cells to extend`:sel.size<=arrowB?`Circle ${[...sel].map(RC).join(' ')} — now the shaft`:`Circle ${RC([...sel][0])} · shaft ${sel.size-arrowB}`):'Tap the circle, then the shaft'):sel.size?`${sel.size} cell${sel.size>1?'s':''} selected`:'Drag across cells to make a cage';$('#bCalc').classList.add('hidden');$('#bTest').disabled=true;return}
  $('#bCalc').classList.toggle('hidden',!FEATURES.calculator||mode==='k');$('#bPick').classList.toggle('hidden',mode!=='k');
@@ -625,7 +639,7 @@ function celebrate(){
  grid.classList.add('celeb-wave');startConfetti();
  celebT=setTimeout(showCard,max*CELEB_WAVE_STEP+CELEB_CARD_PAD)}
 $('#celebClose').onclick=()=>endCeleb();
-$('#celebList').onclick=()=>{endCeleb();showList()};
+$('#celebList').onclick=()=>{endCeleb();go('home')};
 
 // A cell is "fully" one colour when it has exactly one colour (no other slices). Boost does not matter.
 function fullColour(i){const o=normCol(P.col[i]);return o.c.length===1?o.c[0]:0}
@@ -674,7 +688,7 @@ grid.addEventListener('pointerdown',e=>{if(editing&&etab==='kropki'){e.preventDe
  try{grid.setPointerCapture(e.pointerId)}catch(_){}
  if(rep)return; // upgrade happens on pointerup
  if(already){const v=valAt(i);if(v&&numSel!==v){numSel=v;renderSel();return}sel.clear();numSel=0;renderSel();return}
- if(!add)sel=new Set();sel.add(i);
+ if(!add){sel=new Set();colHl=0}sel.add(i);
  if(!editing&&!add)numSel=valAt(i)||0; // selecting a cell that already has a digit turns highlight on
  renderSel()});
 // Thermo drawing only takes a cell when the finger is near its centre, so a diagonal drag doesn't clip the corner cells.
@@ -691,8 +705,8 @@ function endGP(e){if(!gp||(e&&e.pointerId!=null&&e.pointerId!==gp.id))return;con
  if(g.moved){if(editing&&editCage>=0){editCage=-1;sumBuf='';renderLines();renderControls()}renderSel();return}
  if(g.rep){tapSeq.n++;tapSeq.t=Date.now();const i=g.start,ks=cagesOf[i];let grp;
   const full=(mode==='k'&&tapSeq.n===1)?fullColour(i):0;
-  if(full)grp=cellsOfFullColour(full);
-  else{const L=tapGroups(i);grp=L[Math.min(tapSeq.n-1,L.length-1)]}
+  if(full){grp=cellsOfFullColour(full);colHl=full}
+  else{colHl=0;const L=tapGroups(i);grp=L[Math.min(tapSeq.n-1,L.length-1)]}
   // Use tapSeq.base (selection before the first tap): the first tap of a double-tap may already have toggled/deselected the cell.
   if(multi&&tapSeq.n===1&&tapSeq.base.has(i)){sel=new Set(tapSeq.base);for(const j of grp)sel.delete(j)}
   else sel=new Set([...(multi?tapSeq.base:[]),...grp]);
@@ -722,8 +736,10 @@ $('#bPick').onclick=()=>setPick(!pickColour);
 // Tap the status line to drop the cell selection (number highlight stays). A quick second tap on a cell is a double-tap (cage/box), so this is the reliable way to get to 'no cell selected' without waiting for the double-tap window.
 $('#infoTxt').addEventListener('click',()=>{if(editing||!sel.size)return;sel.clear();renderSel()});
 const CNAMES=['red','orange','yellow','green','teal','blue','purple','pink','grey'];
-function selectColour(d){const hit=[];for(let i=0;i<81;i++)if(normCol(P.col[i]).c.includes(d))hit.push(i);
- sel=new Set([...(multi?sel:[]),...hit]);setPick(false);if(!hit.length)toast(`No ${CNAMES[d-1]} cells`);renderSel()}
+// v23: selects only cells that are fully this colour; cells with any part of it are highlighted.
+function selectColour(d){const full=cellsOfFullColour(d),any=P.col.some(o=>normCol(o).c.includes(d));
+ sel=new Set([...(multi?sel:[]),...full]);colHl=any?d:0;setPick(false);
+ if(!any)toast(`No ${CNAMES[d-1]} cells`);else if(!full.length)toast(`No cells fully ${CNAMES[d-1]} — partly ${CNAMES[d-1]} cells are highlighted`);renderSel()}
 // long-press a colour key (Colour mode) = select all cells with that colour
 padBtns.forEach(b=>{let t=null;
  b.addEventListener('pointerdown',()=>{delete b.dataset.lp;if(mode!=='k')return;t=setTimeout(()=>{t=null;b.dataset.lp='1';selectColour(+b.dataset.d)},500)});
@@ -874,27 +890,53 @@ $('#modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal()})
 const fmtT=s=>{s=Math.floor(s);const h=Math.floor(s/3600),m=Math.floor(s/60)%60,x=s%60;return (h?h+':'+String(m).padStart(2,'0'):m)+':'+String(x).padStart(2,'0')};
 let lastTick=Date.now();
 setInterval(()=>{const now=Date.now(),dt=(now-lastTick)/1000;lastTick=now;
- if(!document.hidden&&!paused&&!P.solved&&!editing&&$('#list').classList.contains('hidden')&&dt<5){P.time+=dt;if(!saveT)saveT=setTimeout(saveNow,5000)}
+ if(!document.hidden&&!paused&&!P.solved&&!editing&&curScreen==='game'&&$('#menu').classList.contains('hidden')&&dt<5){P.time+=dt;if(!saveT)saveT=setTimeout(saveNow,5000)}
  $('#timer').textContent=paused?'⏸ '+fmtT(P.time):fmtT(P.time);$('#timer').classList.toggle('paused',paused)},1000);
 $('#timer').onclick=()=>{paused=!paused;$('#timer').classList.toggle('paused',paused);$('#timer').textContent=paused?'⏸ '+fmtT(P.time):fmtT(P.time)};
 document.addEventListener('visibilitychange',()=>{if(document.hidden)saveNow();lastTick=Date.now()});
 
 // ---------- Puzzle list, import / export ----------
-function openPuzzle(id){saveNow();curId=id;P=DB[id];undoS=[];redoS=[];sel.clear();numSel=0;editing=false;editCage=-1;paused=false;cellCache=Array(81).fill(null);SV('sdk_cur',curId);showGame();render()}
-function showGame(){$('#list').classList.add('hidden');$('#game').classList.remove('hidden')}
+function openPuzzle(id){saveNow();curId=id;P=DB[id];undoS=[];redoS=[];sel.clear();numSel=0;colHl=0;editing=false;editCage=-1;paused=false;cellCache=Array(81).fill(null);SV('sdk_cur',curId);go('game');render()}
 function progress(p){let f=0,g=0;for(let i=0;i<81;i++){if(p.givens[i])g++;else if(p.v[i])f++}return Math.round(100*(f+g)/81)}
-function showList(){endCeleb();saveNow();$('#game').classList.add('hidden');$('#list').classList.remove('hidden');
- const ps=Object.values(DB).sort((a,b)=>b.updated-a.updated);
- $('#items').innerHTML=ps.map(p=>`<div class="item${p.id===curId?' cur':''}" data-id="${p.id}"><div class="t">${esc(p.name)}</div><div class="s">${p.solved?'Solved ✓':progress(p)+'% filled'} · ${fmtT(p.time)} · ${p.cages.length} cages${(p.thermos||[]).length?` · ${p.thermos.length} thermos`:''}${(p.arrows||[]).length?` · ${p.arrows.length} arrows`:''}${(p.whispers||[]).length?` · ${p.whispers.length} whispers`:''}${(p.kropki||[]).length?` · ${p.kropki.length} dots`:''} · ${new Date(p.updated).toLocaleDateString('en-US',{month:'short',day:'numeric'})}</div>
- <div class="r"><button class="open" data-a="open">Open</button><button data-a="copy">Copy</button><button data-a="ren">Rename</button><button data-a="restart">Restart</button><button class="del" data-a="del">Delete</button></div></div>`).join('')}
-$('#items').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;const id=b.closest('.item').dataset.id,p=DB[id],a=b.dataset.a;
- if(a==='open')openPuzzle(id);
- else if(a==='copy')exportDialog(p);
- else if(a==='ren'){const n=prompt('Puzzle name',p.name);if(n&&n.trim()){p.name=n.trim();saveNow();showList()}}
- else if(a==='restart'){if(confirm(`Restart "${p.name}"? Your digits, notes, colours, ruled-out combos and time will be cleared.`)){Object.assign(p,{v:Array(81).fill(0),cn:Array(81).fill(''),mn:Array(81).fill(''),col:Array.from({length:81},()=>({c:[],b:0})),time:0,solved:false});p.cages.forEach(c=>c.elim=[]);(p.arrows||[]).forEach(a=>a.elim=[]);p.groups={};p.lineSums={};if(id===curId){undoS=[];redoS=[];cellCache=Array(81).fill(null)}saveNow();showList()}}
- else if(a==='del'){if(confirm(`Delete "${p.name}"? This can't be undone.`)){delete DB[id];if(!Object.keys(DB).length){const n=blankPuzzle('Untitled');DB[n.id]=n}if(id===curId){curId=Object.values(DB).sort((a,b)=>b.updated-a.updated)[0].id;P=DB[curId];undoS=[];redoS=[];cellCache=Array(81).fill(null)}saveNow();showList()}}});
-$('#bList').onclick=showList;
-$$('#hlSeg button').forEach(b=>{b.onclick=()=>setHlStyle(b.dataset.hs);b.classList.toggle('on',b.dataset.hs===hlStyle)});$('#bBack').onclick=()=>{showGame();render()};
+// ---------- Screens (v23): game, home (main menu), list (select puzzle), add (add puzzle) ----------
+// Each move pushes a history entry, so a browser/Android back gesture works; the ‹ Menu buttons do the same.
+let curScreen='game',navDepth=0;
+function showScreen(s){if(s==='game'&&!DB[curId])s='home';endCeleb();closeMenu();if(curScreen==='game'&&s!=='game')saveNow();curScreen=s;
+ for(const x of ['game','home','list','add'])$('#'+x).classList.toggle('hidden',x!==s);
+ if(s==='home')renderHome();else if(s==='list')renderList();else if(s==='game')render();window.scrollTo(0,0)}
+function go(s){if(s===curScreen)return showScreen(s);showScreen(s);try{history.pushState({s},'');navDepth++}catch(e){}}
+function back(){if(navDepth>0)history.back();else go('home')}
+window.addEventListener('popstate',e=>{navDepth=Math.max(0,navDepth-1);closeModal();showScreen((e.state&&e.state.s)||'home')});
+const statusOf=p=>p.solved?'solved':(p.v.some(x=>x)||p.cn.some(x=>x)||p.mn.some(x=>x)||p.time>=60)?'prog':'new';
+const STATUS_TXT={solved:'Solved ✓',prog:'In progress',new:'Not started'};
+function renderHome(){const p=DB[curId],cont=p&&!p.solved;$('#hCont').classList.toggle('hidden',!cont);$('#hSel').classList.toggle('prim',!cont);
+ if(cont)$('#hContSub').textContent=`${p.name} · ${fmtT(p.time)} · ${progress(p)}% filled`;
+ const ps=Object.values(DB),n=ps.length,sv=ps.filter(x=>x.solved).length;$('#hSelSub').textContent=`${n} puzzle${n===1?'':'s'} · ${sv} solved`}
+function renderList(){const ps=Object.values(DB).sort((a,b)=>b.updated-a.updated);
+ $('#items').innerHTML=ps.map(p=>{const st=statusOf(p);return `<div class="item${p.id===curId?' cur':''}" data-id="${p.id}"><button class="iopen" data-a="open"><span class="t">${esc(p.name)}</span><span class="s"><span class="chip ${st}">${STATUS_TXT[st]}</span> ⏱ ${fmtT(p.time)}${p.solved?'':` · ${progress(p)}% filled`}</span><span class="s2">${[['cage',p.cages],['thermo',p.thermos],['arrow',p.arrows],['whisper',p.whispers],['dot',p.kropki]].filter(([,x],k)=>!k||(x||[]).length).map(([n,x])=>`${(x||[]).length} ${n}${(x||[]).length===1?'':'s'}`).join(' · ')} · ${new Date(p.updated).toLocaleDateString('en-US',{month:'short',day:'numeric'})}</span></button><button class="imore" data-a="more" aria-label="More for ${esc(p.name)}">⋯</button></div>`}).join('')}
+$('#items').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;const id=b.closest('.item').dataset.id;
+ if(b.dataset.a==='open')openPuzzle(id);else puzzleSheet(id)});
+// ⋯ sheet: everything the old ☰ list row had (Copy, Rename, Restart, Delete) plus Edit.
+function puzzleSheet(id){const p=DB[id];if(!p)return;const st=statusOf(p);
+ $('#mbox').innerHTML=`<h2>${esc(p.name)}</h2><p class="muted" style="margin:0 0 10px;font-size:14px">${STATUS_TXT[st]} · ⏱ ${fmtT(p.time)}</p><div class="sheet">
+ <button data-a="open" class="btn">Open</button><button data-a="edit">✎ Edit puzzle (cages, lines, givens)</button><button data-a="copy">Copy puzzle code</button><button data-a="ren">Rename</button><button data-a="restart">Restart</button><button data-a="del" class="del">Delete</button><button data-a="x" class="cx">Cancel</button></div>`;
+ showModal();$('#mbox').onclick=e=>{const b=e.target.closest('.sheet button');if(!b)return;const a=b.dataset.a;
+  if(a==='x'){closeModal();return}
+  if(a==='open'){closeModal();openPuzzle(id);return}
+  if(a==='edit'){closeModal();openPuzzle(id);setEditing(true);return}
+  if(a==='copy'){closeModal();exportDialog(p);return}
+  if(a==='ren'){const n=prompt('Puzzle name',p.name);if(n&&n.trim()){p.name=n.trim();saveNow();closeModal();renderList()}return}
+  if(a==='restart'){if(confirm(`Restart "${p.name}"? Your digits, notes, colours, ruled-out combos and time will be cleared.`)){Object.assign(p,{v:Array(81).fill(0),cn:Array(81).fill(''),mn:Array(81).fill(''),col:Array.from({length:81},()=>({c:[],b:0})),time:0,solved:false});p.cages.forEach(c=>c.elim=[]);(p.arrows||[]).forEach(a=>a.elim=[]);p.groups={};p.lineSums={};if(id===curId){undoS=[];redoS=[];cellCache=Array(81).fill(null)}saveNow();closeModal();renderList()}return}
+  if(a==='del'){if(confirm(`Delete "${p.name}"? This can't be undone.`)){delete DB[id];if(!Object.keys(DB).length){const n=blankPuzzle('Untitled');DB[n.id]=n}if(id===curId){curId=Object.values(DB).sort((a,b)=>b.updated-a.updated)[0].id;P=DB[curId];undoS=[];redoS=[];cellCache=Array(81).fill(null)}saveNow();closeModal();renderList()}return}}}
+$('#hCont').onclick=()=>go('game');$('#hSel').onclick=()=>go('list');$('#hAdd').onclick=()=>go('add');$('#hHelp').onclick=showHelp;
+$('#lBack').onclick=back;$('#aBack').onclick=back;
+// ---------- ☰ menu (v23): UI contrast, Help, Main menu ----------
+function openMenu(){const k=Math.round(uiK*100);$('#kSlider').value=k;$('#kVal').textContent=k+'%';$('#menu').classList.remove('hidden');$('#bMenu').setAttribute('aria-expanded','true')}
+function closeMenu(){$('#menu').classList.add('hidden');$('#bMenu').setAttribute('aria-expanded','false')}
+$('#bMenu').onclick=()=>$('#menu').classList.contains('hidden')?openMenu():closeMenu();
+$('#menu').addEventListener('click',e=>{if(e.target.id==='menu')closeMenu()});
+$('#kSlider').addEventListener('input',e=>{uiK=+e.target.value/100;$('#kVal').textContent=e.target.value+'%';applyContrast();SV('sdk_contrast',uiK)});
+$('#mHelp').onclick=()=>{closeMenu();showHelp()};$('#mHome').onclick=()=>go('home');
 $('#bNew').onclick=()=>{const n=prompt('Name for the new puzzle','Puzzle '+(Object.keys(DB).length+1));if(n===null)return;const p=blankPuzzle(n.trim()||'Untitled');DB[p.id]=p;openPuzzle(p.id);setEditing(true)};
 $('#bPaste').onclick=()=>{
  $('#mbox').innerHTML=`<h2>Paste puzzle</h2><p class="muted" style="font-size:14px;margin:4px 0 8px">Paste the code Dev gave you (starts with <b>SUDOKU v1</b>).</p><textarea id="pIn" placeholder="SUDOKU v1\nname ...\ngivens ...\ncage 21 r1c1 r1c2 ..."></textarea><div id="pErr" class="err"></div>
@@ -910,7 +952,7 @@ function exportDialog(p){
  const go=async st=>{const t=exportPuzzle(p,st);$('#xOut').value=t;try{await navigator.clipboard.writeText(t);toast('Copied')}catch(e){$('#xOut').select();toast('Select all and copy')}};
  $('#xP').onclick=()=>go(false);$('#xS').onclick=()=>go(true);$('#xOut').value=exportPuzzle(p,false)}
 
-// ---------- Help (opened from the ☰ puzzle list) ----------
+// ---------- Help (☰ menu and main menu) ----------
 // One entry per section. To document a new element (arrows, kropki…), add an object to HELP_ELEMENTS;
 // app controls live in HELP_CONTROLS. Each body is a small HTML string.
 const HELP_ELEMENTS=[
@@ -924,20 +966,20 @@ const HELP_ELEMENTS=[
 ];
 const HELP_CONTROLS=[
  {id:'select',title:'Selecting cells',body:`<ul><li><b>Tap</b> a cell to select it; tap it again to deselect.</li><li><b>Double-tap</b> selects the cell's cage (or the uncaged cells of its box).</li><li>On a thermo, arrow or whisper, the next tap selects that line: <b>double</b> = cage, <b>triple</b> = the line, then the box. An uncaged line cell goes line → uncaged group → box. (Order if a cell is on several: cage → thermo → arrow → whisper.)</li><li>Otherwise <b>triple-tap</b> selects the whole box.</li><li><b>Drag</b> to select several cells, or turn on <b>Multi</b> to add/remove cells with taps (double-tapping a selected cell removes its group).</li><li>While <b>Multi</b> is on, the number highlight is <b>locked</b>: selecting cells won't change it. To change it, clear the selection (tap the status line) and tap a number key; tap the same key to turn it off.</li><li>Tap the status line to clear the selection.</li></ul>`},
- {id:'modes',title:'Digit, Corner, Centre',body:`<p>Pick a mode, then a number. Digit places a value; Corner and Centre add pencil marks. Placing a digit clears that digit's marks from the same row, column, box, cage and thermo.</p><p>With nothing selected, the number keys <b>highlight</b> that number: its cells and pencil marks light up and the places it can't go are greyed. Tap the key again to clear.</p><p><b>Highlight style</b> (in ☰): <b>Classic</b> tints the highlighted and selected cells. <b>Spotlight</b> keeps them at full brightness with an outline (amber = has the number, navy = selected) and dims the rest of the grid, which works better on a coloured grid. Colour mode always uses the spotlight look for selections.</p>`},
- {id:'colour',title:'Colours',body:`<p>In Colour mode each key has a <b>+</b> half and a <b>−</b> half. + adds a colour (up to 3 per cell); + on a colour already there makes it 2/3 of the cell. − shrinks or removes it. Long-press a key, or use ◎ Select colour, to select every cell with that colour. Double-tap a cell that is one solid colour to select all cells of that colour.</p><p>While you're in Colour mode, selected cells keep their colours bright with a dark outline and the rest of the grid is dimmed, so the selection stands out.</p>`},
+ {id:'modes',title:'Digit, Corner, Centre',body:`<p>Pick a mode, then a number. Digit places a value; Corner and Centre add pencil marks. Placing a digit clears that digit's marks from the same row, column, box, cage and thermo.</p><p>With nothing selected, the number keys <b>highlight</b> that number. Tap the key again to clear.</p>`},
+ {id:'look',title:'Selection vs highlight',body:`<ul><li><b>Selected</b> cells get a thin navy border and turn slightly brighter.</li><li><b>Highlighted</b> cells (holding the number, or a pencil mark of it — shown as an amber chip) have no border; every other cell darkens a little, and cells where the number can't go darken a bit more.</li><li>A cell that is both keeps the border and isn't darkened.</li><li>On a grid with <b>no colours</b>, selected cells are also tinted blue and highlighted ones amber/yellow. Once <b>any</b> cell is coloured, the tints switch off for the whole grid so they don't mix with your colours.</li><li><b>☰ → UI contrast</b> makes the border, brightening and darkening stronger or softer.</li></ul>`},
+ {id:'colour',title:'Colours',body:`<p>In Colour mode each key has a <b>+</b> half and a <b>−</b> half. + adds a colour (up to 3 per cell); + on a colour already there makes it 2/3 of the cell. − shrinks or removes it.</p><p>Long-press a key, or use ◎ Select colour, to <b>select</b> every cell that is <b>fully</b> that colour; cells with only <b>part</b> of it are <b>highlighted</b>. Double-tap a cell that is one solid colour does the same for its colour.</p>`},
  {id:'sigma',title:'Σ Combos and Total',body:`<p>Σ works on: one cell in a cage (the whole cage), an uncaged box group, 2+ cells all in one cage, row, column or 3×3 box (type their sum; a whole row, column or box is 45), a thermo (ranges), an arrow (circle values and shaft digits), or a whisper (each cell's possible digits). The status line adds up whole cages, known groups and placed digits.</p>`},
  {id:'test',title:'Test',body:`<p>For puzzles that come with a solution, select cells with centre marks and press <b>Test</b>: a green ✓ means the right digit is among the marks, a red ✕ means it's missing. Wrong placed digits also show red.</p>`},
- {id:'other',title:'Timer, edit, puzzles',body:`<p>Tap the timer to pause. ✎ opens the editor for cages, thermos, arrows, whispers, dots and givens. In the Arrows tab, tap the circle then the shaft cells in order. In the Dots tab, tap the line between two cells to cycle no dot → white → black. ☰ lists puzzles: paste a new one, copy, rename, restart or delete.</p>`},
+ {id:'other',title:'Timer, edit, menus',body:`<p>Tap the timer to pause. ✎ opens the editor for cages, thermos, arrows, whispers, dots and givens. In the Arrows tab, tap the circle then the shaft cells in order. In the Dots tab, tap the line between two cells to cycle no dot → white → black.</p><p><b>☰</b> has UI contrast, Help and Main menu. The <b>main menu</b> has Continue (your current unsolved puzzle), Select puzzle (tap one to open; <b>⋯</b> to edit, copy its code, rename, restart or delete) and Add puzzle (paste a code or start a blank one). The app opens straight into your puzzle if it isn't solved yet.</p>`},
 ];
 function showHelp(){
  const sec=h=>`<details class="hs" id="help-${h.id}"><summary>${esc(h.title)}</summary><div class="hb2">${h.body}</div></details>`;
  $('#mbox').innerHTML=`<h2>Help</h2><div class="hgrp">Puzzle elements</div>${HELP_ELEMENTS.map(sec).join('')}<div class="hgrp">Using the app</div>${HELP_CONTROLS.map(sec).join('')}<div class="r"><button class="btn" id="hClose">Close</button></div>`;
  $('#mbox').classList.add('help');showModal();$('#hClose').onclick=closeModal}
-$('#bHelp').onclick=showHelp;
 
 // ---------- Keyboard (handy on a Mac/iPad keyboard) ----------
-document.addEventListener('keydown',e=>{if(!$('#celeb').classList.contains('hidden')){if(e.key==='Escape'){e.preventDefault();endCeleb()}return}if(!$('#modal').classList.contains('hidden')||!$('#list').classList.contains('hidden'))return;
+document.addEventListener('keydown',e=>{if(!$('#celeb').classList.contains('hidden')){if(e.key==='Escape'){e.preventDefault();endCeleb()}return}if(!$('#modal').classList.contains('hidden')||curScreen!=='game'||!$('#menu').classList.contains('hidden'))return;
  if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='z'){e.preventDefault();e.shiftKey?redo():undo();return}
  if(e.key==='Escape'&&!editing){e.preventDefault();sel.clear();numSel=0;render();return}
  if(/^[1-9]$/.test(e.key)&&!editing){pressDigit(+e.key);return}
@@ -946,4 +988,5 @@ document.addEventListener('keydown',e=>{if(!$('#celeb').classList.contains('hidd
  const mv={ArrowUp:-9,ArrowDown:9,ArrowLeft:-1,ArrowRight:1}[e.key];if(mv&&sel.size){e.preventDefault();let i=[...sel].pop()+mv;if(i<0||i>80)return;sel=new Set([i]);renderSel()}});
 
 if('serviceWorker' in navigator)navigator.serviceWorker.register('./sw.js',{scope:'./'});
-render();
+// Launch: straight into the current puzzle if it is unsolved, otherwise the main menu.
+{const s0=DB[curId]&&!DB[curId].solved?'game':'home';try{history.replaceState({s:s0},'')}catch(e){}showScreen(s0)}

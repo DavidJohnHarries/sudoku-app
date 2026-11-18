@@ -3,10 +3,10 @@
 <meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#f3f4f6"><title>Sudoku</title>
 <link rel="manifest" href="manifest.json"><link rel="apple-touch-icon" href="icon-180.png">
-<link rel="stylesheet" href="style.css?v=22">
+<link rel="stylesheet" href="style.css?v=23">
 </head><body>
 <div id="game">
- <header><button id="bList" class="hb" aria-label="Puzzles">☰</button><div id="pname"></div><button id="timer" class="hb tm">0:00</button><button id="bEdit" class="hb" aria-label="Edit puzzle">✎</button></header>
+ <header><button id="bMenu" class="hb" aria-label="Menu" aria-haspopup="true">☰</button><div id="pname"></div><button id="timer" class="hb tm">0:00</button><button id="bEdit" class="hb" aria-label="Edit puzzle">✎</button></header>
  <div id="info"><span id="infoTxt">No cage selected</span><span class="ib"><button id="bPick" class="calc pick hidden">◎ Select colour</button><button id="bCalc" class="calc" disabled>Σ Combos</button></span></div>
  <div id="gridWrap"><div id="grid"></div><svg id="thermo" viewBox="0 0 900 900" preserveAspectRatio="none"></svg><svg id="whispers" viewBox="0 0 900 900" preserveAspectRatio="none"></svg><svg id="arrows" viewBox="0 0 900 900" preserveAspectRatio="none"></svg><svg id="lines" viewBox="0 0 900 900" preserveAspectRatio="none"></svg><svg id="dots" viewBox="0 0 900 900" preserveAspectRatio="none"></svg></div>
  <div id="play">
@@ -51,12 +51,29 @@
   <div class="tools"><button id="eUndo">↶ Undo</button><button id="eRedo">↷ Redo</button><button id="bDone" class="btn">Done editing</button></div>
  </div>
 </div>
-<div id="list" class="hidden">
- <header><span class="lt">Puzzles</span><button id="bBack" class="hb">Back ›</button></header>
- <div class="lbtns"><button id="bPaste" class="btn">Paste puzzle</button><button id="bNew" class="btn sec">New blank</button><button id="bHelp" class="btn sec">Help</button></div>
- <div class="setrow"><span>Highlight style</span><div class="seg" id="hlSeg" role="radiogroup"><button data-hs="classic">Classic</button><button data-hs="spot">Spotlight</button></div></div>
+<div id="home" class="screen hidden">
+ <div class="hhead"><div class="happ">Sudoku</div><div class="hsub">Killer &amp; variants</div></div>
+ <button id="hCont" class="hcard prim"><span class="hl1">Continue</span><span class="hl2" id="hContSub"></span></button>
+ <button id="hSel" class="hcard"><span class="hl1">Select puzzle</span><span class="hl2" id="hSelSub"></span></button>
+ <button id="hAdd" class="hcard"><span class="hl1">Add puzzle</span><span class="hl2">Paste a puzzle code, or build one in the editor</span></button>
+ <button id="hHelp" class="hlink">Help</button>
+</div>
+<div id="list" class="screen hidden">
+ <header><button id="lBack" class="hb back" aria-label="Back to main menu">‹ Menu</button><span class="lt">Select puzzle</span></header>
  <div id="items"></div>
 </div>
+<div id="add" class="screen hidden">
+ <header><button id="aBack" class="hb back" aria-label="Back to main menu">‹ Menu</button><span class="lt">Add puzzle</span></header>
+ <button id="bPaste" class="hcard"><span class="hl1">Paste puzzle code</span><span class="hl2">From Dev, or one you copied (starts with SUDOKU v1)</span></button>
+ <button id="bNew" class="hcard"><span class="hl1">New blank puzzle</span><span class="hl2">Opens the editor: cages, thermos, arrows, whispers, dots, givens</span></button>
+</div>
+<div id="menu" class="hidden"><div class="mpop" role="menu" aria-label="Menu">
+ <div class="mrow"><div class="mlab"><span>UI contrast</span><span id="kVal">100%</span></div>
+  <input type="range" id="kSlider" min="30" max="200" step="5" value="100" aria-label="UI contrast">
+  <div class="kprev" aria-hidden="true"><div><span class="kc"><b>7</b></span><small>Normal</small></div><div><span class="kc ksel"><b>7</b></span><small>Selected</small></div><div><span class="kc khl"><b>4</b></span><small>Highlight</small></div><div><span class="kc kdim"><b>7</b></span><small>Dimmed</small></div></div>
+  <div class="mnote">Changes how selected and highlighted cells look.</div></div>
+ <div class="mitems"><button class="mitem" id="mHelp">Help</button><button class="mitem" id="mHome">Main menu</button></div>
+</div></div>
 <div id="modal" class="hidden"><div class="box" id="mbox"></div></div>
 
 <div id="celeb" class="hidden" aria-hidden="true">
@@ -68,8 +85,8 @@
   <div class="celeb-time" id="celebTime"></div>
   <div class="r">
    <button type="button" class="btn" id="celebClose">Close</button>
-   <button type="button" class="btn sec" id="celebList">Puzzle list</button>
+   <button type="button" class="btn sec" id="celebList">Main menu</button>
   </div>
  </div>
 </div>
-<script src="app.js?v=22"></script></body></html>
+<script src="app.js?v=23"></script></body></html>
