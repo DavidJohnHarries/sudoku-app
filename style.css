@@ -175,10 +175,15 @@ header{display:flex;align-items:center;gap:6px;height:50px}
    Selected: thin navy border + slightly brighter. Highlighted: no border, all other cells darken.
    #grid.tint (no coloured cell anywhere) adds the old blue / amber / yellow tints. */
 .cell::after{content:'';position:absolute;inset:0;z-index:1;pointer-events:none;background:transparent}
-.cell.sel::after{background:var(--selw);box-shadow:inset 0 0 0 var(--selbw) #1e3a8a}
+.cell.sel::after{background:var(--selw)}
+/* v24: selection outline on the grid lines, outer perimeter of each selected region only */
+#selsvg{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible}
+#selPath{fill:none;stroke:#1e3a8a;stroke-width:var(--selsw);stroke-linecap:square}
+/* v24: coloured grid + selection → every unselected cell darkens (stacks with highlight darkening, and with blocked) */
+#grid.sdim .cell:not(.sel)::before{content:'';position:absolute;inset:0;background:var(--sdim);z-index:1;pointer-events:none}
 #grid.tint .cell.sel::after{background:var(--tsel)}
 #grid.hlon .cell:not(.hl):not(.sel)::after{background:var(--dim)}
-#grid.hlon .cell.blocked:not(.sel)::before{content:'';position:absolute;inset:0;background:var(--blk);z-index:1;pointer-events:none}
+#grid.hlon .cell.blocked:not(.sel)::before{content:'';position:absolute;inset:0;box-shadow:inset 0 0 0 200px var(--blk);z-index:1;pointer-events:none}
 #grid.tint.hlon .cell.same:not(.sel)::after{background:var(--tsame)}
 #grid.tint.hlon .cell.nmark:not(.sel):not(.same)::after{background:var(--tnm)}
 #grid.hlon .cell.same .val{text-shadow:0 0 3px #fff,0 0 6px #fff}

@@ -166,3 +166,7 @@ A published hard killer is in `puzzles/escape-room-sujoyku.txt` — *Escape Room
 - Colour mode: ◎ Select colour / long-press / double-tap a solid cell selects cells **fully** that colour and highlights cells with **any part** of it.
 - ☰ → UI contrast slider (30–200%, localStorage `sdk_contrast`) scales darkening, brightening, border width and tints (CSS vars set by `applyContrast`). The menu is a sheet over the keypad so the board previews live.
 - Screens: game, home, list, add, with history entries (browser/Android back works). Puzzle data format and `sdk_puzzles`/`sdk_cur` are unchanged.
+
+## v24: selection outline on the grid lines; selection darkening on coloured grids
+- The selection outline is an SVG path (`#selsvg`, above cage/box lines, below kropki dots) drawn centred on the grid lines, only around the outer perimeter of each connected selected region (edges shared by two selected cells stay normal grid lines). Edges on the outer frame are centred on the frame line. Width scales with UI contrast (`--selsw`, 7 grid units at 100%, never thinner than the box lines).
+- If any cell is coloured (no tints), a selection also darkens every unselected cell (`#grid.sdim`, `--sdim`); this stacks with the highlight darkening, so a cell that is neither selected nor highlighted gets both. Uncoloured grids keep the v23 tints and no selection darkening.
