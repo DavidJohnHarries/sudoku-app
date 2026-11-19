@@ -1,0 +1,23 @@
+SUDOKU v1
+name Thermo Arrow Sudoku
+# Author: 33554432
+# Source: https://logic-masters.de/Raetselportal/Raetsel/zeigen.php?id=0008DX
+# Source: https://f-puzzles.com/?id=yyn6q2ck
+# Rules: normal sudoku; digits along an arrow sum to the digit in its circle (may repeat); thermo digits strictly increase from the bulb.
+givens .................................................................................
+solution 412983765 863571942 795462813 679835421 158724396 234619578 381247659 946158237 527396184
+thermo r4c5 r3c4 r2c4 r1c4
+thermo r5c6 r6c7 r6c8 r6c9
+thermo r5c1 r6c1 r6c2 r6c3
+thermo r2c9 r3c9
+thermo r7c8 r7c7 r7c6 r8c6
+thermo r4c1 r3c1 r2c1
+thermo r5c2 r5c3
+thermo r9c2 r8c2 r8c1
+arrow r4c5 r5c5 r6c5
+arrow r6c6 r7c5 r8c5
+arrow r4c7 r3c8 r3c9
+arrow r9c8 r8c7 r7c7
+arrow r2c7 r2c8 r1c9
+arrow r1c1 r1c2 r2c3
+arrow r8c1 r7c2 r7c3
