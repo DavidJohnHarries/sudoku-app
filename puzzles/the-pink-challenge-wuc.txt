@@ -1,0 +1,29 @@
+SUDOKU v1
+name The Pink Challenge
+# Author: wuc
+# Source: https://logic-masters.de/Raetselportal/Raetsel/zeigen.php?id=000NQP
+# Source: https://sudokupad.app/tdatbkqqlf
+# Rules: normal sudoku; digits on a purple renban line are a set of consecutive, non-repeating digits in any order; digits in a cage do not repeat and sum to the small clue.
+givens .................................................................................
+solution 741596832 526738149 938142756 397851624 614327598 285964317 453689271 169273485 872415963
+cage 5 r2c2 r3c2
+cage 5 r2c7 r2c8
+cage 15 r8c2 r8c3
+cage 15 r7c8 r8c8
+cage 21 r6c6 r7c5 r7c6
+cage 13 r3c4 r3c5 r4c4
+cage 12 r4c9 r5c9
+cage 8 r5c1 r6c1
+renban r6c7 r5c7 r4c7 r3c6 r3c5 r3c4
+renban r2c8 r3c9 r3c8 r3c7
+renban r4c3 r5c3 r6c3 r7c4 r7c5 r7c6
+renban r7c3 r7c2 r7c1 r8c2
+renban r4c2 r3c3 r2c4
+renban r8c6 r7c7 r6c8
+renban r8c7 r9c6
+renban r1c4 r2c3
+renban r5c2 r6c1
+renban r8c4 r9c5
+tip Start with the two long 6-cell renbans. A 6-cell line has only four possible sets: 1-6, 2-7, 3-8 or 4-9. The 21-cage sits on the lower line, so that one cannot be 1-6: its two cage cells would be too small to make 21. Also notice that r3c7 sees every cell of the upper line, and r7c3 sees every cell of the lower line, so neither cell can take a digit that appears on its line.
+tip Next look at the 4-cell hooks in box 3 and box 7. Each hook lies entirely inside its box and shares a cell with a cage (the 5-cage up top, the 15-cage down below). The other cell of that cage still has to fit in the same box, beside the whole hook set, and that rules out most of the remaining 6-cell options.
+tip After the two long lines are pinned down, the 1 on the upper line has to sit in row 3, because column 7 already has a 1. Use that in the 13-cage, and on the lower line look at which high pairs can still make the 21-cage.
