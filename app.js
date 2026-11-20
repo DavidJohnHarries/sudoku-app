@@ -67,7 +67,7 @@ cage 8 r8c9 r9c9
 cage 4 r9c3`;
 
 // ---------- Puzzle format (see README) ----------
-function blankPuzzle(name){return {id:uid(),name:name||'Untitled',givens:Array(81).fill(0),sol:null,cages:[],thermos:[],arrows:[],whispers:[],renbans:[],kropki:[],kropkiNeg:false,v:Array(81).fill(0),cn:Array(81).fill(''),mn:Array(81).fill(''),col:Array.from({length:81},()=>({c:[],b:0})),time:0,solved:false,extra:[],groups:{},lineSums:{},updated:Date.now()}}
+function blankPuzzle(name){return {id:uid(),name:name||'Untitled',givens:Array(81).fill(0),sol:null,cages:[],thermos:[],arrows:[],whispers:[],renbans:[],kropki:[],kropkiNeg:false,tips:[],v:Array(81).fill(0),cn:Array(81).fill(''),mn:Array(81).fill(''),col:Array.from({length:81},()=>({c:[],b:0})),time:0,solved:false,extra:[],groups:{},lineSums:{},updated:Date.now()}}
 function parseCell(t){const m=/^r([1-9])c([1-9])$/i.exec(t);return m?(m[1]-1)*9+(m[2]-1):-1}
 function parseGrid81(s){s=s.replace(/[\s|]/g,'');if(s.length!==81||/[^.0-9]/.test(s))return null;return [...s].map(ch=>ch==='.'?0:+ch)}
 function parsePuzzle(text){
@@ -82,6 +82,7 @@ function parsePuzzle(text){
   const sp=line.indexOf(' ');const kw=(sp<0?line:line.slice(0,sp)).toLowerCase(),rest=sp<0?'':line.slice(sp+1).trim();
   const toks=rest.split(/\s+/).filter(Boolean);
   const grabGrid=()=>{let s=rest;while(s.replace(/[\s|]/g,'').length<81&&i+1<lines.length&&/^[\s.0-9|]+$/.test(lines[i+1])&&lines[i+1].trim()){i++;s+=lines[i]}return parseGrid81(s)};
+  if(kw==='tip'){const t=raw.trim().slice(3).trim();if(t)p.tips.push(t);continue} // v28: tips keep the full raw text, '#' included
   if(kw==='name')p.name=rest||p.name;
   else if(kw==='givens'||kw==='values'||kw==='solution'){const g=grabGrid();if(!g){errs.push(`Line ${ln}: ${kw} needs 81 characters of 1-9 or . (0 also = empty)`);continue}if(kw==='givens')p.givens=g;else if(kw==='values')p.v=g;else p.sol=g}
   else if(kw==='cage'){const sum=+toks[0];const cells=toks.slice(1).map(parseCell);
@@ -186,6 +187,7 @@ function exportPuzzle(p,state){
  for(const r of p.renbans||[])L.push('renban '+r.cells.map(RC).join(' '));
  for(const d of p.kropki||[])L.push(`kropki ${d.t} ${RC(d.a)} ${RC(d.b)}`);
  if(p.kropkiNeg)L.push('kropki-negative');
+ for(const t of p.tips||[])L.push('tip '+t);
  L.push(...p.extra);
  if(state){
   if(p.v.some(x=>x))L.push('values '+gridStr(p.v));
@@ -258,7 +260,7 @@ function calcTarget(){
 // ---------- Storage ----------
 let DB=LS('sdk_puzzles')||{};let curId=LS('sdk_cur');
 if(!Object.keys(DB).length){const {p}=parsePuzzle(SAMPLE);DB[p.id]=p;curId=p.id}
-for(const p of Object.values(DB)){p.extra=p.extra||[];p.thermos=p.thermos||[];p.whispers=p.whispers||[];p.renbans=(p.renbans||[]).map(r=>({cells:r.cells,elim:r.elim||[]}));p.arrows=(p.arrows||[]).map(a=>({cells:a.cells,b:a.b||1,elim:a.elim||[]}));p.kropki=(p.kropki||[]).map(d=>({...d,elim:d.elim||[]}));p.kropkiNeg=!!p.kropkiNeg;p.groups=p.groups||{};p.lineSums=p.lineSums||{};p.sol=p.sol||null;p.cages.forEach(c=>c.elim=c.elim||[]);if(p.col)for(let i=0;i<81;i++)p.col[i]=normCol(p.col[i])}
+for(const p of Object.values(DB)){p.extra=p.extra||[];p.tips=p.tips||[];{const keep=[];for(const x of p.extra){if(/^tip\s/i.test(x))p.tips.push(x.slice(3).trim());else keep.push(x)}p.extra=keep}p.thermos=p.thermos||[];p.whispers=p.whispers||[];p.renbans=(p.renbans||[]).map(r=>({cells:r.cells,elim:r.elim||[]}));p.arrows=(p.arrows||[]).map(a=>({cells:a.cells,b:a.b||1,elim:a.elim||[]}));p.kropki=(p.kropki||[]).map(d=>({...d,elim:d.elim||[]}));p.kropkiNeg=!!p.kropkiNeg;p.groups=p.groups||{};p.lineSums=p.lineSums||{};p.sol=p.sol||null;p.cages.forEach(c=>c.elim=c.elim||[]);if(p.col)for(let i=0;i<81;i++)p.col[i]=normCol(p.col[i])}
 if(!DB[curId])curId=Object.values(DB).sort((a,b)=>b.updated-a.updated)[0].id;
 let P=DB[curId];
 let saveT=null;const saveNow=()=>{clearTimeout(saveT);saveT=null;SV('sdk_puzzles',DB);SV('sdk_cur',curId)};
@@ -348,7 +350,7 @@ function computeConflicts(){bad=new Set();cageBad=new Set();thermoBad=new Set();
  const units=HOUSES.concat(P.cages.map(c=>c.cells));
  for(const u of units){const m={};for(const i of u){const v=valAt(i);if(v)(m[v]=m[v]||[]).push(i)}for(const k in m)if(m[k].length>1)m[k].forEach(i=>bad.add(i))}
  P.cages.forEach((c,k)=>{let s=0,f=0;for(const i of c.cells){const v=valAt(i);if(v){s+=v;f++}}if(s>c.sum||(f===c.cells.length&&s!==c.sum))cageBad.add(k)})}
-function noteMark(d){return numSel&&+d===numSel?`<span class="nh">${d}</span>`:`<span>${d}</span>`}
+function noteMark(d,weak){return numSel&&+d===numSel?(weak?`<span class="nh2">${d}</span>`:`<span class="nh">${d}</span>`):`<span>${d}</span>`}
 function cellHTML(i){
  let h='';const v=valAt(i);
  if(normCol(P.col[i]).c.length)h+=`<div class="bg" style="background:${pie(P.col[i])}"></div>`;
@@ -356,7 +358,7 @@ function cellHTML(i){
  if(anc!==undefined)h+=`<span class="sum${cageBad.has(anc)?' bad':''}">${P.cages[anc].sum}</span>`;
  if(v)h+=`<span class="val">${v}</span>`;
  else{
-  if(P.cn[i]){const d=[...P.cn[i]],t=Math.ceil(d.length/2),sp=a=>a.map(noteMark).join('');
+  if(P.cn[i]){const d=[...P.cn[i]],t=Math.ceil(d.length/2),w=!!(P.mn[i]&&P.mn[i].includes(String(numSel))),sp=a=>a.map(x=>noteMark(x,w)).join(''); // v28 CR1: centre mark gets the chip, corner twin stays grey
    h+=`<div class="cn${anc!==undefined?' a':''}"><div>${sp(d.slice(0,t))}</div><div>${sp(d.slice(t))}</div></div>`}
   if(P.mn[i])h+=`<span class="mn m${P.mn[i].length}">${[...P.mn[i]].map(noteMark).join('')}</span>`;
  }
@@ -420,10 +422,17 @@ function renderRenbans(){const el=$('#renbans');if(!el)return;let g='';
  (P.renbans||[]).forEach((r,k)=>{const hot=editing&&etab==='renban'&&k===editLine;g+=whisperSVG(r.cells,hot?'#60a5fa':renbanBad.has(k)?'#f87171':'#d68af0',hot?.9:.8)});
  if(editing&&etab==='renban'&&sel.size&&editLine<0)g+=whisperSVG([...sel],'#60a5fa',.9);
  el.innerHTML=g}
+// v28 CR2: thin halo round placed digits. Arrow lines/heads are cut away in a digit-shaped gap (mask = digit glyph
+// plus a thin stroke), so the real cell background shows round the digit: white, any colour or split colours,
+// and selection/highlight darkening. Thermos, whispers and renbans are pale and stay whole (no rings cut into them).
+let haloFont='';const HALO_W=7,HALO_DY=0;
+function digitMask(){if(!haloFont){const c=document.querySelector('#grid .cell');haloFont=c?getComputedStyle(c).fontFamily.replace(/"/g,"'"):'sans-serif'}
+ let t='';for(let i=0;i<81;i++){const v=valAt(i);if(v)t+=`<text x="${COL(i)*100+50}" y="${ROW(i)*100+50+HALO_DY}">${v}</text>`}
+ return t?`<defs><mask id="vHalo" maskUnits="userSpaceOnUse" x="0" y="0" width="900" height="900"><rect width="900" height="900" fill="#fff"/><g fill="#000" stroke="#000" stroke-width="${HALO_W}" stroke-linejoin="round" text-anchor="middle" dominant-baseline="central" font-size="66" font-family="${haloFont}">${t}</g></mask></defs>`:''}
 function renderArrows(){const el=$('#arrows');if(!el)return;let g='';
  (P.arrows||[]).forEach((a,k)=>{const hot=editing&&etab==='arrow'&&k===editLine;g+=arrowSVG(a.cells,a.b,hot?'#3b82f6':arrowBad.has(k)?'#ef4444':'#9ca3af')});
  if(editing&&etab==='arrow'&&sel.size&&editLine<0)g+=arrowSVG([...sel],arrowB,'#3b82f6');
- el.innerHTML=g}
+ const m=g?digitMask():'';el.innerHTML=m?m+`<g mask="url(#vHalo)">${g}</g>`:g}
 function renderThermos(){const el=$('#thermo');if(!el)return;let g='';
  (P.thermos||[]).forEach((t,k)=>{const hot=editing&&etab==='thermo'&&k===editLine;g+=thermoSVG(t.cells,hot?'#93c5fd':thermoBad.has(k)?'#fca5a5':'#c8ccd2',1)});
  if(editing&&etab==='thermo'&&sel.size&&editLine<0)g+=thermoSVG([...sel],'#93c5fd',1);
@@ -1027,12 +1036,17 @@ function puzzleSheet(id){const p=DB[id];if(!p)return;const st=statusOf(p);
 $('#hCont').onclick=()=>go('game');$('#hSel').onclick=()=>go('list');$('#hAdd').onclick=()=>go('add');$('#hHelp').onclick=showHelp;
 $('#lBack').onclick=back;$('#aBack').onclick=back;
 // ---------- ☰ menu (v23): UI contrast, Help, Main menu ----------
-function openMenu(){const k=Math.round(uiK*100);$('#kSlider').value=k;$('#kVal').textContent=k+'%';$('#menu').classList.remove('hidden');$('#bMenu').setAttribute('aria-expanded','true')}
+function openMenu(){$('#mTips').disabled=!(P.tips&&P.tips.length);const k=Math.round(uiK*100);$('#kSlider').value=k;$('#kVal').textContent=k+'%';$('#menu').classList.remove('hidden');$('#bMenu').setAttribute('aria-expanded','true')}
+// v28 CR3: tips from the puzzle text ("tip <text>" lines), one at a time; Prev/Next only when there is one.
+function openTips(n){const T=P.tips||[];if(!T.length)return;n=Math.max(0,Math.min(n,T.length-1));
+ $('#mbox').innerHTML=`<h2>TIPS</h2><div class="muted" id="tipN">Tip ${n+1} of ${T.length}</div><p id="tipTxt" style="font-size:17px;line-height:1.45;margin:10px 0 14px">${esc(T[n])}</p>
+ <div class="r">${n>0?'<button class="btn sec" id="tPrev">‹ Prev</button>':''}${n<T.length-1?'<button class="btn sec" id="tNext">Next ›</button>':''}<button class="btn" id="mClose">Close</button></div>`;
+ showModal();$('#mClose').onclick=closeModal;if(n>0)$('#tPrev').onclick=()=>openTips(n-1);if(n<T.length-1)$('#tNext').onclick=()=>openTips(n+1)}
 function closeMenu(){$('#menu').classList.add('hidden');$('#bMenu').setAttribute('aria-expanded','false')}
 $('#bMenu').onclick=()=>$('#menu').classList.contains('hidden')?openMenu():closeMenu();
 $('#menu').addEventListener('click',e=>{if(e.target.id==='menu')closeMenu()});
 $('#kSlider').addEventListener('input',e=>{uiK=+e.target.value/100;$('#kVal').textContent=e.target.value+'%';applyContrast();SV('sdk_contrast',uiK)});
-$('#mHelp').onclick=()=>{closeMenu();showHelp()};$('#mHome').onclick=()=>go('home');
+$('#mHelp').onclick=()=>{closeMenu();showHelp()};$('#mTips').onclick=()=>{closeMenu();openTips(0)};$('#mHome').onclick=()=>go('home');
 $('#bNew').onclick=()=>{const n=prompt('Name for the new puzzle','Puzzle '+(Object.keys(DB).length+1));if(n===null)return;const p=blankPuzzle(n.trim()||'Untitled');DB[p.id]=p;openPuzzle(p.id);setEditing(true)};
 $('#bPaste').onclick=()=>{
  $('#mbox').innerHTML=`<h2>Paste puzzle</h2><p class="muted" style="font-size:14px;margin:4px 0 8px">Paste the code Dev gave you (starts with <b>SUDOKU v1</b>).</p><textarea id="pIn" placeholder="SUDOKU v1\nname ...\ngivens ...\ncage 21 r1c1 r1c2 ..."></textarea><div id="pErr" class="err"></div>
@@ -1068,7 +1082,7 @@ const HELP_CONTROLS=[
  {id:'colour',title:'Colours',body:`<p>In Colour mode each key has a <b>+</b> half and a <b>−</b> half. + adds a colour (up to 3 per cell); + on a colour already there makes it 2/3 of the cell. − shrinks or removes it.</p><p>Long-press a key, or use ◎ Select colour, to <b>select</b> every cell that is <b>fully</b> that colour; cells with only <b>part</b> of it are <b>highlighted</b>. Double-tap a cell that is one solid colour does the same for its colour.</p>`},
  {id:'sigma',title:'Σ Combos and Total',body:`<p>Σ works on: one cell in a cage (the whole cage), an uncaged box group, 2+ cells all in one cage, row, column or 3×3 box (type their sum; a whole row, column or box is 45), a thermo (ranges), an arrow (circle values and shaft digits), a whisper (each cell's possible digits), a renban (the possible runs), or the two cells of a kropki dot (the possible pairs). The Σ button names what it will show (Combos, Ranges, Sums, Digits, Runs, Pairs). The status line adds up whole cages, known groups and placed digits.</p>`},
  {id:'test',title:'Test',body:`<p>For puzzles that come with a solution, select cells with centre marks and press <b>Test</b>: a green ✓ means the right digit is among the marks, a red ✕ means it's missing. Wrong placed digits also show red.</p>`},
- {id:'other',title:'Timer, edit, menus',body:`<p>Tap the timer to pause. ✎ opens the editor for cages, thermos, arrows, whispers, renbans, dots and givens. In the Arrows tab, tap the circle then the shaft cells in order. In the Dots tab, tap the line between two cells to cycle no dot → white → black.</p><p><b>☰</b> has UI contrast, Help and Main menu. The <b>main menu</b> has Continue (your current unsolved puzzle), Select puzzle (tap one to open; <b>⋯</b> to edit, copy its code, rename, restart or delete) and Add puzzle (paste a code or start a blank one). The app opens straight into your puzzle if it isn't solved yet.</p>`},
+ {id:'other',title:'Timer, edit, menus',body:`<p>Tap the timer to pause. ✎ opens the editor for cages, thermos, arrows, whispers, renbans, dots and givens. In the Arrows tab, tap the circle then the shaft cells in order. In the Dots tab, tap the line between two cells to cycle no dot → white → black.</p><p><b>☰</b> has UI contrast, Tips, Help and Main menu. <b>Tips</b> shows the puzzle's hints one at a time (Prev/Next); it is greyed out when the puzzle has none. In a puzzle code each hint is a line <code>tip your text</code>, in order. The <b>main menu</b> has Continue (your current unsolved puzzle), Select puzzle (tap one to open; <b>⋯</b> to edit, copy its code, rename, restart or delete) and Add puzzle (paste a code or start a blank one). The app opens straight into your puzzle if it isn't solved yet.</p>`},
 ];
 function showHelp(){
  const sec=h=>`<details class="hs" id="help-${h.id}"><summary>${esc(h.title)}</summary><div class="hb2">${h.body}</div></details>`;
