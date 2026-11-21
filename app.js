@@ -299,8 +299,8 @@ function undo(){if(!undoS.length)return;redoS.push(snap());restore(undoS.pop());
 function redo(){if(!redoS.length)return;undoS.push(snap());restore(redoS.pop());save();editCage=-1;editLine=-1;render()}
 
 // ---------- Build static DOM (never rebuilt mid-tap) ----------
-const grid=$('#grid'),cells=[];
-for(let i=0;i<81;i++){const d=document.createElement('div');d.className='cell';cells.push(d);grid.appendChild(d)}
+const grid=$('#grid'),ink=$('#ink'),cells=[],inkCells=[];
+for(let i=0;i<81;i++){const d=document.createElement('div');d.className='cell';cells.push(d);grid.appendChild(d);const e=document.createElement('div');e.className='cell';inkCells.push(e);ink.appendChild(e)}
 const pad=$('#pad');const padBtns=[];
 for(let d=1;d<=9;d++){const b=document.createElement('button');b.dataset.d=d;b.innerHTML=`<span class="sw"></span><span class="n">${d}</span><span class="cpm minus" data-op="-">−</span><span class="cpm plus" data-op="+">+</span>`;pad.appendChild(b);padBtns.push(b)}
 const sumPad=$('#sumPad');[1,2,3,4,5,6,7,8,9,0].forEach(d=>{const b=document.createElement('button');b.dataset.s=d;b.textContent=d;sumPad.appendChild(b)});
@@ -351,17 +351,21 @@ function computeConflicts(){bad=new Set();cageBad=new Set();thermoBad=new Set();
  for(const u of units){const m={};for(const i of u){const v=valAt(i);if(v)(m[v]=m[v]||[]).push(i)}for(const k in m)if(m[k].length>1)m[k].forEach(i=>bad.add(i))}
  P.cages.forEach((c,k)=>{let s=0,f=0;for(const i of c.cells){const v=valAt(i);if(v){s+=v;f++}}if(s>c.sum||(f===c.cells.length&&s!==c.sum))cageBad.add(k)})}
 function noteMark(d,weak){return numSel&&+d===numSel?(weak===true?`<span class="nh2">${d}</span>`:`<span class="nh">${d}</span>`):`<span>${d}</span>`}
+function marksHTML(i){
+ if(valAt(i))return '';
+ let h='';
+ const anc=cagesOf[i].find(k=>P.cages[k].cells[0]===i);
+ if(P.cn[i]){const d=[...P.cn[i]],t=Math.ceil(d.length/2),w=!!(P.mn[i]&&P.mn[i].includes(String(numSel))),sp=a=>a.map(x=>noteMark(x,w)).join(''); // v28 CR1: centre mark gets the chip, corner twin stays grey
+  h+=`<div class="cn${anc!==undefined?' a':''}"><div>${sp(d.slice(0,t))}</div><div>${sp(d.slice(t))}</div></div>`}
+ if(P.mn[i])h+=`<span class="mn m${P.mn[i].length}">${[...P.mn[i]].map(x=>noteMark(x)).join('')}</span>`; // v29: pass only the digit — .map(noteMark) was feeding the index as `weak`
+ return h}
 function cellHTML(i){
  let h='';const v=valAt(i);
  if(normCol(P.col[i]).c.length)h+=`<div class="bg" style="background:${pie(P.col[i])}"></div>`;
  const anc=cagesOf[i].find(k=>P.cages[k].cells[0]===i);
  if(anc!==undefined)h+=`<span class="sum${cageBad.has(anc)?' bad':''}">${P.cages[anc].sum}</span>`;
  if(v)h+=`<span class="val">${v}</span>`;
- else{
-  if(P.cn[i]){const d=[...P.cn[i]],t=Math.ceil(d.length/2),w=!!(P.mn[i]&&P.mn[i].includes(String(numSel))),sp=a=>a.map(x=>noteMark(x,w)).join(''); // v28 CR1: centre mark gets the chip, corner twin stays grey
-   h+=`<div class="cn${anc!==undefined?' a':''}"><div>${sp(d.slice(0,t))}</div><div>${sp(d.slice(t))}</div></div>`}
-  if(P.mn[i])h+=`<span class="mn m${P.mn[i].length}">${[...P.mn[i]].map(x=>noteMark(x)).join('')}</span>`; // v29: pass only the digit — .map(noteMark) was feeding the index as `weak`, so a centre 3 not in first position got grey-bold instead of the amber chip
- }
+ else h+=marksHTML(i);
  return h}
 let cellCache=Array(81).fill(null);
 const solWrong=i=>!!(P.sol&&P.v[i]&&P.sol[i]&&P.v[i]!==P.sol[i]);
@@ -422,20 +426,14 @@ function renderRenbans(){const el=$('#renbans');if(!el)return;let g='';
  (P.renbans||[]).forEach((r,k)=>{const hot=editing&&etab==='renban'&&k===editLine;g+=whisperSVG(r.cells,hot?'#60a5fa':renbanBad.has(k)?'#f87171':'#d68af0',hot?.9:.8)});
  if(editing&&etab==='renban'&&sel.size&&editLine<0)g+=whisperSVG([...sel],'#60a5fa',.9);
  applyHalo(el,g,'vHaloR')}
-// v28–v30 CR2: digit-shaped gap in arrow and renban lines (mask = glyph plus a thin stroke), so
-// the real cell background shows round the number: white, any colour or split colours, and
-// selection/highlight darkening. Placed digits keep the approved v28 thickness; pencil marks use a
-// thinner hard cut (v30, ~1/3 of the v29 note width). Thermos and whispers stay whole — they are
-// already pale, and David asked for the cut on renbans (small marks were getting lost in the bar).
-// Pencil-mark glyphs are measured from the laid-out corner/centre spans so cage-sum padding and
-// smaller type stay lined up. Each line SVG gets its own mask id (HTML ids must be unique).
-let haloFont='';const HALO_W=7,HALO_NOTE_W=1.7,HALO_DY=0;
+// v28/v30/v31: placed digits cut a gap in arrow and renban lines with an SVG mask (centred
+// 66-unit glyphs, approved thickness HALO_W). Pencil marks must NOT be drawn as a second
+// SVG <text> — on iOS Safari that font/baseline/letter-spacing does not match the HTML marks,
+// so the cut sat beside the real text (v30). Marks are painted in #ink, above the line SVGs,
+// as the same HTML with a thin background-coloured text-stroke (option B look, aligned).
+let haloFont='';const HALO_W=7,HALO_DY=0;
 function digitMask(id){if(!haloFont){const c=document.querySelector('#grid .cell');haloFont=c?getComputedStyle(c).fontFamily.replace(/"/g,"'"):'sans-serif'}
  let t='';for(let i=0;i<81;i++){const v=valAt(i);if(v)t+=`<text x="${COL(i)*100+50}" y="${ROW(i)*100+50+HALO_DY}">${v}</text>`}
- const wr=$('#gridWrap').getBoundingClientRect(),sc=wr.width?900/wr.width:0;
- if(sc)for(let i=0;i<81;i++){if(valAt(i))continue;for(const s of cells[i].querySelectorAll('.cn span,.mn span')){const d=s.textContent;if(!d)continue;const r=s.getBoundingClientRect();if(!r.width)continue;
-  const x=(r.left+r.width/2-wr.left)*sc,y=(r.top+r.height/2-wr.top)*sc,fs=parseFloat(getComputedStyle(s).fontSize)*sc;
-  t+=`<text x="${x.toFixed(1)}" y="${y.toFixed(1)}" font-size="${fs.toFixed(1)}" stroke-width="${HALO_NOTE_W}">${d}</text>`}}
  return t?`<defs><mask id="${id}" maskUnits="userSpaceOnUse" x="0" y="0" width="900" height="900"><rect width="900" height="900" fill="#fff"/><g fill="#000" stroke="#000" stroke-width="${HALO_W}" stroke-linejoin="round" text-anchor="middle" dominant-baseline="central" font-size="66" font-family="${haloFont}">${t}</g></mask></defs>`:''}
 function applyHalo(el,g,id){const m=g?digitMask(id):'';el.innerHTML=m?m+`<g mask="url(#${id})">${g}</g>`:g}
 function renderArrows(){const el=$('#arrows');if(!el)return;let g='';
@@ -505,6 +503,26 @@ function blockedCells(){const s=new Set();if(!numSel)return s;
   for(const k of renbansOf[i])for(const j of P.renbans[k].cells)if(j!==i)s.add(j)}
  for(let i=0;i<81;i++)if(valAt(i)===numSel)s.delete(i);return s}
 function hasPencil(i,n){if(!n||valAt(i))return false;const d=String(n);return P.cn[i].includes(d)||P.mn[i].includes(d)}
+function parseRgba(s){if(!s)return null;s=String(s).trim();
+ let m=/^rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)(?:\s*,\s*([\d.]+))?\s*\)$/i.exec(s);
+ if(m)return [+m[1],+m[2],+m[3],m[4]===undefined?1:+m[4]];
+ m=/^#([0-9a-f]{6})$/i.exec(s);if(m){const n=parseInt(m[1],16);return [n>>16&255,n>>8&255,n&255,1]}
+ return null}
+function blendOver(base,ov){const a=ov[3];return [base[0]*(1-a)+ov[0]*a,base[1]*(1-a)+ov[1]*a,base[2]*(1-a)+ov[2]*a]}
+function haloColor(i){
+ let rgb=[255,255,255];
+ const o=normCol(P.col[i]);
+ if(o.c.length===1){const p=parseRgba(COLOURS[o.c[0]-1]);if(p)rgb=p.slice(0,3)}
+ const cl=cells[i].classList,varc=n=>parseRgba(getComputedStyle(document.documentElement).getPropertyValue(n));
+ if(grid.classList.contains('sdim')&&!cl.contains('sel')){const ov=varc('--sdim');if(ov)rgb=blendOver(rgb,ov)}
+ if(grid.classList.contains('hlon')&&cl.contains('blocked')&&!cl.contains('sel')){const ov=varc('--blk');if(ov)rgb=blendOver(rgb,ov)}
+ if(grid.classList.contains('hlon')&&!cl.contains('hl')&&!cl.contains('sel')){const ov=varc('--dim');if(ov)rgb=blendOver(rgb,ov)}
+ if(cl.contains('sel')){const ov=varc('--selw');if(ov)rgb=blendOver(rgb,ov)}
+ return `rgb(${rgb[0].toFixed(1)},${rgb[1].toFixed(1)},${rgb[2].toFixed(1)})`}
+let inkCache=Array(81).fill(null);
+function renderInk(){
+ for(let i=0;i<81;i++){const h=marksHTML(i);if(inkCache[i]!==h){inkCells[i].innerHTML=h;inkCache[i]=h}inkCells[i].style.setProperty('--halo',haloColor(i))}
+}
 let paintedNum=-1;
 function renderSel(){
  syncNumSel();
@@ -521,6 +539,7 @@ function renderSel(){
  grid.classList.toggle('hlon',hlOn);
  // v24/v25: a selection darkens every unselected cell (every grid since v25: the tint mode is gone); this stacks with the highlight darkening.
  grid.classList.toggle('sdim',!editing&&sel.size>0);
+ renderInk();
  drawSelOutline();
  pad.classList.toggle('hlmode',!editing&&mode!=='k'&&!sel.size);
  if(editing){if(etab==='thermo')renderThermos();if(etab==='arrow')renderArrows();if(etab==='whisper')renderWhispers();if(etab==='renban')renderRenbans();$('#bPick').classList.add('hidden');$('#infoTxt').textContent=etab==='kropki'?`${(P.kropki||[]).length} dot${(P.kropki||[]).length===1?'':'s'} — tap an edge to cycle`:etab==='thermo'?(sel.size?(editLine>=0?`Editing thermo: ${sel.size} cells — tap cells to extend`:`${sel.size} cell${sel.size>1?'s':''} · bulb ${RC([...sel][0])}`):'Drag from the bulb to the tip'):etab==='renban'?(sel.size?(editLine>=0?`Editing renban: ${sel.size} cells — tap cells to extend`:`${sel.size} cell${sel.size>1?'s':''} on the line`):'Drag along the renban line'):etab==='whisper'?(sel.size?(editLine>=0?`Editing whisper: ${sel.size} cells — tap cells to extend`:`${sel.size} cell${sel.size>1?'s':''} on the line`):'Drag along the whisper line'):etab==='arrow'?(sel.size?(editLine>=0?`Editing arrow: ${sel.size} cells — tap cells to extend`:sel.size<=arrowB?`Circle ${[...sel].map(RC).join(' ')} — now the shaft`:`Circle ${RC([...sel][0])} · shaft ${sel.size-arrowB}`):'Tap the circle, then the shaft'):sel.size?`${sel.size} cell${sel.size>1?'s':''} selected`:'Drag across cells to make a cage';$('#bCalc').classList.add('hidden');$('#bTest').disabled=true;return}
