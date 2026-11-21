@@ -23,13 +23,17 @@ header{display:flex;align-items:center;gap:6px;height:50px}
    layers still multiply over the digits (no painted ring on a thermo bulb or a split-colour
    cell). Split-colour cells still use a transparent --halo. */
 #grid .mn,#grid .cn,#grid .val{visibility:hidden}
-#grid,#renbans,#arrows,#ink,#thermo,#whispers,#lines,#selsvg,#dots{position:absolute;inset:0}
+#grid,#renbans,#arrows,#ink,#thermo,#whispers,#lines,#selsvg,#dots,#sums{position:absolute;inset:0}
 #renbans,#arrows{z-index:1}
 #ink{z-index:2;display:grid;grid-template-columns:repeat(9,1fr);grid-template-rows:repeat(9,1fr);pointer-events:none}
 #ink .mn span,#ink .cn span{paint-order:stroke fill;-webkit-text-stroke-width:calc(1.7em / 26);-webkit-text-stroke-color:color-mix(in srgb,var(--halo,#fff) 60%,transparent)}
 #ink .val{paint-order:stroke fill;-webkit-text-stroke-width:calc(1.5em / 66);-webkit-text-stroke-color:color-mix(in srgb,var(--halo,#fff) 60%,transparent)}
 #thermo,#whispers{z-index:3}
 #lines,#selsvg,#dots{z-index:4;width:100%;height:100%;pointer-events:none}
+/* v37: cage sums sit in #sums above the cage/grid lines, as they did in v28 (a white rounded
+   label covering the dashed corner). v33's z-index:4 on #lines painted those dashes over the
+   labels, which live in #grid (z-index auto) and could no longer stack above the lines. */
+#sums{z-index:5;display:grid;grid-template-columns:repeat(9,1fr);grid-template-rows:repeat(9,1fr);pointer-events:none}
 .cell{position:relative;overflow:hidden;container-type:size}
 .cell .bg{position:absolute;inset:0;z-index:0}
 .cell>span,.cell>div:not(.bg){z-index:2}

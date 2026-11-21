@@ -299,8 +299,8 @@ function undo(){if(!undoS.length)return;redoS.push(snap());restore(undoS.pop());
 function redo(){if(!redoS.length)return;undoS.push(snap());restore(redoS.pop());save();editCage=-1;editLine=-1;render()}
 
 // ---------- Build static DOM (never rebuilt mid-tap) ----------
-const grid=$('#grid'),ink=$('#ink'),cells=[],inkCells=[];
-for(let i=0;i<81;i++){const d=document.createElement('div');d.className='cell';cells.push(d);grid.appendChild(d);const e=document.createElement('div');e.className='cell';inkCells.push(e);ink.appendChild(e)}
+const grid=$('#grid'),ink=$('#ink'),sumLayer=$('#sums'),cells=[],inkCells=[],sumCells=[];
+for(let i=0;i<81;i++){const d=document.createElement('div');d.className='cell';cells.push(d);grid.appendChild(d);const e=document.createElement('div');e.className='cell';inkCells.push(e);ink.appendChild(e);const s=document.createElement('div');s.className='cell';sumCells.push(s);sumLayer.appendChild(s)}
 const pad=$('#pad');const padBtns=[];
 for(let d=1;d<=9;d++){const b=document.createElement('button');b.dataset.d=d;b.innerHTML=`<span class="sw"></span><span class="n">${d}</span><span class="cpm minus" data-op="-">−</span><span class="cpm plus" data-op="+">+</span>`;pad.appendChild(b);padBtns.push(b)}
 const sumPad=$('#sumPad');[1,2,3,4,5,6,7,8,9,0].forEach(d=>{const b=document.createElement('button');b.dataset.s=d;b.textContent=d;sumPad.appendChild(b)});
@@ -360,17 +360,18 @@ function marksHTML(i){
  if(P.mn[i])h+=`<span class="mn m${P.mn[i].length}">${[...P.mn[i]].map(x=>noteMark(x)).join('')}</span>`; // v29: pass only the digit — .map(noteMark) was feeding the index as `weak`
  return h}
 function inkHTML(i){const v=valAt(i);return v?`<span class="val">${v}</span>`:marksHTML(i)}
+function sumHTML(i){
+ const anc=cagesOf[i].find(k=>P.cages[k].cells[0]===i);
+ return anc===undefined?'':`<span class="sum${cageBad.has(anc)?' bad':''}">${P.cages[anc].sum}</span>`}
 function cellHTML(i){
  let h='';const v=valAt(i);
  if(normCol(P.col[i]).c.length)h+=`<div class="bg" style="background:${pie(P.col[i])}"></div>`;
- const anc=cagesOf[i].find(k=>P.cages[k].cells[0]===i);
- if(anc!==undefined)h+=`<span class="sum${cageBad.has(anc)?' bad':''}">${P.cages[anc].sum}</span>`;
  if(v)h+=`<span class="val">${v}</span>`;
  else h+=marksHTML(i);
  return h}
-let cellCache=Array(81).fill(null);
+let cellCache=Array(81).fill(null),sumCache=Array(81).fill(null);
 const solWrong=i=>!!(P.sol&&P.v[i]&&P.sol[i]&&P.v[i]!==P.sol[i]);
-function renderCells(){computeConflicts();for(let i=0;i<81;i++){const h=cellHTML(i);if(cellCache[i]!==h){cells[i].innerHTML=h;cellCache[i]=h}cells[i].classList.toggle('given',!!P.givens[i]);cells[i].classList.toggle('bad',bad.has(i)||solWrong(i))}}
+function renderCells(){computeConflicts();for(let i=0;i<81;i++){const h=cellHTML(i);if(cellCache[i]!==h){cells[i].innerHTML=h;cellCache[i]=h}cells[i].classList.toggle('given',!!P.givens[i]);cells[i].classList.toggle('bad',bad.has(i)||solWrong(i));const sh=sumHTML(i);if(sumCache[i]!==sh){sumCells[i].innerHTML=sh;sumCache[i]=sh}}}
 function renderLines(){
  const S=100,d=7;let g='';
  P.cages.forEach((c,k)=>{const set=new Set(c.cells);const IN=(r,cc)=>r>=0&&r<9&&cc>=0&&cc<9&&set.has(r*9+cc);let p='';
