@@ -350,7 +350,7 @@ function computeConflicts(){bad=new Set();cageBad=new Set();thermoBad=new Set();
  const units=HOUSES.concat(P.cages.map(c=>c.cells));
  for(const u of units){const m={};for(const i of u){const v=valAt(i);if(v)(m[v]=m[v]||[]).push(i)}for(const k in m)if(m[k].length>1)m[k].forEach(i=>bad.add(i))}
  P.cages.forEach((c,k)=>{let s=0,f=0;for(const i of c.cells){const v=valAt(i);if(v){s+=v;f++}}if(s>c.sum||(f===c.cells.length&&s!==c.sum))cageBad.add(k)})}
-function noteMark(d,weak){return numSel&&+d===numSel?(weak?`<span class="nh2">${d}</span>`:`<span class="nh">${d}</span>`):`<span>${d}</span>`}
+function noteMark(d,weak){return numSel&&+d===numSel?(weak===true?`<span class="nh2">${d}</span>`:`<span class="nh">${d}</span>`):`<span>${d}</span>`}
 function cellHTML(i){
  let h='';const v=valAt(i);
  if(normCol(P.col[i]).c.length)h+=`<div class="bg" style="background:${pie(P.col[i])}"></div>`;
@@ -360,7 +360,7 @@ function cellHTML(i){
  else{
   if(P.cn[i]){const d=[...P.cn[i]],t=Math.ceil(d.length/2),w=!!(P.mn[i]&&P.mn[i].includes(String(numSel))),sp=a=>a.map(x=>noteMark(x,w)).join(''); // v28 CR1: centre mark gets the chip, corner twin stays grey
    h+=`<div class="cn${anc!==undefined?' a':''}"><div>${sp(d.slice(0,t))}</div><div>${sp(d.slice(t))}</div></div>`}
-  if(P.mn[i])h+=`<span class="mn m${P.mn[i].length}">${[...P.mn[i]].map(noteMark).join('')}</span>`;
+  if(P.mn[i])h+=`<span class="mn m${P.mn[i].length}">${[...P.mn[i]].map(x=>noteMark(x)).join('')}</span>`; // v29: pass only the digit — .map(noteMark) was feeding the index as `weak`, so a centre 3 not in first position got grey-bold instead of the amber chip
  }
  return h}
 let cellCache=Array(81).fill(null);
@@ -422,12 +422,18 @@ function renderRenbans(){const el=$('#renbans');if(!el)return;let g='';
  (P.renbans||[]).forEach((r,k)=>{const hot=editing&&etab==='renban'&&k===editLine;g+=whisperSVG(r.cells,hot?'#60a5fa':renbanBad.has(k)?'#f87171':'#d68af0',hot?.9:.8)});
  if(editing&&etab==='renban'&&sel.size&&editLine<0)g+=whisperSVG([...sel],'#60a5fa',.9);
  el.innerHTML=g}
-// v28 CR2: thin halo round placed digits. Arrow lines/heads are cut away in a digit-shaped gap (mask = digit glyph
-// plus a thin stroke), so the real cell background shows round the digit: white, any colour or split colours,
-// and selection/highlight darkening. Thermos, whispers and renbans are pale and stay whole (no rings cut into them).
-let haloFont='';const HALO_W=7,HALO_DY=0;
+// v28/v29 CR2: thin halo round placed digits and pencil marks. Arrow lines/heads are cut away in a
+// digit-shaped gap (mask = glyph plus a thin stroke), so the real cell background shows round the
+// number: white, any colour or split colours, and selection/highlight darkening. Thermos, whispers
+// and renbans are pale and stay whole (no rings cut into them). Pencil-mark glyphs are measured from
+// the laid-out corner/centre spans so cage-sum padding and smaller type stay lined up.
+let haloFont='';const HALO_W=7,HALO_NOTE_W=5,HALO_DY=0;
 function digitMask(){if(!haloFont){const c=document.querySelector('#grid .cell');haloFont=c?getComputedStyle(c).fontFamily.replace(/"/g,"'"):'sans-serif'}
  let t='';for(let i=0;i<81;i++){const v=valAt(i);if(v)t+=`<text x="${COL(i)*100+50}" y="${ROW(i)*100+50+HALO_DY}">${v}</text>`}
+ const wr=$('#gridWrap').getBoundingClientRect(),sc=wr.width?900/wr.width:0;
+ if(sc)for(let i=0;i<81;i++){if(valAt(i))continue;for(const s of cells[i].querySelectorAll('.cn span,.mn span')){const d=s.textContent;if(!d)continue;const r=s.getBoundingClientRect();if(!r.width)continue;
+  const x=(r.left+r.width/2-wr.left)*sc,y=(r.top+r.height/2-wr.top)*sc,fs=parseFloat(getComputedStyle(s).fontSize)*sc;
+  t+=`<text x="${x.toFixed(1)}" y="${y.toFixed(1)}" font-size="${fs.toFixed(1)}" stroke-width="${HALO_NOTE_W}">${d}</text>`}}
  return t?`<defs><mask id="vHalo" maskUnits="userSpaceOnUse" x="0" y="0" width="900" height="900"><rect width="900" height="900" fill="#fff"/><g fill="#000" stroke="#000" stroke-width="${HALO_W}" stroke-linejoin="round" text-anchor="middle" dominant-baseline="central" font-size="66" font-family="${haloFont}">${t}</g></mask></defs>`:''}
 function renderArrows(){const el=$('#arrows');if(!el)return;let g='';
  (P.arrows||[]).forEach((a,k)=>{const hot=editing&&etab==='arrow'&&k===editLine;g+=arrowSVG(a.cells,a.b,hot?'#3b82f6':arrowBad.has(k)?'#ef4444':'#9ca3af')});
