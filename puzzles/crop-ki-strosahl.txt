@@ -1,0 +1,31 @@
+SUDOKU v1
+name Crop-ki
+# Author: Strosahl
+# Source: https://logic-masters.de/Raetselportal/Raetsel/zeigen.php?id=000LIW
+# Source: https://sudokupad.app/ufmpu77z5s
+# Rules: normal sudoku; digits on a green German whisper line differ from their neighbours by at least 5; digits on a purple renban line are a set of consecutive, non-repeating digits in any order; digits separated by a white dot are consecutive; digits separated by a black dot are in a 1:2 ratio; not all dots are given.
+givens .................................................................................
+solution 215436987 896257413 473918256 189342765 642785139 357691842 561829374 724163598 938574621
+whisper r3c3 r4c3 r5c3 r6c3 r7c3 r7c4 r7c5 r7c6 r7c7 r6c7 r5c7 r4c7 r3c7 r3c6 r3c5 r3c4 r3c3
+renban r1c3 r2c3 r3c3 r3c2 r3c1
+renban r7c9 r7c8 r7c7 r8c7 r9c7
+kropki w r2c1 r2c2
+kropki w r1c7 r1c8
+kropki w r2c6 r3c6
+kropki w r4c2 r4c3
+kropki w r4c7 r4c8
+kropki w r5c4 r5c5
+kropki w r7c1 r7c2
+kropki w r8c5 r9c5
+kropki w r8c6 r9c6
+kropki b r1c5 r1c6
+kropki b r2c9 r3c9
+kropki b r4c5 r4c6
+kropki b r4c2 r5c2
+kropki b r6c8 r6c9
+kropki b r7c9 r8c9
+kropki b r8c3 r9c3
+kropki b r9c8 r9c9
+tip Start with the green loop. A 5 can never sit on a German whisper, so the 16 cells alternate low (1-4) and high (6-9). The loop has even length, and the four corners are an even number of steps apart, so they all have the same polarity — all low, or all high.
+tip Each pink line is a 5-cell renban that sits entirely in one box and includes one corner of the green loop. A 5-cell renban always contains a 5, and that 5 cannot be the corner on the whisper, so it has to be one of the other four cells. Use that, and the dots in those two boxes, to decide the polarity of the corners.
+tip Once you know the polarity, look at the white dots on the sides of the green rectangle, especially in row 4. Each one joins a cell just outside the loop to a cell on it, and that tightens both the loop and the two renbans.
