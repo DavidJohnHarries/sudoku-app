@@ -42,10 +42,10 @@ header{display:flex;align-items:center;gap:6px;height:50px}
 .cell.bad .val{color:#dc2626}
 .sum{position:absolute;left:3%;top:1%;font-size:21cqh;line-height:1;background:#fff;padding:0 2px;border-radius:2px;color:#111827;font-weight:600}
 .sum.bad{color:#fff;background:#dc2626}
-.cn{position:absolute;inset:6% 9%;display:flex;flex-direction:column;justify-content:space-between;font-size:23cqh;line-height:1;color:#374151}
+.cn{position:absolute;inset:6% 9%;display:flex;flex-direction:column;justify-content:space-between;font-size:23cqh;line-height:1;color:#222}
 .cn.a>div:first-child{padding-left:30%}.cn>div{display:flex;justify-content:space-between}.cn>div:only-child{}
 .cn.top-only{justify-content:flex-start}
-.mn{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:26cqh;color:#374151;letter-spacing:-.02em;text-align:center;padding:0 4%;word-break:break-all;line-height:1}
+.mn{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:26cqh;color:#222;letter-spacing:-.02em;text-align:center;padding:0 4%;word-break:break-all;line-height:1}
 .mn.m5{font-size:22cqh}.mn.m6{font-size:19cqh}.mn.m7,.mn.m8,.mn.m9{font-size:16cqh}
 /* Mode bar (v15): a compact segmented control + a Multi toggle, deliberately unlike the big white
    number keys — grey track, short, small icon beside a text label, active segment raised in white. */
@@ -237,6 +237,8 @@ header{display:flex;align-items:center;gap:6px;height:50px}
 .mitems{display:flex;gap:6px}.mitems .mitem{flex:1;text-align:center;background:#f3f4f6}
 .kc b{position:relative;z-index:1;font-weight:400}
 /* v26 Renban: thick translucent pink-violet line, multiplied under digits like whispers. 7 editor tabs → 4 + 3. */
+/* v38: pencil marks are #222 (were #374151); weight stays 400. Renban stroke is #dd9ff3 (was #d68af0), opacity still 0.8.
+   Halos, .nh chips and .nh2 (CR1 grey-bold corner twin) are unchanged. */
 #renbans{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;mix-blend-mode:multiply}
 .tabs{grid-template-columns:repeat(4,1fr)}
 

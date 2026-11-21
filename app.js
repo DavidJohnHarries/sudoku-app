@@ -424,8 +424,9 @@ function renderWhispers(){const el=$('#whispers');if(!el)return;let g='';
  if(editing&&etab==='whisper'&&sel.size&&editLine<0)g+=whisperSVG([...sel],'#60a5fa',.9);
  el.innerHTML=g}
 // Renban: SudokuPad-style thick translucent pink-violet line through cell centres (own layer, multiplied).
+// v38: stroke is #dd9ff3 (was #d68af0); opacity still 0.8. Editor/conflict colours unchanged.
 function renderRenbans(){const el=$('#renbans');if(!el)return;let g='';
- (P.renbans||[]).forEach((r,k)=>{const hot=editing&&etab==='renban'&&k===editLine;g+=whisperSVG(r.cells,hot?'#60a5fa':renbanBad.has(k)?'#f87171':'#d68af0',hot?.9:.8)});
+ (P.renbans||[]).forEach((r,k)=>{const hot=editing&&etab==='renban'&&k===editLine;g+=whisperSVG(r.cells,hot?'#60a5fa':renbanBad.has(k)?'#f87171':'#dd9ff3',hot?.9:.8)});
  if(editing&&etab==='renban'&&sel.size&&editLine<0)g+=whisperSVG([...sel],'#60a5fa',.9);
  el.innerHTML=g}
 // v32/v33: no SVG text mask. Placed digits and pencil marks are painted in #ink as the real
