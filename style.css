@@ -14,14 +14,19 @@ header{display:flex;align-items:center;gap:6px;height:50px}
 .calc{background:#1e3a8a;color:#fff;height:34px;padding:0 12px;font-weight:600;font-size:15px}
 #gridWrap{position:relative;width:min(100%,58vh);aspect-ratio:1;margin:0 auto;touch-action:none}
 #grid{position:absolute;inset:0;display:grid;grid-template-columns:repeat(9,1fr);grid-template-rows:repeat(9,1fr);background:#fff;touch-action:none}
-/* v31/v32: marks and placed digits are drawn in #ink, above the line SVGs, so the gap is
-   the same HTML text (not a second SVG font). Hidden in #grid so we do not paint them twice.
-   Marks use a thin 1.7cqh stroke; placed digits use 7cqh (the approved v28 thickness). */
+/* v31–v33: marks and placed digits are drawn in #ink as the same HTML (not a second SVG font),
+   hidden in #grid so we do not paint them twice. Marks use a thin 1.7cqh stroke; placed digits
+   use 7cqh (the approved v28 thickness). Ink sits above arrows/renbans so that stroke cuts a
+   gap in those lines, and below thermos/whispers so those layers still multiply over the digits
+   (no painted ring on a thermo bulb or a split-colour cell). */
 #grid .mn,#grid .cn,#grid .val{visibility:hidden}
-#ink{position:absolute;inset:0;display:grid;grid-template-columns:repeat(9,1fr);grid-template-rows:repeat(9,1fr);pointer-events:none}
+#grid,#renbans,#arrows,#ink,#thermo,#whispers,#lines,#selsvg,#dots{position:absolute;inset:0}
+#renbans,#arrows{z-index:1}
+#ink{z-index:2;display:grid;grid-template-columns:repeat(9,1fr);grid-template-rows:repeat(9,1fr);pointer-events:none}
 #ink .mn span,#ink .cn span{paint-order:stroke fill;-webkit-text-stroke:1.7cqh var(--halo,#fff)}
 #ink .val{paint-order:stroke fill;-webkit-text-stroke:7cqh var(--halo,#fff)}
-#lines{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+#thermo,#whispers{z-index:3}
+#lines,#selsvg,#dots{z-index:4;width:100%;height:100%;pointer-events:none}
 .cell{position:relative;overflow:hidden;container-type:size}
 .cell .bg{position:absolute;inset:0;z-index:0}
 .cell>span,.cell>div:not(.bg){z-index:2}

@@ -427,9 +427,9 @@ function renderRenbans(){const el=$('#renbans');if(!el)return;let g='';
  (P.renbans||[]).forEach((r,k)=>{const hot=editing&&etab==='renban'&&k===editLine;g+=whisperSVG(r.cells,hot?'#60a5fa':renbanBad.has(k)?'#f87171':'#d68af0',hot?.9:.8)});
  if(editing&&etab==='renban'&&sel.size&&editLine<0)g+=whisperSVG([...sel],'#60a5fa',.9);
  el.innerHTML=g}
-// v32: no SVG text mask. Placed digits and pencil marks are painted in #ink (above the line
-// SVGs) as the real HTML, with a background-coloured text-stroke so the gap cannot drift on
-// iOS Safari the way the old SVG <text> mask did (v30 marks, v31 placed digits).
+// v32/v33: no SVG text mask. Placed digits and pencil marks are painted in #ink as the real
+// HTML, with a background-coloured text-stroke so the gap cannot drift on iOS Safari the way
+// the old SVG <text> mask did. Ink is above arrows/renbans and below thermos/whispers.
 function renderArrows(){const el=$('#arrows');if(!el)return;let g='';
  (P.arrows||[]).forEach((a,k)=>{const hot=editing&&etab==='arrow'&&k===editLine;g+=arrowSVG(a.cells,a.b,hot?'#3b82f6':arrowBad.has(k)?'#ef4444':'#9ca3af')});
  if(editing&&etab==='arrow'&&sel.size&&editLine<0)g+=arrowSVG([...sel],arrowB,'#3b82f6');
@@ -504,8 +504,10 @@ function parseRgba(s){if(!s)return null;s=String(s).trim();
  return null}
 function blendOver(base,ov){const a=ov[3];return [base[0]*(1-a)+ov[0]*a,base[1]*(1-a)+ov[1]*a,base[2]*(1-a)+ov[2]*a]}
 function haloColor(i){
- let rgb=[255,255,255];
  const o=normCol(P.col[i]);
+ // A single stroke cannot match a split-colour cell; a white ring was visible on the pie.
+ if(o.c.length>1)return 'transparent';
+ let rgb=[255,255,255];
  if(o.c.length===1){const p=parseRgba(COLOURS[o.c[0]-1]);if(p)rgb=p.slice(0,3)}
  const cl=cells[i].classList,varc=n=>parseRgba(getComputedStyle(document.documentElement).getPropertyValue(n));
  if(grid.classList.contains('sdim')&&!cl.contains('sel')){const ov=varc('--sdim');if(ov)rgb=blendOver(rgb,ov)}
