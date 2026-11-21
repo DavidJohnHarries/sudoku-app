@@ -42,11 +42,18 @@ header{display:flex;align-items:center;gap:6px;height:50px}
 .cell.bad .val{color:#dc2626}
 .sum{position:absolute;left:3%;top:1%;font-size:21cqh;line-height:1;background:#fff;padding:0 2px;border-radius:2px;color:#111827;font-weight:600}
 .sum.bad{color:#fff;background:#dc2626}
-.cn{position:absolute;inset:6% 9%;display:flex;flex-direction:column;justify-content:space-between;font-size:23cqh;line-height:1;color:#222}
+.cn{position:absolute;inset:6% 9%;display:flex;flex-direction:column;justify-content:space-between;font-size:23cqh;line-height:1;color:color-mix(in srgb,#222 50%,#374151)}
 .cn.a>div:first-child{padding-left:30%}.cn>div{display:flex;justify-content:space-between}.cn>div:only-child{}
 .cn.top-only{justify-content:flex-start}
-.mn{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:26cqh;color:#222;letter-spacing:-.02em;text-align:center;padding:0 4%;word-break:break-all;line-height:1}
-.mn.m5{font-size:22cqh}.mn.m6{font-size:19cqh}.mn.m7,.mn.m8,.mn.m9{font-size:16cqh}
+/* v39: centre-mark colour ramps from the old #374151 (1 mark) to #222 (6+ marks), (n-1)/5 of the way.
+   Colour is on .mn / .cn so .nh / .nh2 on the spans keep their own colours. Weight stays 400. */
+.mn{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:26cqh;color:#374151;letter-spacing:-.02em;text-align:center;padding:0 4%;word-break:break-all;line-height:1}
+.mn.m2{color:color-mix(in srgb,#222 20%,#374151)}
+.mn.m3{color:color-mix(in srgb,#222 40%,#374151)}
+.mn.m4{color:color-mix(in srgb,#222 60%,#374151)}
+.mn.m5{font-size:22cqh;color:color-mix(in srgb,#222 80%,#374151)}
+.mn.m6{font-size:19cqh;color:#222}
+.mn.m7,.mn.m8,.mn.m9{font-size:16cqh;color:#222}
 /* Mode bar (v15): a compact segmented control + a Multi toggle, deliberately unlike the big white
    number keys — grey track, short, small icon beside a text label, active segment raised in white. */
 .modebar{display:flex;gap:8px;align-items:stretch;margin:10px 0 8px}
@@ -237,8 +244,9 @@ header{display:flex;align-items:center;gap:6px;height:50px}
 .mitems{display:flex;gap:6px}.mitems .mitem{flex:1;text-align:center;background:#f3f4f6}
 .kc b{position:relative;z-index:1;font-weight:400}
 /* v26 Renban: thick translucent pink-violet line, multiplied under digits like whispers. 7 editor tabs → 4 + 3. */
-/* v38: pencil marks are #222 (were #374151); weight stays 400. Renban stroke is #dd9ff3 (was #d68af0), opacity still 0.8.
-   Halos, .nh chips and .nh2 (CR1 grey-bold corner twin) are unchanged. */
+/* v38: pencil marks went to #222 (were #374151); weight stays 400. Renban stroke is #dd9ff3 (was #d68af0), opacity still 0.8.
+   Halos, .nh chips and .nh2 (CR1 grey-bold corner twin) are unchanged.
+   v39: centre marks ramp #374151 → #222 by count (max at 6+); corner marks stay a 50% mix. Weight/halos/.nh/.nh2/renban unchanged. */
 #renbans{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;mix-blend-mode:multiply}
 .tabs{grid-template-columns:repeat(4,1fr)}
 
