@@ -14,11 +14,13 @@ header{display:flex;align-items:center;gap:6px;height:50px}
 .calc{background:#1e3a8a;color:#fff;height:34px;padding:0 12px;font-weight:600;font-size:15px}
 #gridWrap{position:relative;width:min(100%,58vh);aspect-ratio:1;margin:0 auto;touch-action:none}
 #grid{position:absolute;inset:0;display:grid;grid-template-columns:repeat(9,1fr);grid-template-rows:repeat(9,1fr);background:#fff;touch-action:none}
-/* v31: pencil marks are drawn in #ink, above arrow/renban SVGs, so the gap is the same
-   HTML text (not a second SVG font). Hidden in #grid so we do not paint them twice. */
-#grid .mn,#grid .cn{visibility:hidden}
+/* v31/v32: marks and placed digits are drawn in #ink, above the line SVGs, so the gap is
+   the same HTML text (not a second SVG font). Hidden in #grid so we do not paint them twice.
+   Marks use a thin 1.7cqh stroke; placed digits use 7cqh (the approved v28 thickness). */
+#grid .mn,#grid .cn,#grid .val{visibility:hidden}
 #ink{position:absolute;inset:0;display:grid;grid-template-columns:repeat(9,1fr);grid-template-rows:repeat(9,1fr);pointer-events:none}
 #ink .mn span,#ink .cn span{paint-order:stroke fill;-webkit-text-stroke:1.7cqh var(--halo,#fff)}
+#ink .val{paint-order:stroke fill;-webkit-text-stroke:7cqh var(--halo,#fff)}
 #lines{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
 .cell{position:relative;overflow:hidden;container-type:size}
 .cell .bg{position:absolute;inset:0;z-index:0}
@@ -130,11 +132,11 @@ header{display:flex;align-items:center;gap:6px;height:50px}
 
 #grid.celeb-wave .cell{animation:cellRipple 1.25s ease both;animation-delay:var(--wave,0s)}
 @keyframes cellRipple{0%{box-shadow:inset 0 0 0 0 transparent}22%{box-shadow:inset 0 0 0 50px rgba(253,230,138,.85)}65%{box-shadow:inset 0 0 0 50px rgba(253,230,138,.35)}100%{box-shadow:inset 0 0 0 0 transparent}}
-#grid.celeb-wave .cell .val{animation:digitGlow 3s ease both;animation-delay:var(--wave,0s)}
+#grid.celeb-wave .cell .val,#ink.celeb-wave .cell .val{animation:digitGlow 3s ease both;animation-delay:var(--wave,0s)}
 @keyframes digitGlow{0%{transform:scale(1);filter:none}16%{transform:scale(1.18);color:#b45309;filter:drop-shadow(0 0 6px #f59e0b)}42%{transform:scale(1.08);color:#b45309;filter:drop-shadow(0 0 4px #f59e0b)}62%{transform:scale(1.16);color:#b45309;filter:drop-shadow(0 0 6px #f59e0b)}100%{transform:scale(1);filter:none}}
 
 @media (prefers-reduced-motion:reduce){
-  #grid.celeb-wave .cell,#grid.celeb-wave .cell .val{animation:none}
+  #grid.celeb-wave .cell,#grid.celeb-wave .cell .val,#ink.celeb-wave .cell .val{animation:none}
   #celeb.card-on .celeb-card{animation:none;opacity:1;transform:none}
 }
 
@@ -188,7 +190,7 @@ header{display:flex;align-items:center;gap:6px;height:50px}
 #grid.sdim .cell:not(.sel)::before{content:'';position:absolute;inset:0;background:var(--sdim);z-index:1;pointer-events:none}
 #grid.hlon .cell:not(.hl):not(.sel)::after{background:var(--dim)}
 #grid.hlon .cell.blocked:not(.sel)::before{content:'';position:absolute;inset:0;box-shadow:inset 0 0 0 200px var(--blk);z-index:1;pointer-events:none}
-#grid.hlon .cell.same .val{text-shadow:0 0 3px #fff,0 0 6px #fff}
+#grid.hlon .cell.same .val,#ink .cell.same .val{text-shadow:0 0 3px #fff,0 0 6px #fff}
 .nh{background:#b45309;color:#fff;border-radius:3px;padding:0 2px;font-weight:800;box-shadow:0 0 0 1px #fff;line-height:1}
 /* ☰ menu: a sheet over the keypad, no backdrop dimming, so the whole board stays visible as a live contrast preview. */
 #menu{position:fixed;inset:0;z-index:25}

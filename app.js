@@ -359,6 +359,7 @@ function marksHTML(i){
   h+=`<div class="cn${anc!==undefined?' a':''}"><div>${sp(d.slice(0,t))}</div><div>${sp(d.slice(t))}</div></div>`}
  if(P.mn[i])h+=`<span class="mn m${P.mn[i].length}">${[...P.mn[i]].map(x=>noteMark(x)).join('')}</span>`; // v29: pass only the digit — .map(noteMark) was feeding the index as `weak`
  return h}
+function inkHTML(i){const v=valAt(i);return v?`<span class="val">${v}</span>`:marksHTML(i)}
 function cellHTML(i){
  let h='';const v=valAt(i);
  if(normCol(P.col[i]).c.length)h+=`<div class="bg" style="background:${pie(P.col[i])}"></div>`;
@@ -425,21 +426,14 @@ function renderWhispers(){const el=$('#whispers');if(!el)return;let g='';
 function renderRenbans(){const el=$('#renbans');if(!el)return;let g='';
  (P.renbans||[]).forEach((r,k)=>{const hot=editing&&etab==='renban'&&k===editLine;g+=whisperSVG(r.cells,hot?'#60a5fa':renbanBad.has(k)?'#f87171':'#d68af0',hot?.9:.8)});
  if(editing&&etab==='renban'&&sel.size&&editLine<0)g+=whisperSVG([...sel],'#60a5fa',.9);
- applyHalo(el,g,'vHaloR')}
-// v28/v30/v31: placed digits cut a gap in arrow and renban lines with an SVG mask (centred
-// 66-unit glyphs, approved thickness HALO_W). Pencil marks must NOT be drawn as a second
-// SVG <text> — on iOS Safari that font/baseline/letter-spacing does not match the HTML marks,
-// so the cut sat beside the real text (v30). Marks are painted in #ink, above the line SVGs,
-// as the same HTML with a thin background-coloured text-stroke (option B look, aligned).
-let haloFont='';const HALO_W=7,HALO_DY=0;
-function digitMask(id){if(!haloFont){const c=document.querySelector('#grid .cell');haloFont=c?getComputedStyle(c).fontFamily.replace(/"/g,"'"):'sans-serif'}
- let t='';for(let i=0;i<81;i++){const v=valAt(i);if(v)t+=`<text x="${COL(i)*100+50}" y="${ROW(i)*100+50+HALO_DY}">${v}</text>`}
- return t?`<defs><mask id="${id}" maskUnits="userSpaceOnUse" x="0" y="0" width="900" height="900"><rect width="900" height="900" fill="#fff"/><g fill="#000" stroke="#000" stroke-width="${HALO_W}" stroke-linejoin="round" text-anchor="middle" dominant-baseline="central" font-size="66" font-family="${haloFont}">${t}</g></mask></defs>`:''}
-function applyHalo(el,g,id){const m=g?digitMask(id):'';el.innerHTML=m?m+`<g mask="url(#${id})">${g}</g>`:g}
+ el.innerHTML=g}
+// v32: no SVG text mask. Placed digits and pencil marks are painted in #ink (above the line
+// SVGs) as the real HTML, with a background-coloured text-stroke so the gap cannot drift on
+// iOS Safari the way the old SVG <text> mask did (v30 marks, v31 placed digits).
 function renderArrows(){const el=$('#arrows');if(!el)return;let g='';
  (P.arrows||[]).forEach((a,k)=>{const hot=editing&&etab==='arrow'&&k===editLine;g+=arrowSVG(a.cells,a.b,hot?'#3b82f6':arrowBad.has(k)?'#ef4444':'#9ca3af')});
  if(editing&&etab==='arrow'&&sel.size&&editLine<0)g+=arrowSVG([...sel],arrowB,'#3b82f6');
- applyHalo(el,g,'vHalo')}
+ el.innerHTML=g}
 function renderThermos(){const el=$('#thermo');if(!el)return;let g='';
  (P.thermos||[]).forEach((t,k)=>{const hot=editing&&etab==='thermo'&&k===editLine;g+=thermoSVG(t.cells,hot?'#93c5fd':thermoBad.has(k)?'#fca5a5':'#c8ccd2',1)});
  if(editing&&etab==='thermo'&&sel.size&&editLine<0)g+=thermoSVG([...sel],'#93c5fd',1);
@@ -521,7 +515,12 @@ function haloColor(i){
  return `rgb(${rgb[0].toFixed(1)},${rgb[1].toFixed(1)},${rgb[2].toFixed(1)})`}
 let inkCache=Array(81).fill(null);
 function renderInk(){
- for(let i=0;i<81;i++){const h=marksHTML(i);if(inkCache[i]!==h){inkCells[i].innerHTML=h;inkCache[i]=h}inkCells[i].style.setProperty('--halo',haloColor(i))}
+ for(let i=0;i<81;i++){const h=inkHTML(i);if(inkCache[i]!==h){inkCells[i].innerHTML=h;inkCache[i]=h}
+  const cl=cells[i].classList;
+  inkCells[i].style.setProperty('--halo',haloColor(i));
+  inkCells[i].classList.toggle('given',cl.contains('given'));
+  inkCells[i].classList.toggle('bad',cl.contains('bad'));
+  inkCells[i].classList.toggle('same',cl.contains('same'));}
 }
 let paintedNum=-1;
 function renderSel(){
@@ -664,7 +663,7 @@ function reducedMotion(){return window.matchMedia&&window.matchMedia('(prefers-r
 function checkSolved(){if(P.solved||editing)return;for(let i=0;i<81;i++)if(!valAt(i)||solWrong(i))return;if(bad.size||cageBad.size)return;P.solved=true;save();celebrate()}
 function endCeleb(){
  clearTimeout(celebT);if(celebRAF)cancelAnimationFrame(celebRAF);celebRAF=0;
- grid.classList.remove('celeb-wave');cells.forEach(c=>c.style.removeProperty('--wave'));
+ grid.classList.remove('celeb-wave');ink.classList.remove('celeb-wave');cells.forEach(c=>c.style.removeProperty('--wave'));inkCells.forEach(c=>c.style.removeProperty('--wave'));
  const fx=$('#celebFx');if(fx){const c=fx.getContext('2d');c&&c.clearRect(0,0,fx.width,fx.height)}
  const el=$('#celeb');if(!el)return;el.classList.add('hidden');el.classList.remove('shown','card-on');el.setAttribute('aria-hidden','true')}
 const CELEB_WAVE_STEP=110,CELEB_CARD_PAD=2000,CELEB_FX_MS=7000;
@@ -721,8 +720,8 @@ function celebrate(){
  el.classList.remove('hidden');el.setAttribute('aria-hidden','false');
  if(reducedMotion()){el.classList.add('shown');showCard();return}
  const or=ROW(lastPlace),oc=COL(lastPlace);let max=0;
- for(let i=0;i<81;i++){const d=Math.max(Math.abs(ROW(i)-or),Math.abs(COL(i)-oc));cells[i].style.setProperty('--wave',(d*CELEB_WAVE_STEP)+'ms');if(d>max)max=d}
- grid.classList.add('celeb-wave');startConfetti();
+ for(let i=0;i<81;i++){const d=Math.max(Math.abs(ROW(i)-or),Math.abs(COL(i)-oc));const w=(d*CELEB_WAVE_STEP)+'ms';cells[i].style.setProperty('--wave',w);inkCells[i].style.setProperty('--wave',w);if(d>max)max=d}
+ grid.classList.add('celeb-wave');ink.classList.add('celeb-wave');startConfetti();
  celebT=setTimeout(showCard,max*CELEB_WAVE_STEP+CELEB_CARD_PAD)}
 $('#celebClose').onclick=()=>endCeleb();
 $('#celebList').onclick=()=>{endCeleb();go('home')};
