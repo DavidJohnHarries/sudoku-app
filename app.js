@@ -421,24 +421,27 @@ function renderWhispers(){const el=$('#whispers');if(!el)return;let g='';
 function renderRenbans(){const el=$('#renbans');if(!el)return;let g='';
  (P.renbans||[]).forEach((r,k)=>{const hot=editing&&etab==='renban'&&k===editLine;g+=whisperSVG(r.cells,hot?'#60a5fa':renbanBad.has(k)?'#f87171':'#d68af0',hot?.9:.8)});
  if(editing&&etab==='renban'&&sel.size&&editLine<0)g+=whisperSVG([...sel],'#60a5fa',.9);
- el.innerHTML=g}
-// v28/v29 CR2: thin halo round placed digits and pencil marks. Arrow lines/heads are cut away in a
-// digit-shaped gap (mask = glyph plus a thin stroke), so the real cell background shows round the
-// number: white, any colour or split colours, and selection/highlight darkening. Thermos, whispers
-// and renbans are pale and stay whole (no rings cut into them). Pencil-mark glyphs are measured from
-// the laid-out corner/centre spans so cage-sum padding and smaller type stay lined up.
-let haloFont='';const HALO_W=7,HALO_NOTE_W=5,HALO_DY=0;
-function digitMask(){if(!haloFont){const c=document.querySelector('#grid .cell');haloFont=c?getComputedStyle(c).fontFamily.replace(/"/g,"'"):'sans-serif'}
+ applyHalo(el,g,'vHaloR')}
+// v28–v30 CR2: digit-shaped gap in arrow and renban lines (mask = glyph plus a thin stroke), so
+// the real cell background shows round the number: white, any colour or split colours, and
+// selection/highlight darkening. Placed digits keep the approved v28 thickness; pencil marks use a
+// thinner hard cut (v30, ~1/3 of the v29 note width). Thermos and whispers stay whole — they are
+// already pale, and David asked for the cut on renbans (small marks were getting lost in the bar).
+// Pencil-mark glyphs are measured from the laid-out corner/centre spans so cage-sum padding and
+// smaller type stay lined up. Each line SVG gets its own mask id (HTML ids must be unique).
+let haloFont='';const HALO_W=7,HALO_NOTE_W=1.7,HALO_DY=0;
+function digitMask(id){if(!haloFont){const c=document.querySelector('#grid .cell');haloFont=c?getComputedStyle(c).fontFamily.replace(/"/g,"'"):'sans-serif'}
  let t='';for(let i=0;i<81;i++){const v=valAt(i);if(v)t+=`<text x="${COL(i)*100+50}" y="${ROW(i)*100+50+HALO_DY}">${v}</text>`}
  const wr=$('#gridWrap').getBoundingClientRect(),sc=wr.width?900/wr.width:0;
  if(sc)for(let i=0;i<81;i++){if(valAt(i))continue;for(const s of cells[i].querySelectorAll('.cn span,.mn span')){const d=s.textContent;if(!d)continue;const r=s.getBoundingClientRect();if(!r.width)continue;
   const x=(r.left+r.width/2-wr.left)*sc,y=(r.top+r.height/2-wr.top)*sc,fs=parseFloat(getComputedStyle(s).fontSize)*sc;
   t+=`<text x="${x.toFixed(1)}" y="${y.toFixed(1)}" font-size="${fs.toFixed(1)}" stroke-width="${HALO_NOTE_W}">${d}</text>`}}
- return t?`<defs><mask id="vHalo" maskUnits="userSpaceOnUse" x="0" y="0" width="900" height="900"><rect width="900" height="900" fill="#fff"/><g fill="#000" stroke="#000" stroke-width="${HALO_W}" stroke-linejoin="round" text-anchor="middle" dominant-baseline="central" font-size="66" font-family="${haloFont}">${t}</g></mask></defs>`:''}
+ return t?`<defs><mask id="${id}" maskUnits="userSpaceOnUse" x="0" y="0" width="900" height="900"><rect width="900" height="900" fill="#fff"/><g fill="#000" stroke="#000" stroke-width="${HALO_W}" stroke-linejoin="round" text-anchor="middle" dominant-baseline="central" font-size="66" font-family="${haloFont}">${t}</g></mask></defs>`:''}
+function applyHalo(el,g,id){const m=g?digitMask(id):'';el.innerHTML=m?m+`<g mask="url(#${id})">${g}</g>`:g}
 function renderArrows(){const el=$('#arrows');if(!el)return;let g='';
  (P.arrows||[]).forEach((a,k)=>{const hot=editing&&etab==='arrow'&&k===editLine;g+=arrowSVG(a.cells,a.b,hot?'#3b82f6':arrowBad.has(k)?'#ef4444':'#9ca3af')});
  if(editing&&etab==='arrow'&&sel.size&&editLine<0)g+=arrowSVG([...sel],arrowB,'#3b82f6');
- const m=g?digitMask():'';el.innerHTML=m?m+`<g mask="url(#vHalo)">${g}</g>`:g}
+ applyHalo(el,g,'vHalo')}
 function renderThermos(){const el=$('#thermo');if(!el)return;let g='';
  (P.thermos||[]).forEach((t,k)=>{const hot=editing&&etab==='thermo'&&k===editLine;g+=thermoSVG(t.cells,hot?'#93c5fd':thermoBad.has(k)?'#fca5a5':'#c8ccd2',1)});
  if(editing&&etab==='thermo'&&sel.size&&editLine<0)g+=thermoSVG([...sel],'#93c5fd',1);
