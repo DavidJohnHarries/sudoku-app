@@ -45,15 +45,14 @@ header{display:flex;align-items:center;gap:6px;height:50px}
 .cn{position:absolute;inset:6% 9%;display:flex;flex-direction:column;justify-content:space-between;font-size:23cqh;line-height:1;color:color-mix(in srgb,#222 50%,#374151)}
 .cn.a>div:first-child{padding-left:30%}.cn>div{display:flex;justify-content:space-between}.cn>div:only-child{}
 .cn.top-only{justify-content:flex-start}
-/* v39: centre-mark colour ramps from the old #374151 (1 mark) to #222 (6+ marks), (n-1)/5 of the way.
-   Colour is on .mn / .cn so .nh / .nh2 on the spans keep their own colours. Weight stays 400. */
-.mn{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:26cqh;color:#374151;letter-spacing:-.02em;text-align:center;padding:0 4%;word-break:break-all;line-height:1}
-.mn.m2{color:color-mix(in srgb,#222 20%,#374151)}
-.mn.m3{color:color-mix(in srgb,#222 40%,#374151)}
-.mn.m4{color:color-mix(in srgb,#222 60%,#374151)}
-.mn.m5{font-size:22cqh;color:color-mix(in srgb,#222 80%,#374151)}
-.mn.m6{font-size:19cqh;color:#222}
-.mn.m7,.mn.m8,.mn.m9{font-size:16cqh;color:#222}
+/* v40: centre-mark colour follows font size, not count. --mn-size is the only per-class size,
+   used for both font-size and the mix so they cannot drift. 1–4 stay 26cqh / #374151.
+   t = clamp((--mn-max - --mn-size) / (--mn-max - --mn-s6), 0, 1); 100% #222 at the 6-digit
+   size (19cqh) and smaller (7–9 are 16cqh). Colour is on .mn / .cn so .nh / .nh2 keep theirs. */
+.mn{--mn-max:26;--mn-s6:19;--mn-size:26;position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:calc(var(--mn-size)*1cqh);color:color-mix(in srgb,#222 calc(100% * clamp(0,(var(--mn-max) - var(--mn-size))/(var(--mn-max) - var(--mn-s6)),1)),#374151);letter-spacing:-.02em;text-align:center;padding:0 4%;word-break:break-all;line-height:1}
+.mn.m5{--mn-size:22}
+.mn.m6{--mn-size:19}
+.mn.m7,.mn.m8,.mn.m9{--mn-size:16}
 /* Mode bar (v15): a compact segmented control + a Multi toggle, deliberately unlike the big white
    number keys — grey track, short, small icon beside a text label, active segment raised in white. */
 .modebar{display:flex;gap:8px;align-items:stretch;margin:10px 0 8px}
@@ -246,7 +245,8 @@ header{display:flex;align-items:center;gap:6px;height:50px}
 /* v26 Renban: thick translucent pink-violet line, multiplied under digits like whispers. 7 editor tabs → 4 + 3. */
 /* v38: pencil marks went to #222 (were #374151); weight stays 400. Renban stroke is #dd9ff3 (was #d68af0), opacity still 0.8.
    Halos, .nh chips and .nh2 (CR1 grey-bold corner twin) are unchanged.
-   v39: centre marks ramp #374151 → #222 by count (max at 6+); corner marks stay a 50% mix. Weight/halos/.nh/.nh2/renban unchanged. */
+   v39: centre marks ramped #374151 → #222 by count (superseded by v40).
+   v40: centre-mark colour follows font size (1–4 stay #374151; 100% #222 at the 6-digit 19cqh size and smaller). Corner marks stay a 50% mix (fixed 23cqh). Weight/halos/.nh/.nh2/renban unchanged. */
 #renbans{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;mix-blend-mode:multiply}
 .tabs{grid-template-columns:repeat(4,1fr)}
 
