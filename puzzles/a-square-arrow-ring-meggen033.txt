@@ -1,0 +1,31 @@
+SUDOKU v1
+name A Square Arrow Ring
+# Author: meggen033
+# Source: https://logic-masters.de/Raetselportal/Raetsel/zeigen.php?id=000MHI
+# Source: https://sudokupad.app/an94nqii9y
+# Rules: normal sudoku; digits on a purple renban line are a set of consecutive, non-repeating digits in any order; adjacent digits on a green German whisper line differ by at least 5; digits along an arrow sum to the digit in the circled cell; digits separated by a white dot are consecutive; not all dots are given.
+givens ......................................................................5..........
+solution 942357618 156498732 378126945 693275184 584631279 721984563 469513827 217849356 835762491
+renban r1c8 r2c8 r2c9
+renban r9c2 r8c2 r8c1
+renban r4c1 r5c1 r6c1
+whisper r8c1 r9c1 r9c2
+whisper r9c8 r9c9 r8c9
+whisper r1c8 r1c9 r2c9
+whisper r1c2 r1c1 r2c1
+whisper r4c9 r5c9 r6c9
+kropki w r8c9 r8c8
+kropki w r3c9 r4c9
+kropki w r4c4 r4c3
+kropki w r3c6 r4c6
+kropki w r7c6 r6c6
+arrow r7c3 r7c4 r7c5 r7c6
+arrow r7c7 r6c7 r5c7 r4c7
+arrow r3c7 r3c6 r3c5 r3c4
+arrow r3c3 r4c3 r5c3 r6c3
+arrow r2c6 r1c5 r1c4
+arrow r8c4 r9c5 r9c6
+arrow r6c5 r5c6 r4c5
+tip Column 9 is almost all green whispers — the top-right corner, the 3-cell line on the right edge, and the bottom-right corner. That leaves only r3c9 and r7c9 as places for a 5. Box 9 already has the given 5 at r8c8, so r3c9 is 5. The white dot then makes r4c9 a 4 or a 6, and the green line below it has r5c9 as 9 or 1.
+tip The given 5 also has a white dot to r8c9, so r8c9 is 4 or 6, and the corner whisper forces r9c9 to be 9 or 1. In the two 2×2 corners that have both a pink L and a green L (top-right and bottom-left), the two cells that sit on both lines are the ends of the whisper, so they have the same polarity (both 1–4 or both 6–9) and cannot be 5. The 3-cell renban is then 123, 234 or 345 (both low) or 567, 678 or 789 (both high), and a 5 on that renban can only go in the cell that is not on the whisper.
+tip Next look at the downward arrow in column 7 (circle in r7c7, shaft up through r6c7–r4c7). The three shaft digits are distinct and sit in the same column as the circle, so the circle is 6–9. That arrow rules out r8c9 = 4 (which would force r9c9 = 9, r4c9 = 6 and r5c9 = 1), so r8c9 is 6 and r9c9 is 1. The same arrow also forces the shared cells of those pink/green corners to be low (1–4).

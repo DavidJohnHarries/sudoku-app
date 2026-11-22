@@ -182,3 +182,6 @@ A published hard killer is in `puzzles/escape-room-sujoyku.txt` — *Escape Room
 - Repeated taps: cage → thermo → arrow → whisper → renban → uncaged group → box. Σ on a renban opens the RENBAN sheet: every run of n consecutive digits; grey = can't fit the placed digits / cell candidates (bipartite match); tap to cross out (undoable, saved, exported); "Always on the line" shows digits common to all live runs.
 - Editor: new Renban tab (tabs now 4 + 3). Help: new "Renban lines" section.
 - Puzzle: `puzzles/tumble-dumediat.txt` — Tumble by dumediat (LMD 000G13, 2★, renban + kropki), unique, matches the setter's solution.
+
+## v45: A Square Arrow Ring
+- New puzzle: `puzzles/a-square-arrow-ring-meggen033.txt` — *A Square Arrow Ring* by meggen033 (LMD 000MHI, 2★, arrows + renban + German whispers + white kropki), unique per `solve_cp`, matches the setter's solution. Visuals are unchanged from v44 (white digit outlines, shared Outline opacity).
