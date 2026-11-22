@@ -26,9 +26,11 @@ header{display:flex;align-items:center;gap:6px;height:50px}
 #grid,#renbans,#arrows,#ink,#thermo,#whispers,#lines,#selsvg,#dots,#sums{position:absolute;inset:0}
 #renbans,#arrows{z-index:1}
 #ink{z-index:2;display:grid;grid-template-columns:repeat(9,1fr);grid-template-rows:repeat(9,1fr);pointer-events:none}
-/* v41: outline sliders scale halo width (1 = v40, 0 = none, 2 = twice). Alpha stays 60%. */
-#ink .mn span{paint-order:stroke fill;-webkit-text-stroke-width:calc(1.7em / 26 * var(--mn-outline,1));-webkit-text-stroke-color:color-mix(in srgb,var(--halo,#fff) 60%,transparent)}
-#ink .cn span{paint-order:stroke fill;-webkit-text-stroke-width:calc(1.7em / 26 * var(--cn-outline,1));-webkit-text-stroke-color:color-mix(in srgb,var(--halo,#fff) 60%,transparent)}
+/* v42: mark/placed outline sliders scale halo width (1 = v40 default). At 200, marks are 5× and
+   placed digits 4× the v40 width. Pencil-mark halos are always white; opacity is --mark-halo-a
+   (default 60%). Placed digits still use --halo (cell colour, transparent on a split pie). */
+#ink .mn span{paint-order:stroke fill;-webkit-text-stroke-width:calc(1.7em / 26 * var(--mn-outline,1));-webkit-text-stroke-color:color-mix(in srgb,#fff var(--mark-halo-a,60%),transparent)}
+#ink .cn span{paint-order:stroke fill;-webkit-text-stroke-width:calc(1.7em / 26 * var(--cn-outline,1));-webkit-text-stroke-color:color-mix(in srgb,#fff var(--mark-halo-a,60%),transparent)}
 #ink .val{paint-order:stroke fill;-webkit-text-stroke-width:calc(1.5em / 66 * var(--val-outline,1));-webkit-text-stroke-color:color-mix(in srgb,var(--halo,#fff) 60%,transparent)}
 #thermo,#whispers{z-index:3}
 #lines,#selsvg,#dots{z-index:4;width:100%;height:100%;pointer-events:none}
@@ -219,7 +221,6 @@ header{display:flex;align-items:center;gap:6px;height:50px}
 .mlab{display:flex;justify-content:space-between;font-weight:600;font-size:16px}.mlab span:last-child{color:#6b7280;font-variant-numeric:tabular-nums;font-weight:500}
 #kSlider,#visuals input[type=range]{width:100%;margin:6px 0 6px;accent-color:#1e3a8a;height:28px}
 .kprev{display:flex;gap:6px;justify-content:space-between}.kprev>div{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px}.kprev small{font-size:11px;color:#6b7280}
-#mVisuals{text-align:center;background:#1e3a8a;color:#fff;font-weight:600;margin:4px 4px 8px;border-radius:12px;height:44px}
 /* v41 Visuals pane: bottom sheet, max-height set in JS from the grid's bottom edge so the whole grid stays visible. */
 #visuals{position:fixed;inset:0;z-index:26}
 .vpop{position:absolute;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 8px);width:min(504px,calc(100vw - 16px));max-height:calc(100% - var(--vis-top,60vh) - env(safe-area-inset-bottom,0px) - 8px);background:#fff;border-radius:16px;box-shadow:0 10px 34px rgba(0,0,0,.25),0 0 0 1px rgba(0,0,0,.05);padding:8px 12px 10px;display:flex;flex-direction:column;min-height:0}
@@ -259,18 +260,19 @@ header{display:flex;align-items:center;gap:6px;height:50px}
 .chip{font-size:12px;font-weight:700;padding:2px 8px;border-radius:10px;background:#e5e7eb;color:#374151}.chip.solved{background:#dcfce7;color:#166534}.chip.prog{background:#fef3c7;color:#92400e}
 .imore{flex:none;width:52px;font-size:24px;font-weight:700;color:#4b5563;background:transparent;border-radius:0;border-left:1px solid #f3f4f6}
 .sheet{display:flex;flex-direction:column;gap:6px}.sheet button{height:46px;text-align:left;padding:0 14px;background:#f3f4f6;font-size:16px}.sheet button.btn{background:#1e3a8a;color:#fff}.sheet .del{color:#b91c1c}.sheet .cx{text-align:center;background:#fff;box-shadow:inset 0 0 0 1px #d1d5db;margin-top:4px}
-.mitems{display:flex;gap:6px}.mitems .mitem{flex:1;text-align:center;background:#f3f4f6}
+.mitems{display:flex;flex-direction:column;gap:4px}.mitems .mitem{width:100%;text-align:center;background:#f3f4f6;color:#111827;font-weight:600;font-size:17px;height:44px;padding:0 12px;border-radius:10px}
 .kc b{position:relative;z-index:1;font-weight:400}
 /* v26 Renban: thick translucent pink-violet line, multiplied under digits like whispers. 7 editor tabs → 4 + 3. */
 /* v38: pencil marks went to #222 (were #374151); weight stays 400. Renban stroke is #dd9ff3 (was #d68af0), opacity still 0.8.
    Halos, .nh chips and .nh2 (CR1 grey-bold corner twin) are unchanged.
    v39: centre marks ramped #374151 → #222 by count (superseded by v40).
    v40: centre-mark colour follows font size (1–4 stay #374151; 100% #222 at the 6-digit 19cqh size and smaller). Corner marks stay a 50% mix (fixed 23cqh). Weight/halos/.nh/.nh2/renban unchanged.
-   v41: ☰ → Visuals pane; CSS vars --mn-light/--mn-dark/--cn-color and --*-outline scale those colours and halo widths. Defaults (100) reproduce v40. */
+   v41: ☰ → Visuals pane; CSS vars --mn-light/--mn-dark/--cn-color and --*-outline scale those colours and halo widths. Defaults (100) reproduce v40.
+   v42: mark halo is always white (opacity --mark-halo-a, default 60%); 200 = 5× mark / 4× placed outline. */
 #renbans{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;mix-blend-mode:multiply}
 .tabs{grid-template-columns:repeat(4,1fr)}
 
 /* v28: CR1 corner twin of a highlighted centre mark; CR3 disabled Tips item */
 .nh2{font-weight:800;color:#111827}
 .mitem:disabled{opacity:.4;pointer-events:none}
-.mitems .mitem{white-space:nowrap;padding:0 6px;font-size:16px}
+.mitems .mitem{white-space:nowrap}

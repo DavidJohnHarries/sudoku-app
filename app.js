@@ -291,26 +291,50 @@ function applyContrast(){const k=uiK*K_SCALE,st=document.documentElement.style,a
  st.setProperty('--selsw',(4.5+2.5*k).toFixed(2));              // selected: outline on the grid lines, in grid units (box lines are 5, cell lines 1.5)
  st.setProperty('--sdim',`rgba(17,24,39,${a(.17*k,.5)})`)}     // a selection darkens every unselected cell
 
-// v41 Visuals pane: sliders 0–200 (100 = v40 default). Darkness scales both ends of a colour
+// v42 Visuals pane: sliders 0–200 (100 = v40 default); mark outline opacity 0–100 (60 = v40). Darkness scales both ends of a colour
 // toward #d1d5db (0) or black (200). Centre-mark --mn-light/#374151 and --mn-dark/#222 keep
 // the size-based ramp; only the endpoints move. Outline vars multiply halo width (alpha stays 60%).
 const VIS_KEYS=['cnDark','cnOut','mnDark','mnOut','cageDark','line','valOut'];
 const VIS_DEF=Object.fromEntries(VIS_KEYS.map(k=>[k,100]));
-function loadVis(){const o=LS('sdk_visuals')||{},out={};for(const k of VIS_KEYS){const v=+o[k];out[k]=(v>=0&&v<=200)?v:100}return out}
+VIS_DEF.markOutA=60;
+function loadVis(){
+ const o=LS('sdk_visuals')||{},out={};
+ for(const k of VIS_KEYS){const v=+o[k];out[k]=(v>=0&&v<=200)?v:100}
+ const a=+o.markOutA;out.markOutA=(a>=0&&a<=100)?a:60;
+ return out}
 let vis=loadVis();
 function hexRgb(h){h=String(h).replace('#','');if(h.length===3)h=[...h].map(c=>c+c).join('');const n=parseInt(h,16);return [n>>16&255,n>>8&255,n&255]}
 function rgbCss(r,g,b){return `rgb(${Math.round(r)}, ${Math.round(g)}, ${Math.round(b)})`}
 function shadeRgb(rgb,pct){const t=pct/100;if(Math.abs(t-1)<1e-9)return rgb;if(t<=1){const f=[209,213,219];return rgb.map((x,i)=>x*t+f[i]*(1-t))}const u=t-1;return rgb.map(x=>x*(1-u))}
 function shadeHex(hex,pct){return rgbCss(...shadeRgb(hexRgb(hex),pct))}
+function hexToHsl(hex){
+ const [r,g,b]=hexRgb(hex).map(x=>x/255);
+ const max=Math.max(r,g,b),min=Math.min(r,g,b),l=(max+min)/2;
+ let h=0,s=0;
+ if(max!==min){const d=max-min;s=l>0.5?d/(2-max-min):d/(max+min);
+  h=(max===r?((g-b)/d+(g<b?6:0)):max===g?((b-r)/d+2):((r-g)/d+4))/6}
+ return [h*360,s*100,l*100]}
+function hslToRgb(h,s,l){
+ h/=360;s/=100;l/=100;
+ if(s<1e-9){const v=l*255;return [v,v,v]}
+ const hue2rgb=(p,q,t)=>{if(t<0)t+=1;if(t>1)t-=1;if(t<1/6)return p+(q-p)*6*t;if(t<1/2)return q;if(t<2/3)return p+(q-p)*(2/3-t)*6;return p};
+ const q=l<0.5?l*(1+s):l+s-l*s,p=2*l-q;
+ return [hue2rgb(p,q,h+1/3)*255,hue2rgb(p,q,h)*255,hue2rgb(p,q,h-1/3)*255]}
+// t=0 keeps the colour; t=1 pushes HSL saturation to 100% at the same lightness (no shift toward black).
+function saturateHex(hex,t){const [h,s,l]=hexToHsl(hex);return rgbCss(...hslToRgb(h,s+(100-s)*t,l))}
+// Outline sliders: 0 = none, 100 = v40 width (var unset), 200 = maxAt200 × the v40 width.
+function outlineMult(pct,maxAt200){if(pct===100)return null;if(pct<=100)return pct/100;return 1+(pct-100)/100*(maxAt200-1)}
+function setOutlineVar(st,name,pct,maxAt200){const m=outlineMult(pct,maxAt200);if(m===null)st.removeProperty(name);else st.setProperty(name,String(m))}
 // Idle constraint-line colour/opacity. At 100, returns the v40 values unchanged (pixel-identical).
-// Below 100, fade opacity. Above 100, opacity rises toward 1 and the colour darkens toward black.
-function lineStyle(col,op){if(vis.line===100)return {col,op};const s=vis.line/100;if(s<=1)return {col,op:op*s};return {col:shadeHex(col,100+(s-1)*100),op:op+(1-op)*(s-1)}}
+// Below 100, fade opacity. Above 100, opacity rises toward 1 and the colour saturates toward its own hue (not black).
+function lineStyle(col,op){if(vis.line===100)return {col,op};const s=vis.line/100;if(s<=1)return {col,op:op*s};const t=s-1;return {col:saturateHex(col,t),op:op+(1-op)*t}}
 function applyVisuals(paint){
  const st=document.documentElement.style;
- // At 100, leave the vars unset so the stylesheet is the v40 default (pixel-identical).
- if(vis.mnOut===100)st.removeProperty('--mn-outline');else st.setProperty('--mn-outline',String(vis.mnOut/100));
- if(vis.cnOut===100)st.removeProperty('--cn-outline');else st.setProperty('--cn-outline',String(vis.cnOut/100));
- if(vis.valOut===100)st.removeProperty('--val-outline');else st.setProperty('--val-outline',String(vis.valOut/100));
+ // At default, leave the vars unset so the stylesheet is the v40 path (pixel-identical on uncoloured cells).
+ setOutlineVar(st,'--mn-outline',vis.mnOut,5);
+ setOutlineVar(st,'--cn-outline',vis.cnOut,5);
+ setOutlineVar(st,'--val-outline',vis.valOut,4);
+ if(vis.markOutA===60)st.removeProperty('--mark-halo-a');else st.setProperty('--mark-halo-a',vis.markOutA+'%');
  if(vis.mnDark===100){st.removeProperty('--mn-light');st.removeProperty('--mn-dark')}
  else{st.setProperty('--mn-light',shadeHex('#374151',vis.mnDark));st.setProperty('--mn-dark',shadeHex('#222222',vis.mnDark))}
  if(vis.cnDark===100)st.removeProperty('--cn-color');
@@ -1099,7 +1123,7 @@ function puzzleSheet(id){const p=DB[id];if(!p)return;const st=statusOf(p);
   if(a==='del'){if(confirm(`Delete "${p.name}"? This can't be undone.`)){delete DB[id];if(!Object.keys(DB).length){const n=blankPuzzle('Untitled');DB[n.id]=n}if(id===curId){curId=Object.values(DB).sort((a,b)=>b.updated-a.updated)[0].id;P=DB[curId];undoS=[];redoS=[];cellCache=Array(81).fill(null)}saveNow();closeModal();renderList()}return}}}
 $('#hCont').onclick=()=>go('game');$('#hSel').onclick=()=>go('list');$('#hAdd').onclick=()=>go('add');$('#hHelp').onclick=showHelp;
 $('#lBack').onclick=back;$('#aBack').onclick=back;
-// ---------- ☰ menu (v23/v41): Visuals pane, Tips, Help, Main menu ----------
+// ---------- ☰ menu (v42): Tips, Help, Main menu, Visuals (same button style) ----------
 function openMenu(){$('#mTips').disabled=!(P.tips&&P.tips.length);$('#menu').classList.remove('hidden');$('#bMenu').setAttribute('aria-expanded','true')}
 // v28 CR3: tips from the puzzle text ("tip <text>" lines), one at a time; Prev/Next only when there is one.
 function openTips(n){const T=P.tips||[];if(!T.length)return;n=Math.max(0,Math.min(n,T.length-1));
@@ -1113,6 +1137,7 @@ function syncVisSliders(){
  $('#vCnOut').value=vis.cnOut;$('#vCnOutVal').textContent=vis.cnOut;
  $('#vMnDark').value=vis.mnDark;$('#vMnDarkVal').textContent=vis.mnDark;
  $('#vMnOut').value=vis.mnOut;$('#vMnOutVal').textContent=vis.mnOut;
+ $('#vMarkOutA').value=vis.markOutA;$('#vMarkOutAVal').textContent=vis.markOutA+'%';
  $('#vCageDark').value=vis.cageDark;$('#vCageDarkVal').textContent=vis.cageDark;
  $('#vLine').value=vis.line;$('#vLineVal').textContent=vis.line;
  $('#vValOut').value=vis.valOut;$('#vValOutVal').textContent=vis.valOut;
@@ -1132,6 +1157,7 @@ $('#vReset').onclick=()=>{vis={...VIS_DEF};uiK=1;syncVisSliders();applyVisuals(t
 function bindVis(id,key){$('#'+id).addEventListener('input',e=>{vis[key]=+e.target.value;$('#'+id+'Val').textContent=e.target.value;applyVisuals(true);saveVis()})}
 bindVis('vCnDark','cnDark');bindVis('vCnOut','cnOut');bindVis('vMnDark','mnDark');bindVis('vMnOut','mnOut');
 bindVis('vCageDark','cageDark');bindVis('vLine','line');bindVis('vValOut','valOut');
+$('#vMarkOutA').addEventListener('input',e=>{vis.markOutA=+e.target.value;$('#vMarkOutAVal').textContent=e.target.value+'%';applyVisuals(true);saveVis()});
 $('#kSlider').addEventListener('input',e=>{uiK=+e.target.value/100;$('#kVal').textContent=e.target.value;applyContrast();saveVis()});
 $('#mHelp').onclick=()=>{closeMenu();showHelp()};$('#mTips').onclick=()=>{closeMenu();openTips(0)};$('#mHome').onclick=()=>go('home');
 $('#bNew').onclick=()=>{const n=prompt('Name for the new puzzle','Puzzle '+(Object.keys(DB).length+1));if(n===null)return;const p=blankPuzzle(n.trim()||'Untitled');DB[p.id]=p;openPuzzle(p.id);setEditing(true)};
