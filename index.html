@@ -3,7 +3,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#f3f4f6"><title>Sudoku</title>
 <link rel="manifest" href="manifest.json"><link rel="apple-touch-icon" href="icon-180.png">
-<link rel="stylesheet" href="style.css?v=43">
+<link rel="stylesheet" href="style.css?v=44">
 </head><body>
 <div id="game">
  <header><button id="bMenu" class="hb" aria-label="Menu" aria-haspopup="true">☰</button><div id="pname"></div><button id="timer" class="hb tm">0:00</button><button id="bEdit" class="hb" aria-label="Edit puzzle">✎</button></header>
@@ -94,10 +94,10 @@
    <div class="vrow"><div class="vlab"><span>Outline</span><span id="vMnOutVal">100</span></div>
     <input type="range" id="vMnOut" min="0" max="200" step="5" value="100" aria-label="Centre marks outline"></div>
   </div>
-  <div class="vgrp"><div class="vgt">Marks outline</div>
+  <div class="vgrp"><div class="vgt">Outline opacity</div>
    <div class="vrow"><div class="vlab"><span>Opacity</span><span id="vMarkOutAVal">60%</span></div>
-    <input type="range" id="vMarkOutA" min="0" max="100" step="5" value="60" aria-label="Marks outline opacity">
-    <div class="mnote">Corner and centre marks share this (white halo).</div></div>
+    <input type="range" id="vMarkOutA" min="0" max="100" step="5" value="60" aria-label="Outline opacity">
+    <div class="mnote">Corner marks, centre marks, placed digits and givens share this (white halo).</div></div>
   </div>
   <div class="vgrp"><div class="vgt">Cages</div>
    <div class="vrow"><div class="vlab"><span>Darkness</span><span id="vCageDarkVal">100</span></div>
@@ -134,4 +134,4 @@
   </div>
  </div>
 </div>
-<script src="app.js?v=43"></script></body></html>
+<script src="app.js?v=44"></script></body></html>

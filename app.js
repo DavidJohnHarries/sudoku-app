@@ -338,7 +338,7 @@ function applyVisuals(paint){
  setOutlineVar(st,'--mn-outline',vis.mnOut,5);
  setOutlineVar(st,'--cn-outline',vis.cnOut,5);
  setOutlineVar(st,'--val-outline',vis.valOut,4);
- if(vis.markOutA===60)st.removeProperty('--mark-halo-a');else st.setProperty('--mark-halo-a',vis.markOutA+'%');
+ if(vis.markOutA===60)st.removeProperty('--outline-a');else st.setProperty('--outline-a',vis.markOutA+'%');
  if(vis.mnDark===100){st.removeProperty('--mn-light');st.removeProperty('--mn-dark')}
  else{st.setProperty('--mn-light',shadeHex('#374151',vis.mnDark));st.setProperty('--mn-dark',shadeHex('#222222',vis.mnDark))}
  if(vis.cnDark===100)st.removeProperty('--cn-color');
