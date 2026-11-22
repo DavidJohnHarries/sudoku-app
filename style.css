@@ -26,8 +26,10 @@ header{display:flex;align-items:center;gap:6px;height:50px}
 #grid,#renbans,#arrows,#ink,#thermo,#whispers,#lines,#selsvg,#dots,#sums{position:absolute;inset:0}
 #renbans,#arrows{z-index:1}
 #ink{z-index:2;display:grid;grid-template-columns:repeat(9,1fr);grid-template-rows:repeat(9,1fr);pointer-events:none}
-#ink .mn span,#ink .cn span{paint-order:stroke fill;-webkit-text-stroke-width:calc(1.7em / 26);-webkit-text-stroke-color:color-mix(in srgb,var(--halo,#fff) 60%,transparent)}
-#ink .val{paint-order:stroke fill;-webkit-text-stroke-width:calc(1.5em / 66);-webkit-text-stroke-color:color-mix(in srgb,var(--halo,#fff) 60%,transparent)}
+/* v41: outline sliders scale halo width (1 = v40, 0 = none, 2 = twice). Alpha stays 60%. */
+#ink .mn span{paint-order:stroke fill;-webkit-text-stroke-width:calc(1.7em / 26 * var(--mn-outline,1));-webkit-text-stroke-color:color-mix(in srgb,var(--halo,#fff) 60%,transparent)}
+#ink .cn span{paint-order:stroke fill;-webkit-text-stroke-width:calc(1.7em / 26 * var(--cn-outline,1));-webkit-text-stroke-color:color-mix(in srgb,var(--halo,#fff) 60%,transparent)}
+#ink .val{paint-order:stroke fill;-webkit-text-stroke-width:calc(1.5em / 66 * var(--val-outline,1));-webkit-text-stroke-color:color-mix(in srgb,var(--halo,#fff) 60%,transparent)}
 #thermo,#whispers{z-index:3}
 #lines,#selsvg,#dots{z-index:4;width:100%;height:100%;pointer-events:none}
 /* v37: cage sums sit in #sums above the cage/grid lines, as they did in v28 (a white rounded
@@ -42,14 +44,14 @@ header{display:flex;align-items:center;gap:6px;height:50px}
 .cell.bad .val{color:#dc2626}
 .sum{position:absolute;left:3%;top:1%;font-size:21cqh;line-height:1;background:#fff;padding:0 2px;border-radius:2px;color:#111827;font-weight:600}
 .sum.bad{color:#fff;background:#dc2626}
-.cn{position:absolute;inset:6% 9%;display:flex;flex-direction:column;justify-content:space-between;font-size:23cqh;line-height:1;color:color-mix(in srgb,#222 50%,#374151)}
+.cn{position:absolute;inset:6% 9%;display:flex;flex-direction:column;justify-content:space-between;font-size:23cqh;line-height:1;color:var(--cn-color,color-mix(in srgb,#222 50%,#374151))}
 .cn.a>div:first-child{padding-left:30%}.cn>div{display:flex;justify-content:space-between}.cn>div:only-child{}
 .cn.top-only{justify-content:flex-start}
 /* v40: centre-mark colour follows font size, not count. --mn-size is the only per-class size,
    used for both font-size and the mix so they cannot drift. 1–4 stay 26cqh / #374151.
    t = clamp((--mn-max - --mn-size) / (--mn-max - --mn-s6), 0, 1); 100% #222 at the 6-digit
    size (19cqh) and smaller (7–9 are 16cqh). Colour is on .mn / .cn so .nh / .nh2 keep theirs. */
-.mn{--mn-max:26;--mn-s6:19;--mn-size:26;position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:calc(var(--mn-size)*1cqh);color:color-mix(in srgb,#222 calc(100% * clamp(0,(var(--mn-max) - var(--mn-size))/(var(--mn-max) - var(--mn-s6)),1)),#374151);letter-spacing:-.02em;text-align:center;padding:0 4%;word-break:break-all;line-height:1}
+.mn{--mn-max:26;--mn-s6:19;--mn-size:26;position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:calc(var(--mn-size)*1cqh);color:color-mix(in srgb,var(--mn-dark,#222) calc(100% * clamp(0,(var(--mn-max) - var(--mn-size))/(var(--mn-max) - var(--mn-s6)),1)),var(--mn-light,#374151));letter-spacing:-.02em;text-align:center;padding:0 4%;word-break:break-all;line-height:1}
 .mn.m5{--mn-size:22}
 .mn.m6{--mn-size:19}
 .mn.m7,.mn.m8,.mn.m9{--mn-size:16}
@@ -210,13 +212,30 @@ header{display:flex;align-items:center;gap:6px;height:50px}
 #grid.hlon .cell.blocked:not(.sel)::before{content:'';position:absolute;inset:0;box-shadow:inset 0 0 0 200px var(--blk);z-index:1;pointer-events:none}
 #grid.hlon .cell.same .val,#ink .cell.same .val{text-shadow:0 0 3px #fff,0 0 6px #fff}
 .nh{background:#b45309;color:#fff;border-radius:3px;padding:0 2px;font-weight:800;box-shadow:0 0 0 1px #fff;line-height:1}
-/* ☰ menu: a sheet over the keypad, no backdrop dimming, so the whole board stays visible as a live contrast preview. */
+/* ☰ menu: a short sheet over the keypad. Visuals is a taller, internally-scrollable sheet capped so the grid stays visible. */
 #menu{position:fixed;inset:0;z-index:25}
 .mpop{position:absolute;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom) + 10px);width:min(504px,calc(100vw - 16px));background:#fff;border-radius:16px;box-shadow:0 10px 34px rgba(0,0,0,.25),0 0 0 1px rgba(0,0,0,.05);padding:8px}
 .mrow{padding:6px 8px 8px;border-bottom:1px solid #e5e7eb;margin-bottom:4px}
 .mlab{display:flex;justify-content:space-between;font-weight:600;font-size:16px}.mlab span:last-child{color:#6b7280;font-variant-numeric:tabular-nums;font-weight:500}
-#kSlider{width:100%;margin:6px 0 6px;accent-color:#1e3a8a;height:28px}
+#kSlider,#visuals input[type=range]{width:100%;margin:6px 0 6px;accent-color:#1e3a8a;height:28px}
 .kprev{display:flex;gap:6px;justify-content:space-between}.kprev>div{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px}.kprev small{font-size:11px;color:#6b7280}
+#mVisuals{text-align:center;background:#1e3a8a;color:#fff;font-weight:600;margin:4px 4px 8px;border-radius:12px;height:44px}
+/* v41 Visuals pane: bottom sheet, max-height set in JS from the grid's bottom edge so the whole grid stays visible. */
+#visuals{position:fixed;inset:0;z-index:26}
+.vpop{position:absolute;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 8px);width:min(504px,calc(100vw - 16px));max-height:calc(100% - var(--vis-top,60vh) - env(safe-area-inset-bottom,0px) - 8px);background:#fff;border-radius:16px;box-shadow:0 10px 34px rgba(0,0,0,.25),0 0 0 1px rgba(0,0,0,.05);padding:8px 12px 10px;display:flex;flex-direction:column;min-height:0}
+.vhead{display:flex;align-items:center;justify-content:space-between;gap:8px;flex:none;margin:0 0 2px}
+.vhead h2{margin:0;font-size:18px;font-weight:700;color:#111827}
+.vhead-actions{display:flex;align-items:center;gap:8px;flex:none}
+.vdone{background:#1e3a8a;color:#fff;font-weight:600;height:36px;padding:0 14px;border-radius:10px;min-height:auto}
+.vscroll{overflow:auto;-webkit-overflow-scrolling:touch;flex:1;min-height:0;padding:0 2px 4px;overscroll-behavior:contain}
+.vgrp{padding:6px 0 2px;border-bottom:1px solid #e5e7eb}
+.vgrp:last-child{border-bottom:0}
+.vgt{font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#6b7280;margin-bottom:2px}
+.vrow{margin:0 0 2px}
+.vlab{display:flex;justify-content:space-between;align-items:baseline;font-weight:600;font-size:15px}
+.vlab span:last-child{color:#6b7280;font-variant-numeric:tabular-nums;font-weight:500}
+#visuals input[type=range]{margin:0 0 4px}
+.vreset{flex:none;margin:0;width:auto;height:36px;padding:0 10px;background:transparent;font-weight:600;color:#1e3a8a;min-height:auto}
 .kc{position:relative;width:34px;height:34px;display:flex;align-items:center;justify-content:center;font-size:24px;color:#2563eb;background:#93c5fd;border-radius:3px;overflow:hidden}
 .kc::after{content:'';position:absolute;inset:0;border-radius:3px}
 .kc.ksel::after{background:var(--selw);box-shadow:inset 0 0 0 var(--selbw) #1e3a8a}.kc.kdim::after{background:var(--dim)}
@@ -246,7 +265,8 @@ header{display:flex;align-items:center;gap:6px;height:50px}
 /* v38: pencil marks went to #222 (were #374151); weight stays 400. Renban stroke is #dd9ff3 (was #d68af0), opacity still 0.8.
    Halos, .nh chips and .nh2 (CR1 grey-bold corner twin) are unchanged.
    v39: centre marks ramped #374151 → #222 by count (superseded by v40).
-   v40: centre-mark colour follows font size (1–4 stay #374151; 100% #222 at the 6-digit 19cqh size and smaller). Corner marks stay a 50% mix (fixed 23cqh). Weight/halos/.nh/.nh2/renban unchanged. */
+   v40: centre-mark colour follows font size (1–4 stay #374151; 100% #222 at the 6-digit 19cqh size and smaller). Corner marks stay a 50% mix (fixed 23cqh). Weight/halos/.nh/.nh2/renban unchanged.
+   v41: ☰ → Visuals pane; CSS vars --mn-light/--mn-dark/--cn-color and --*-outline scale those colours and halo widths. Defaults (100) reproduce v40. */
 #renbans{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;mix-blend-mode:multiply}
 .tabs{grid-template-columns:repeat(4,1fr)}
 

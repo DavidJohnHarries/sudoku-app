@@ -3,7 +3,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#f3f4f6"><title>Sudoku</title>
 <link rel="manifest" href="manifest.json"><link rel="apple-touch-icon" href="icon-180.png">
-<link rel="stylesheet" href="style.css?v=40">
+<link rel="stylesheet" href="style.css?v=41">
 </head><body>
 <div id="game">
  <header><button id="bMenu" class="hb" aria-label="Menu" aria-haspopup="true">☰</button><div id="pname"></div><button id="timer" class="hb tm">0:00</button><button id="bEdit" class="hb" aria-label="Edit puzzle">✎</button></header>
@@ -72,11 +72,43 @@
  <button id="bNew" class="hcard"><span class="hl1">New blank puzzle</span><span class="hl2">Opens the editor: cages, thermos, arrows, whispers, dots, givens</span></button>
 </div>
 <div id="menu" class="hidden"><div class="mpop" role="menu" aria-label="Menu">
- <div class="mrow"><div class="mlab"><span>UI contrast</span><span id="kVal">100%</span></div>
-  <input type="range" id="kSlider" min="30" max="200" step="5" value="100" aria-label="UI contrast">
-  <div class="kprev" aria-hidden="true"><div><span class="kc"><b>7</b></span><small>Normal</small></div><div><span class="kc ksel"><b>7</b></span><small>Selected</small></div><div><span class="kc khl"><b>4</b></span><small>Highlight</small></div><div><span class="kc kdim"><b>7</b></span><small>Dimmed</small></div></div>
-  <div class="mnote">Changes how selected and highlighted cells look.</div></div>
+ <button class="mitem vis" id="mVisuals">Visuals</button>
  <div class="mitems"><button class="mitem" id="mTips">Tips</button><button class="mitem" id="mHelp">Help</button><button class="mitem" id="mHome">Main menu</button></div>
+</div></div>
+<div id="visuals" class="hidden"><div class="vpop" role="dialog" aria-label="Visuals" aria-modal="true">
+ <div class="vhead"><h2>Visuals</h2><div class="vhead-actions"><button type="button" class="vreset" id="vReset">Reset</button><button type="button" class="vdone" id="vDone">Done</button></div></div>
+ <div class="vscroll">
+  <div class="vgrp"><div class="vgt">Corner marks</div>
+   <div class="vrow"><div class="vlab"><span>Darkness</span><span id="vCnDarkVal">100</span></div>
+    <input type="range" id="vCnDark" min="0" max="200" step="5" value="100" aria-label="Corner marks darkness"></div>
+   <div class="vrow"><div class="vlab"><span>Outline</span><span id="vCnOutVal">100</span></div>
+    <input type="range" id="vCnOut" min="0" max="200" step="5" value="100" aria-label="Corner marks outline"></div>
+  </div>
+  <div class="vgrp"><div class="vgt">Centre marks</div>
+   <div class="vrow"><div class="vlab"><span>Darkness</span><span id="vMnDarkVal">100</span></div>
+    <input type="range" id="vMnDark" min="0" max="200" step="5" value="100" aria-label="Centre marks darkness"></div>
+   <div class="vrow"><div class="vlab"><span>Outline</span><span id="vMnOutVal">100</span></div>
+    <input type="range" id="vMnOut" min="0" max="200" step="5" value="100" aria-label="Centre marks outline"></div>
+  </div>
+  <div class="vgrp"><div class="vgt">Cages</div>
+   <div class="vrow"><div class="vlab"><span>Darkness</span><span id="vCageDarkVal">100</span></div>
+    <input type="range" id="vCageDark" min="0" max="200" step="5" value="100" aria-label="Cages darkness"></div>
+  </div>
+  <div class="vgrp"><div class="vgt">Lines</div>
+   <div class="vrow"><div class="vlab"><span>Strength</span><span id="vLineVal">100</span></div>
+    <input type="range" id="vLine" min="0" max="200" step="5" value="100" aria-label="Lines strength">
+    <div class="mnote">Arrows, thermos, whispers, renbans and dots.</div></div>
+  </div>
+  <div class="vgrp"><div class="vgt">Placed digits</div>
+   <div class="vrow"><div class="vlab"><span>Outline</span><span id="vValOutVal">100</span></div>
+    <input type="range" id="vValOut" min="0" max="200" step="5" value="100" aria-label="Placed digits outline"></div>
+  </div>
+  <div class="vgrp"><div class="vgt">Selection</div>
+   <div class="vrow"><div class="vlab"><span>UI contrast</span><span id="kVal">100</span></div>
+    <input type="range" id="kSlider" min="30" max="200" step="5" value="100" aria-label="UI contrast">
+    <div class="mnote">How strongly selected and highlighted cells stand out.</div></div>
+  </div>
+ </div>
 </div></div>
 <div id="modal" class="hidden"><div class="box" id="mbox"></div></div>
 
@@ -93,4 +125,4 @@
   </div>
  </div>
 </div>
-<script src="app.js?v=40"></script></body></html>
+<script src="app.js?v=41"></script></body></html>

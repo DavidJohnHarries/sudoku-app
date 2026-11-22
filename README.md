@@ -14,7 +14,7 @@ Live: https://davidjohnharries.github.io/sudoku-app/
 - **Conflicts:** repeated digits in a row/column/box/cage turn red; a cage whose digits go over its sum, or that's full with the wrong sum, gets a red sum label. If the puzzle includes a `solution` line, a digit you placed that doesn't match it is also red. Givens are never flagged this way.
 - **Σ Combos:** enabled when exactly one selected cell is in a cage (opens the whole cage), or when two or more selected cells all sit in the same cage or all sit on the same row or column (opens just those cells; type a sum if it isn't already known). Selecting an exact uncaged box-group still opens that group. Lists every set of different digits that makes the sum. Tap a row to rule it out (saved with the puzzle). Rows that don't include the digits already placed, or that can't fit a parent cage, are greyed "not possible".
 - **✎ Edit puzzle:** Cages tab — drag cells, type the sum, Create cage; tap a cage to change its sum or Delete it. Givens tab — set the printed digits. Warnings: cells in two cages, cages not joined up, impossible sums for the cage size, totals ≠ 405 once every cell is caged.
-- **☰ menu:** UI contrast, Help, Main menu. **Main menu:** Continue (current unsolved puzzle), Select puzzle (tap to open; ⋯ = Open, Edit, Copy puzzle code, Rename, Restart, Delete), Add puzzle (Paste puzzle code, New blank). Launch opens the current puzzle if unsolved, else the main menu. Tap the timer to pause.
+- **☰ menu:** Visuals, Tips, Help, Main menu. **Main menu:** Continue (current unsolved puzzle), Select puzzle (tap to open; ⋯ = Open, Edit, Copy puzzle code, Rename, Restart, Delete), Add puzzle (Paste puzzle code, New blank). Launch opens the current puzzle if unsolved, else the main menu. Tap the timer to pause.
 
 ## Puzzle format (v1)
 Plain text, one item per line. Keyword first, then values. `#` starts a comment. Cells are `rRcC` (row, column 1–9).
@@ -164,7 +164,7 @@ A published hard killer is in `puzzles/escape-room-sujoyku.txt` — *Escape Room
 - The v22 Highlight style toggle is gone (`sdk_hlstyle` is removed on load). One system: **selected** = thin navy border + slightly brighter; **highlighted** (number highlight, or Colour-mode colour) = no border, every other cell darkens; "can't go here" cells darken a little more. Selected + highlighted = border, not darkened.
 - If **no** cell in the grid is coloured, selection is also tinted blue and highlighted cells amber (placed) / yellow (pencilled). If any cell is coloured, no tints anywhere. Matching pencil digits are white-on-amber chips.
 - Colour mode: ◎ Select colour / long-press / double-tap a solid cell selects cells **fully** that colour and highlights cells with **any part** of it.
-- ☰ → UI contrast slider (30–200%, localStorage `sdk_contrast`) scales darkening, brightening, border width and tints (CSS vars set by `applyContrast`). The menu is a sheet over the keypad so the board previews live.
+- ☰ → **Visuals** opens a scrollable bottom sheet (capped so the grid stays visible) of sliders for corner/centre mark darkness and outlines, cage darkness, constraint-line strength (arrows, thermos, whispers, renbans, dots), placed-digit outlines, and UI contrast. Defaults (100) match v40. Stored in localStorage `sdk_visuals` and `sdk_contrast`.
 - Screens: game, home, list, add, with history entries (browser/Android back works). Puzzle data format and `sdk_puzzles`/`sdk_cur` are unchanged.
 
 ## v24: selection outline on the grid lines; selection darkening on coloured grids

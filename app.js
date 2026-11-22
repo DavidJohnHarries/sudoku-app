@@ -291,7 +291,38 @@ function applyContrast(){const k=uiK*K_SCALE,st=document.documentElement.style,a
  st.setProperty('--selsw',(4.5+2.5*k).toFixed(2));              // selected: outline on the grid lines, in grid units (box lines are 5, cell lines 1.5)
  st.setProperty('--sdim',`rgba(17,24,39,${a(.17*k,.5)})`)}     // a selection darkens every unselected cell
 
+// v41 Visuals pane: sliders 0–200 (100 = v40 default). Darkness scales both ends of a colour
+// toward #d1d5db (0) or black (200). Centre-mark --mn-light/#374151 and --mn-dark/#222 keep
+// the size-based ramp; only the endpoints move. Outline vars multiply halo width (alpha stays 60%).
+const VIS_KEYS=['cnDark','cnOut','mnDark','mnOut','cageDark','line','valOut'];
+const VIS_DEF=Object.fromEntries(VIS_KEYS.map(k=>[k,100]));
+function loadVis(){const o=LS('sdk_visuals')||{},out={};for(const k of VIS_KEYS){const v=+o[k];out[k]=(v>=0&&v<=200)?v:100}return out}
+let vis=loadVis();
+function hexRgb(h){h=String(h).replace('#','');if(h.length===3)h=[...h].map(c=>c+c).join('');const n=parseInt(h,16);return [n>>16&255,n>>8&255,n&255]}
+function rgbCss(r,g,b){return `rgb(${Math.round(r)}, ${Math.round(g)}, ${Math.round(b)})`}
+function shadeRgb(rgb,pct){const t=pct/100;if(Math.abs(t-1)<1e-9)return rgb;if(t<=1){const f=[209,213,219];return rgb.map((x,i)=>x*t+f[i]*(1-t))}const u=t-1;return rgb.map(x=>x*(1-u))}
+function shadeHex(hex,pct){return rgbCss(...shadeRgb(hexRgb(hex),pct))}
+// Idle constraint-line colour/opacity. At 100, returns the v40 values unchanged (pixel-identical).
+// Below 100, fade opacity. Above 100, opacity rises toward 1 and the colour darkens toward black.
+function lineStyle(col,op){if(vis.line===100)return {col,op};const s=vis.line/100;if(s<=1)return {col,op:op*s};return {col:shadeHex(col,100+(s-1)*100),op:op+(1-op)*(s-1)}}
+function applyVisuals(paint){
+ const st=document.documentElement.style;
+ // At 100, leave the vars unset so the stylesheet is the v40 default (pixel-identical).
+ if(vis.mnOut===100)st.removeProperty('--mn-outline');else st.setProperty('--mn-outline',String(vis.mnOut/100));
+ if(vis.cnOut===100)st.removeProperty('--cn-outline');else st.setProperty('--cn-outline',String(vis.cnOut/100));
+ if(vis.valOut===100)st.removeProperty('--val-outline');else st.setProperty('--val-outline',String(vis.valOut/100));
+ if(vis.mnDark===100){st.removeProperty('--mn-light');st.removeProperty('--mn-dark')}
+ else{st.setProperty('--mn-light',shadeHex('#374151',vis.mnDark));st.setProperty('--mn-dark',shadeHex('#222222',vis.mnDark))}
+ if(vis.cnDark===100)st.removeProperty('--cn-color');
+ else st.setProperty('--cn-color',rgbCss(...shadeRgb([44.5,49.5,57.5],vis.cnDark)));
+ applyContrast();
+ if(paint&&typeof renderLines==='function'&&typeof P!=='undefined'&&P){
+  renderLines();renderThermos();renderWhispers();renderRenbans();renderArrows();renderDots()}
+}
+function saveVis(){SV('sdk_visuals',vis);SV('sdk_contrast',uiK)}
+
 applyContrast();
+applyVisuals(false);
 const snap=()=>JSON.stringify({rb:P.renbans,wh:P.whispers,ar:P.arrows,kd:P.kropki,kn:P.kropkiNeg,th:P.thermos,gr:P.groups,ls:P.lineSums,g:P.givens,c:P.cages,v:P.v,cn:P.cn,mn:P.mn,col:P.col,s:P.solved});
 function restore(s){const o=JSON.parse(s);Object.assign(P,{renbans:o.rb||[],whispers:o.wh||[],arrows:o.ar||[],kropki:o.kd||[],kropkiNeg:!!o.kn,thermos:o.th||[],groups:o.gr||{},lineSums:o.ls||{},givens:o.g,cages:o.c,v:o.v,cn:o.cn,mn:o.mn,col:o.col,solved:o.s})}
 function act(fn){const before=snap();fn();const after=snap();if(after!==before){undoS.push(before);if(undoS.length>500)undoS.shift();redoS=[];save()}render()}
@@ -381,7 +412,8 @@ function renderLines(){
    if(!IN(r,cc-1)){const ys=IN(r-1,cc)?(IN(r-1,cc-1)?y0-d:y0):y0+d,ye=IN(r+1,cc)?(IN(r+1,cc-1)?y0+S+d:y0+S):y0+S-d;p+=`M${x0+d} ${ys}V${ye}`}
    if(!IN(r,cc+1)){const ys=IN(r-1,cc)?(IN(r-1,cc+1)?y0-d:y0):y0+d,ye=IN(r+1,cc)?(IN(r+1,cc+1)?y0+S+d:y0+S):y0+S-d;p+=`M${x0+S-d} ${ys}V${ye}`}}
   const hot=editing&&k===editCage,badc=cageBad.has(k);
-  g+=`<path d="${p}" fill="none" stroke="${hot?'#2563eb':badc?'#dc2626':'#374151'}" stroke-width="${hot?5:2.6}" stroke-dasharray="${hot?'':'7 6'}"/>`});
+  const cageCol=vis.cageDark===100?'#374151':shadeHex('#374151',vis.cageDark);
+  g+=`<path d="${p}" fill="none" stroke="${hot?'#2563eb':badc?'#dc2626':cageCol}" stroke-width="${hot?5:2.6}" stroke-dasharray="${hot?'':'7 6'}"/>`});
  for(let k=1;k<9;k++){const w=k%3?1.5:5,c=k%3?'#9ca3af':'#111827';g+=`<path d="M${k*S} 0V900M0 ${k*S}H900" stroke="${c}" stroke-width="${w}"/>`}
  g+='<rect x="2.5" y="2.5" width="895" height="895" fill="none" stroke="#111827" stroke-width="5"/>';
  $('#lines').innerHTML=g}
@@ -389,10 +421,11 @@ function renderLines(){
 // r=10 of a 100-unit cell, so they stay clear of the central digit and most notes.
 function dotXY(d){return d.b-d.a===1?[COL(d.b)*100,ROW(d.a)*100+50]:[COL(d.a)*100+50,ROW(d.b)*100]}
 function renderDots(){const el=$('#dots');if(!el)return;let g='';
+ const L=lineStyle('#111827',1),sw=vis.line===100?2.6:2.6*Math.max(vis.line/100,0.15);
  (P.kropki||[]).forEach((d,k)=>{const [x,y]=dotXY(d),bd=dotBad.has(k),hot=editing&&etab==='kropki'&&lastDotEdge&&lastDotEdge[0]===d.a&&lastDotEdge[1]===d.b;
-  const fill=d.t==='b'?(bd?'#dc2626':'#111827'):'#fff',stroke=bd?'#dc2626':'#111827';
+  const fill=d.t==='b'?(bd?'#dc2626':L.col):'#fff',stroke=bd?'#dc2626':L.col,wd=bd?4:sw;
   if(hot)g+=`<circle cx="${x}" cy="${y}" r="17" fill="none" stroke="#2563eb" stroke-width="4"/>`;
-  g+=`<circle cx="${x}" cy="${y}" r="10" fill="${fill}" stroke="${stroke}" stroke-width="${bd?4:2.6}"/>`});
+  g+=`<circle cx="${x}" cy="${y}" r="10" fill="${fill}" stroke="${stroke}" stroke-width="${wd}"${bd||hot||vis.line===100?'':` opacity="${L.op}"`}/>`});
  for(const [a,b] of negBad){const [x,y]=dotXY({a,b});g+=`<circle cx="${x}" cy="${y}" r="9" fill="none" stroke="#dc2626" stroke-width="3" stroke-dasharray="4 3"/>`}
  if(editing&&etab==='kropki'&&lastDotEdge&&dotAt(P,lastDotEdge[0],lastDotEdge[1])<0){const [x,y]=dotXY({a:lastDotEdge[0],b:lastDotEdge[1]});g+=`<circle cx="${x}" cy="${y}" r="17" fill="none" stroke="#2563eb" stroke-width="4" stroke-dasharray="6 5"/>`}
  el.innerHTML=g}
@@ -404,7 +437,7 @@ function thermoSVG(cs,col,op){if(!cs.length)return '';const b=cs[0];
 // Arrows: SudokuPad-style grey ring (or pill) around the circle and a thin line with an open
 // arrowhead through the shaft cell centres, under the cage outlines, multiplied so digits show through.
 const AR_R=37;
-function arrowSVG(cs,b,col){if(!cs.length)return '';b=Math.min(b||1,cs.length);const X=i=>COL(i)*100+50,Y=i=>ROW(i)*100+50;
+function arrowSVG(cs,b,col,op){if(!cs.length)return '';const wrap=op!=null&&op<1?o=>`<g opacity="${op}">`+o+'</g>':o=>o;b=Math.min(b||1,cs.length);const X=i=>COL(i)*100+50,Y=i=>ROW(i)*100+50;
  const circ=cs.slice(0,b),sh=cs.slice(b);let g='';
  const xs=circ.map(X),ys=circ.map(Y),x0=Math.min(...xs)-AR_R,y0=Math.min(...ys)-AR_R,w=Math.max(...xs)-Math.min(...xs)+2*AR_R,h=Math.max(...ys)-Math.min(...ys)+2*AR_R;
  g+=`<rect x="${x0}" y="${y0}" width="${w}" height="${h}" rx="${AR_R}" ry="${AR_R}" fill="none" stroke="${col}" stroke-width="5"/>`;
@@ -415,29 +448,29 @@ function arrowSVG(cs,b,col){if(!cs.length)return '';b=Math.min(b||1,cs.length);c
   const [ex,ey]=pts[pts.length-1],[px,py]=pts[pts.length-2],ang=Math.atan2(ey-py,ex-px),hl=24,sp=0.62;
   const hp=s=>[ex-hl*Math.cos(ang+s*sp),ey-hl*Math.sin(ang+s*sp)];const [ax,ay]=hp(1),[bx,by]=hp(-1);
   g+=`<path d="M${ax.toFixed(1)} ${ay.toFixed(1)}L${ex} ${ey}L${bx.toFixed(1)} ${by.toFixed(1)}" fill="none" stroke="${col}" stroke-width="5" stroke-linejoin="round" stroke-linecap="round"/>`}
- return g}
+ return wrap(g)}
 // Whispers: SudokuPad-style thick translucent green line through cell centres.
 function whisperSVG(cs,col,op){if(cs.length<1)return '';if(cs.length===1)return `<circle cx="${COL(cs[0])*100+50}" cy="${ROW(cs[0])*100+50}" r="12" fill="${col}" opacity="${op}"/>`;
  return `<path d="${thermoPath(cs)}" fill="none" stroke="${col}" stroke-opacity="${op}" stroke-width="24" stroke-linecap="round" stroke-linejoin="round"/>`}
 function renderWhispers(){const el=$('#whispers');if(!el)return;let g='';
- (P.whispers||[]).forEach((w,k)=>{const hot=editing&&etab==='whisper'&&k===editLine;g+=whisperSVG(w.cells,hot?'#60a5fa':whisperBad.has(k)?'#f87171':'#5fd35f',hot?.9:.75)});
+ (P.whispers||[]).forEach((w,k)=>{const hot=editing&&etab==='whisper'&&k===editLine,L=lineStyle('#5fd35f',.75);g+=whisperSVG(w.cells,hot?'#60a5fa':whisperBad.has(k)?'#f87171':L.col,hot?.9:L.op)});
  if(editing&&etab==='whisper'&&sel.size&&editLine<0)g+=whisperSVG([...sel],'#60a5fa',.9);
  el.innerHTML=g}
 // Renban: SudokuPad-style thick translucent pink-violet line through cell centres (own layer, multiplied).
 // v38: stroke is #dd9ff3 (was #d68af0); opacity still 0.8. Editor/conflict colours unchanged.
 function renderRenbans(){const el=$('#renbans');if(!el)return;let g='';
- (P.renbans||[]).forEach((r,k)=>{const hot=editing&&etab==='renban'&&k===editLine;g+=whisperSVG(r.cells,hot?'#60a5fa':renbanBad.has(k)?'#f87171':'#dd9ff3',hot?.9:.8)});
+ (P.renbans||[]).forEach((r,k)=>{const hot=editing&&etab==='renban'&&k===editLine,L=lineStyle('#dd9ff3',.8);g+=whisperSVG(r.cells,hot?'#60a5fa':renbanBad.has(k)?'#f87171':L.col,hot?.9:L.op)});
  if(editing&&etab==='renban'&&sel.size&&editLine<0)g+=whisperSVG([...sel],'#60a5fa',.9);
  el.innerHTML=g}
 // v32/v33: no SVG text mask. Placed digits and pencil marks are painted in #ink as the real
 // HTML, with a background-coloured text-stroke so the gap cannot drift on iOS Safari the way
 // the old SVG <text> mask did. Ink is above arrows/renbans and below thermos/whispers.
 function renderArrows(){const el=$('#arrows');if(!el)return;let g='';
- (P.arrows||[]).forEach((a,k)=>{const hot=editing&&etab==='arrow'&&k===editLine;g+=arrowSVG(a.cells,a.b,hot?'#3b82f6':arrowBad.has(k)?'#ef4444':'#9ca3af')});
+ (P.arrows||[]).forEach((a,k)=>{const hot=editing&&etab==='arrow'&&k===editLine,L=lineStyle('#9ca3af',1);g+=arrowSVG(a.cells,a.b,hot?'#3b82f6':arrowBad.has(k)?'#ef4444':L.col,hot||arrowBad.has(k)?1:L.op)});
  if(editing&&etab==='arrow'&&sel.size&&editLine<0)g+=arrowSVG([...sel],arrowB,'#3b82f6');
  el.innerHTML=g}
 function renderThermos(){const el=$('#thermo');if(!el)return;let g='';
- (P.thermos||[]).forEach((t,k)=>{const hot=editing&&etab==='thermo'&&k===editLine;g+=thermoSVG(t.cells,hot?'#93c5fd':thermoBad.has(k)?'#fca5a5':'#c8ccd2',1)});
+ (P.thermos||[]).forEach((t,k)=>{const hot=editing&&etab==='thermo'&&k===editLine,L=lineStyle('#c8ccd2',1);g+=thermoSVG(t.cells,hot?'#93c5fd':thermoBad.has(k)?'#fca5a5':L.col,hot||thermoBad.has(k)?1:L.op)});
  if(editing&&etab==='thermo'&&sel.size&&editLine<0)g+=thermoSVG([...sel],'#93c5fd',1);
  el.innerHTML=g}
 function selGroup(){if(!sel.size)return null;const b=BOX([...sel][0]);const G=groupOf(P,b);if(!G||G.cells.length!==sel.size||!G.cells.every(i=>sel.has(i)))return null;return G}
@@ -1026,7 +1059,7 @@ $('#modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal()})
 const fmtT=s=>{s=Math.floor(s);const h=Math.floor(s/3600),m=Math.floor(s/60)%60,x=s%60;return (h?h+':'+String(m).padStart(2,'0'):m)+':'+String(x).padStart(2,'0')};
 let lastTick=Date.now();
 setInterval(()=>{const now=Date.now(),dt=(now-lastTick)/1000;lastTick=now;
- if(!document.hidden&&!paused&&!P.solved&&!editing&&curScreen==='game'&&$('#menu').classList.contains('hidden')&&dt<5){P.time+=dt;if(!saveT)saveT=setTimeout(saveNow,5000)}
+ if(!document.hidden&&!paused&&!P.solved&&!editing&&curScreen==='game'&&$('#menu').classList.contains('hidden')&&$('#visuals').classList.contains('hidden')&&dt<5){P.time+=dt;if(!saveT)saveT=setTimeout(saveNow,5000)}
  $('#timer').textContent=paused?'⏸ '+fmtT(P.time):fmtT(P.time);$('#timer').classList.toggle('paused',paused)},1000);
 $('#timer').onclick=()=>{paused=!paused;$('#timer').classList.toggle('paused',paused);$('#timer').textContent=paused?'⏸ '+fmtT(P.time):fmtT(P.time)};
 document.addEventListener('visibilitychange',()=>{if(document.hidden)saveNow();lastTick=Date.now()});
@@ -1037,7 +1070,7 @@ function progress(p){let f=0,g=0;for(let i=0;i<81;i++){if(p.givens[i])g++;else i
 // ---------- Screens (v23): game, home (main menu), list (select puzzle), add (add puzzle) ----------
 // Each move pushes a history entry, so a browser/Android back gesture works; the ‹ Menu buttons do the same.
 let curScreen='game',navDepth=0;
-function showScreen(s){if(s==='game'&&!DB[curId])s='home';endCeleb();closeMenu();if(curScreen==='game'&&s!=='game')saveNow();curScreen=s;
+function showScreen(s){if(s==='game'&&!DB[curId])s='home';endCeleb();closeMenu();if(typeof closeVisuals==='function')closeVisuals();if(curScreen==='game'&&s!=='game')saveNow();curScreen=s;
  for(const x of ['game','home','list','add'])$('#'+x).classList.toggle('hidden',x!==s);
  if(s==='home')renderHome();else if(s==='list')renderList();else if(s==='game')render();window.scrollTo(0,0)}
 function go(s){if(s===curScreen)return showScreen(s);showScreen(s);try{history.pushState({s},'');navDepth++}catch(e){}}
@@ -1066,17 +1099,40 @@ function puzzleSheet(id){const p=DB[id];if(!p)return;const st=statusOf(p);
   if(a==='del'){if(confirm(`Delete "${p.name}"? This can't be undone.`)){delete DB[id];if(!Object.keys(DB).length){const n=blankPuzzle('Untitled');DB[n.id]=n}if(id===curId){curId=Object.values(DB).sort((a,b)=>b.updated-a.updated)[0].id;P=DB[curId];undoS=[];redoS=[];cellCache=Array(81).fill(null)}saveNow();closeModal();renderList()}return}}}
 $('#hCont').onclick=()=>go('game');$('#hSel').onclick=()=>go('list');$('#hAdd').onclick=()=>go('add');$('#hHelp').onclick=showHelp;
 $('#lBack').onclick=back;$('#aBack').onclick=back;
-// ---------- ☰ menu (v23): UI contrast, Help, Main menu ----------
-function openMenu(){$('#mTips').disabled=!(P.tips&&P.tips.length);const k=Math.round(uiK*100);$('#kSlider').value=k;$('#kVal').textContent=k+'%';$('#menu').classList.remove('hidden');$('#bMenu').setAttribute('aria-expanded','true')}
+// ---------- ☰ menu (v23/v41): Visuals pane, Tips, Help, Main menu ----------
+function openMenu(){$('#mTips').disabled=!(P.tips&&P.tips.length);$('#menu').classList.remove('hidden');$('#bMenu').setAttribute('aria-expanded','true')}
 // v28 CR3: tips from the puzzle text ("tip <text>" lines), one at a time; Prev/Next only when there is one.
 function openTips(n){const T=P.tips||[];if(!T.length)return;n=Math.max(0,Math.min(n,T.length-1));
  $('#mbox').innerHTML=`<h2>TIPS</h2><div class="muted" id="tipN">Tip ${n+1} of ${T.length}</div><p id="tipTxt" style="font-size:17px;line-height:1.45;margin:10px 0 14px">${esc(T[n])}</p>
  <div class="r">${n>0?'<button class="btn sec" id="tPrev">‹ Prev</button>':''}${n<T.length-1?'<button class="btn sec" id="tNext">Next ›</button>':''}<button class="btn" id="mClose">Close</button></div>`;
  showModal();$('#mClose').onclick=closeModal;if(n>0)$('#tPrev').onclick=()=>openTips(n-1);if(n<T.length-1)$('#tNext').onclick=()=>openTips(n+1)}
 function closeMenu(){$('#menu').classList.add('hidden');$('#bMenu').setAttribute('aria-expanded','false')}
-$('#bMenu').onclick=()=>$('#menu').classList.contains('hidden')?openMenu():closeMenu();
+function visOpen(){return !$('#visuals').classList.contains('hidden')}
+function syncVisSliders(){
+ $('#vCnDark').value=vis.cnDark;$('#vCnDarkVal').textContent=vis.cnDark;
+ $('#vCnOut').value=vis.cnOut;$('#vCnOutVal').textContent=vis.cnOut;
+ $('#vMnDark').value=vis.mnDark;$('#vMnDarkVal').textContent=vis.mnDark;
+ $('#vMnOut').value=vis.mnOut;$('#vMnOutVal').textContent=vis.mnOut;
+ $('#vCageDark').value=vis.cageDark;$('#vCageDarkVal').textContent=vis.cageDark;
+ $('#vLine').value=vis.line;$('#vLineVal').textContent=vis.line;
+ $('#vValOut').value=vis.valOut;$('#vValOutVal').textContent=vis.valOut;
+ const k=Math.round(uiK*100);$('#kSlider').value=k;$('#kVal').textContent=k}
+function openVisuals(){
+ closeMenu();syncVisSliders();
+ const grid=$('#gridWrap').getBoundingClientRect(),gap=8;
+ document.documentElement.style.setProperty('--vis-top',Math.round(grid.bottom+gap)+'px');
+ $('#visuals').classList.remove('hidden')}
+function closeVisuals(){$('#visuals').classList.add('hidden')}
+$('#bMenu').onclick=()=>{if(visOpen())closeVisuals();else if($('#menu').classList.contains('hidden'))openMenu();else closeMenu()};
 $('#menu').addEventListener('click',e=>{if(e.target.id==='menu')closeMenu()});
-$('#kSlider').addEventListener('input',e=>{uiK=+e.target.value/100;$('#kVal').textContent=e.target.value+'%';applyContrast();SV('sdk_contrast',uiK)});
+$('#visuals').addEventListener('click',e=>{if(e.target.id==='visuals')closeVisuals()});
+$('#mVisuals').onclick=openVisuals;
+$('#vDone').onclick=closeVisuals;
+$('#vReset').onclick=()=>{vis={...VIS_DEF};uiK=1;syncVisSliders();applyVisuals(true);saveVis()};
+function bindVis(id,key){$('#'+id).addEventListener('input',e=>{vis[key]=+e.target.value;$('#'+id+'Val').textContent=e.target.value;applyVisuals(true);saveVis()})}
+bindVis('vCnDark','cnDark');bindVis('vCnOut','cnOut');bindVis('vMnDark','mnDark');bindVis('vMnOut','mnOut');
+bindVis('vCageDark','cageDark');bindVis('vLine','line');bindVis('vValOut','valOut');
+$('#kSlider').addEventListener('input',e=>{uiK=+e.target.value/100;$('#kVal').textContent=e.target.value;applyContrast();saveVis()});
 $('#mHelp').onclick=()=>{closeMenu();showHelp()};$('#mTips').onclick=()=>{closeMenu();openTips(0)};$('#mHome').onclick=()=>go('home');
 $('#bNew').onclick=()=>{const n=prompt('Name for the new puzzle','Puzzle '+(Object.keys(DB).length+1));if(n===null)return;const p=blankPuzzle(n.trim()||'Untitled');DB[p.id]=p;openPuzzle(p.id);setEditing(true)};
 $('#bPaste').onclick=()=>{
@@ -1109,11 +1165,11 @@ const HELP_ELEMENTS=[
 const HELP_CONTROLS=[
  {id:'select',title:'Selecting cells',body:`<ul><li><b>Tap</b> a cell to select it; tap it again to deselect.</li><li><b>Double-tap</b> selects the cell's cage (or the uncaged cells of its box).</li><li>On a thermo, arrow, whisper or renban, the next tap selects that line: <b>double</b> = cage, <b>triple</b> = the line, then the box. An uncaged line cell goes line → uncaged group → box. (Order if a cell is on several: cage → thermo → arrow → whisper → renban.)</li><li>Otherwise <b>triple-tap</b> selects the whole box.</li><li><b>Drag</b> to select several cells, or turn on <b>Multi</b> to add/remove cells with taps (double-tapping a selected cell removes its group).</li><li>While <b>Multi</b> is on, the number highlight is <b>locked</b>: selecting cells won't change it. To change it, clear the selection (tap the status line) and tap a number key; tap the same key to turn it off.</li><li>Tap the status line to clear the selection.</li></ul>`},
  {id:'modes',title:'Digit, Corner, Centre',body:`<p>Pick a mode, then a number. Digit places a value; Corner and Centre add pencil marks. Placing a digit clears that digit's marks from the same row, column, box, cage and thermo.</p><p>With nothing selected, the number keys <b>highlight</b> that number. Tap the key again to clear.</p>`},
- {id:'look',title:'Selection vs highlight',body:`<ul><li><b>Selected</b> cells get a navy outline drawn on the grid lines around the selection, and turn slightly brighter. Every unselected cell also darkens a little.</li><li><b>Highlighted</b> cells (holding the number, or a pencil mark of it — shown as an amber chip) have no border; every other cell darkens a little, and cells where the number can't go darken a bit more.</li><li>A cell that is both keeps the border and isn't darkened.</li><li>A cell that is neither selected nor highlighted gets both darkenings, so the three kinds stay easy to tell apart.</li><li><b>☰ → UI contrast</b> makes the border, brightening and darkening stronger or softer.</li></ul>`},
+ {id:'look',title:'Selection vs highlight',body:`<ul><li><b>Selected</b> cells get a navy outline drawn on the grid lines around the selection, and turn slightly brighter. Every unselected cell also darkens a little.</li><li><b>Highlighted</b> cells (holding the number, or a pencil mark of it — shown as an amber chip) have no border; every other cell darkens a little, and cells where the number can't go darken a bit more.</li><li>A cell that is both keeps the border and isn't darkened.</li><li>A cell that is neither selected nor highlighted gets both darkenings, so the three kinds stay easy to tell apart.</li><li><b>☰ → Visuals</b> opens a pane of sliders (mark darkness and outlines, cage darkness, line strength, placed-digit outlines, and UI contrast) so you can tune how the grid looks. The pane stays below the grid and updates it live.</li></ul>`},
  {id:'colour',title:'Colours',body:`<p>In Colour mode each key has a <b>+</b> half and a <b>−</b> half. + adds a colour (up to 3 per cell); + on a colour already there makes it 2/3 of the cell. − shrinks or removes it.</p><p>Long-press a key, or use ◎ Select colour, to <b>select</b> every cell that is <b>fully</b> that colour; cells with only <b>part</b> of it are <b>highlighted</b>. Double-tap a cell that is one solid colour does the same for its colour.</p>`},
  {id:'sigma',title:'Σ Combos and Total',body:`<p>Σ works on: one cell in a cage (the whole cage), an uncaged box group, 2+ cells all in one cage, row, column or 3×3 box (type their sum; a whole row, column or box is 45), a thermo (ranges), an arrow (circle values and shaft digits), a whisper (each cell's possible digits), a renban (the possible runs), or the two cells of a kropki dot (the possible pairs). The Σ button names what it will show (Combos, Ranges, Sums, Digits, Runs, Pairs). The status line adds up whole cages, known groups and placed digits.</p>`},
  {id:'test',title:'Test',body:`<p>For puzzles that come with a solution, select cells with centre marks and press <b>Test</b>: a green ✓ means the right digit is among the marks, a red ✕ means it's missing. Wrong placed digits also show red.</p>`},
- {id:'other',title:'Timer, edit, menus',body:`<p>Tap the timer to pause. ✎ opens the editor for cages, thermos, arrows, whispers, renbans, dots and givens. In the Arrows tab, tap the circle then the shaft cells in order. In the Dots tab, tap the line between two cells to cycle no dot → white → black.</p><p><b>☰</b> has UI contrast, Tips, Help and Main menu. <b>Tips</b> shows the puzzle's hints one at a time (Prev/Next); it is greyed out when the puzzle has none. In a puzzle code each hint is a line <code>tip your text</code>, in order. The <b>main menu</b> has Continue (your current unsolved puzzle), Select puzzle (tap one to open; <b>⋯</b> to edit, copy its code, rename, restart or delete) and Add puzzle (paste a code or start a blank one). The app opens straight into your puzzle if it isn't solved yet.</p>`},
+ {id:'other',title:'Timer, edit, menus',body:`<p>Tap the timer to pause. ✎ opens the editor for cages, thermos, arrows, whispers, renbans, dots and givens. In the Arrows tab, tap the circle then the shaft cells in order. In the Dots tab, tap the line between two cells to cycle no dot → white → black.</p><p><b>☰</b> has Visuals, Tips, Help and Main menu. <b>Tips</b> shows the puzzle's hints one at a time (Prev/Next); it is greyed out when the puzzle has none. In a puzzle code each hint is a line <code>tip your text</code>, in order. The <b>main menu</b> has Continue (your current unsolved puzzle), Select puzzle (tap one to open; <b>⋯</b> to edit, copy its code, rename, restart or delete) and Add puzzle (paste a code or start a blank one). The app opens straight into your puzzle if it isn't solved yet.</p>`},
 ];
 function showHelp(){
  const sec=h=>`<details class="hs" id="help-${h.id}"><summary>${esc(h.title)}</summary><div class="hb2">${h.body}</div></details>`;
@@ -1121,7 +1177,7 @@ function showHelp(){
  $('#mbox').classList.add('help');showModal();$('#hClose').onclick=closeModal}
 
 // ---------- Keyboard (handy on a Mac/iPad keyboard) ----------
-document.addEventListener('keydown',e=>{if(!$('#celeb').classList.contains('hidden')){if(e.key==='Escape'){e.preventDefault();endCeleb()}return}if(!$('#modal').classList.contains('hidden')||curScreen!=='game'||!$('#menu').classList.contains('hidden'))return;
+document.addEventListener('keydown',e=>{if(!$('#celeb').classList.contains('hidden')){if(e.key==='Escape'){e.preventDefault();endCeleb()}return}if(e.key==='Escape'&&visOpen()){e.preventDefault();closeVisuals();return}if(e.key==='Escape'&&!$('#menu').classList.contains('hidden')){e.preventDefault();closeMenu();return}if(!$('#modal').classList.contains('hidden')||curScreen!=='game'||!$('#menu').classList.contains('hidden')||visOpen())return;
  if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='z'){e.preventDefault();e.shiftKey?redo():undo();return}
  if(e.key==='Escape'&&!editing){e.preventDefault();sel.clear();numSel=0;render();return}
  if(/^[1-9]$/.test(e.key)&&!editing){pressDigit(+e.key);return}
