@@ -322,12 +322,16 @@ function hslToRgb(h,s,l){
  return [hue2rgb(p,q,h+1/3)*255,hue2rgb(p,q,h)*255,hue2rgb(p,q,h-1/3)*255]}
 // t=0 keeps the colour; t=1 pushes HSL saturation to 100% at the same lightness (no shift toward black).
 function saturateHex(hex,t){const [h,s,l]=hexToHsl(hex);return rgbCss(...hslToRgb(h,s+(100-s)*t,l))}
+// Near-grey / very dark strokes (arrows, thermos, kropki, …): low chroma or very dark.
+function isNeutralLine(hex){const [h,s,l]=hexToHsl(hex),[r,g,b]=hexRgb(hex);return s<35||l<20||Math.max(r,g,b)-Math.min(r,g,b)<40}
+// t=0 keeps the colour; t=1 is black, with saturation and lightness both falling so there is no hue shift (no blue cast).
+function darkenNeutralHex(hex,t){const [h,s,l]=hexToHsl(hex);return rgbCss(...hslToRgb(h,0,l*(1-t)))}
 // Outline sliders: 0 = none, 100 = v40 width (var unset), 200 = maxAt200 × the v40 width.
 function outlineMult(pct,maxAt200){if(pct===100)return null;if(pct<=100)return pct/100;return 1+(pct-100)/100*(maxAt200-1)}
 function setOutlineVar(st,name,pct,maxAt200){const m=outlineMult(pct,maxAt200);if(m===null)st.removeProperty(name);else st.setProperty(name,String(m))}
 // Idle constraint-line colour/opacity. At 100, returns the v40 values unchanged (pixel-identical).
-// Below 100, fade opacity. Above 100, opacity rises toward 1 and the colour saturates toward its own hue (not black).
-function lineStyle(col,op){if(vis.line===100)return {col,op};const s=vis.line/100;if(s<=1)return {col,op:op*s};const t=s-1;return {col:saturateHex(col,t),op:op+(1-op)*t}}
+// Below 100, fade opacity. Above 100, opacity rises toward 1; coloured lines saturate, near-grey/dark lines darken toward black with no hue shift.
+function lineStyle(col,op){if(vis.line===100)return {col,op};const s=vis.line/100;if(s<=1)return {col,op:op*s};const t=s-1;return {col:(isNeutralLine(col)?darkenNeutralHex:saturateHex)(col,t),op:op+(1-op)*t}}
 function applyVisuals(paint){
  const st=document.documentElement.style;
  // At default, leave the vars unset so the stylesheet is the v40 path (pixel-identical on uncoloured cells).
