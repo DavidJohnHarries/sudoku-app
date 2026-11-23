@@ -23,8 +23,8 @@ header{display:flex;align-items:center;gap:6px;height:50px}
    layers still multiply over the digits (no painted ring on a thermo bulb or a split-colour
    cell). Split-colour cells still use a transparent --halo. */
 #grid .mn,#grid .cn,#grid .val{visibility:hidden}
-#grid,#renbans,#arrows,#ink,#thermo,#whispers,#lines,#selsvg,#dots,#sums{position:absolute;inset:0}
-#renbans,#arrows{z-index:1}
+#grid,#renbans,#rsl,#arrows,#ink,#thermo,#whispers,#lines,#selsvg,#dots,#sums{position:absolute;inset:0}
+#renbans,#arrows,#rsl{z-index:1}
 #ink{z-index:2;display:grid;grid-template-columns:repeat(9,1fr);grid-template-rows:repeat(9,1fr);pointer-events:none}
 /* v44: all grid digit outlines are white (placed, givens, marks, highlighted/error). Opacity is
    --outline-a (default 60%). At 200, marks are 5× and placed/given digits 4× the v40 width. */
@@ -261,7 +261,7 @@ header{display:flex;align-items:center;gap:6px;height:50px}
 .sheet{display:flex;flex-direction:column;gap:6px}.sheet button{height:46px;text-align:left;padding:0 14px;background:#f3f4f6;font-size:16px}.sheet button.btn{background:#1e3a8a;color:#fff}.sheet .del{color:#b91c1c}.sheet .cx{text-align:center;background:#fff;box-shadow:inset 0 0 0 1px #d1d5db;margin-top:4px}
 .mitems{display:flex;flex-direction:column;gap:4px}.mitems .mitem{width:100%;text-align:center;background:#f3f4f6;color:#111827;font-weight:600;font-size:17px;height:44px;padding:0 12px;border-radius:10px}
 .kc b{position:relative;z-index:1;font-weight:400}
-/* v26 Renban: thick translucent pink-violet line, multiplied under digits like whispers. 7 editor tabs → 4 + 3. */
+/* v26 Renban: thick translucent pink-violet line, multiplied under digits like whispers. 8 editor tabs → 4 + 4 (RSL). */
 /* v38: pencil marks went to #222 (were #374151); weight stays 400. Renban stroke is #dd9ff3 (was #d68af0), opacity still 0.8.
    Halos, .nh chips and .nh2 (CR1 grey-bold corner twin) are unchanged.
    v39: centre marks ramped #374151 → #222 by count (superseded by v40).
@@ -276,3 +276,6 @@ header{display:flex;align-items:center;gap:6px;height:50px}
 .nh2{font-weight:800;color:#111827}
 .mitem:disabled{opacity:.4;pointer-events:none}
 .mitems .mitem{white-space:nowrap}
+
+/* Region-sum lines (v46): thick translucent cyan line, same layer as renbans/arrows so white digit halos cut the stroke. */
+#rsl{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;mix-blend-mode:multiply}

@@ -29,6 +29,7 @@ thermo r1c1 r1c2 r2c3          # thermometer, bulb first; each step to a neighbo
 arrow r1c1 r1c2 r1c3           # arrow: circle first, then the shaft in order to the arrowhead; shaft digits sum to the circle
 arrow r1c1 r1c2 > r2c3 r3c3    # 2-3 cell circle (read as a number) before ">", then the shaft
 whisper r1c1 r1c2 r2c3         # German whisper: cells in order along the line; neighbours differ by 5+
+rsl r1c1 r1c2 r2c3              # region-sum line: box borders split the line into equal-sum segments (aliases: regionsum, region-sum, region_sum)
 kropki w r1c1 r1c2             # white Kropki dot: consecutive digits (cells must share an edge)
 kropki b r3c4 r4c4             # black Kropki dot: one digit is double the other
 kropki-negative                # optional: all dots are given (no dot = neither consecutive nor double)
@@ -185,3 +186,9 @@ A published hard killer is in `puzzles/escape-room-sujoyku.txt` — *Escape Room
 
 ## v45: A Square Arrow Ring
 - New puzzle: `puzzles/a-square-arrow-ring-meggen033.txt` — *A Square Arrow Ring* by meggen033 (LMD 000MHI, 2★, arrows + renban + German whispers + white kropki), unique per `solve_cp`, matches the setter's solution. Visuals are unchanged from v44 (white digit outlines, shared Outline opacity).
+
+## v46: Region-sum lines; Bent out of Shape
+- Format: `rsl r1c1 r1c2 r2c3 ...` (2+ cells in path order, king-adjacent steps; aliases `regionsum` / `region-sum` / `region_sum`). Box borders split a line into segments; the digits on each segment of a line have the same sum. Different lines may have different sums. If a line re-enters a box, that visit is a new segment. Digits may repeat if sudoku rules allow.
+- Drawn as a thick translucent cyan line (`#2ecbff`, `#rsl` layer at z-index 1 with renbans and arrows, multiplied) so white digit halos cut the stroke. The Lines slider saturates it above 100 like other coloured lines. Turns red when segment sum ranges cannot meet.
+- Repeated taps: cage → thermo → arrow → whisper → renban → region-sum line → uncaged group → box. Σ on a region-sum line opens a read-only REGION SUM sheet of each segment's possible sum range. Editor: new RSL tab (tabs now 4 + 4). Help: new "Region-sum lines" section. Visuals note lists region-sum lines with the other constraint lines.
+- Puzzle: `puzzles/bent-out-of-shape-msdos.txt` — *Bent out of Shape* by MSDOS (LMD 000P97, 2★, region-sum lines + renban + black kropki; not all dots given), unique per `solve_cp`, matches the setter's solution. Existing default visuals are unchanged.

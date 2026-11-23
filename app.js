@@ -8,7 +8,7 @@ const RC=i=>`r${Math.floor(i/9)+1}c${i%9+1}`;
 const COLOURS=['#fca5a5','#fdba74','#fde047','#86efac','#5eead4','#93c5fd','#c4b5fd','#f9a8d4','#cbd5e1'];
 const MAXCOL=3;
 // Feature flags / hooks for later variants (thermometers, arrows, kropki...): add a parser section + a draw layer.
-const FEATURES={calculator:true,thermo:true,kropki:true,arrows:true,whispers:true,renban:true};
+const FEATURES={calculator:true,thermo:true,kropki:true,arrows:true,whispers:true,renban:true,rsl:true};
 // Colours: up to 3 per cell, drawn in palette order. At most one may be boosted
 // (2/3 of the pie; the others share the remaining 1/3 equally). No boost = equal shares.
 function normCol(x){
@@ -67,7 +67,7 @@ cage 8 r8c9 r9c9
 cage 4 r9c3`;
 
 // ---------- Puzzle format (see README) ----------
-function blankPuzzle(name){return {id:uid(),name:name||'Untitled',givens:Array(81).fill(0),sol:null,cages:[],thermos:[],arrows:[],whispers:[],renbans:[],kropki:[],kropkiNeg:false,tips:[],v:Array(81).fill(0),cn:Array(81).fill(''),mn:Array(81).fill(''),col:Array.from({length:81},()=>({c:[],b:0})),time:0,solved:false,extra:[],groups:{},lineSums:{},updated:Date.now()}}
+function blankPuzzle(name){return {id:uid(),name:name||'Untitled',givens:Array(81).fill(0),sol:null,cages:[],thermos:[],arrows:[],whispers:[],renbans:[],rsls:[],kropki:[],kropkiNeg:false,tips:[],v:Array(81).fill(0),cn:Array(81).fill(''),mn:Array(81).fill(''),col:Array.from({length:81},()=>({c:[],b:0})),time:0,solved:false,extra:[],groups:{},lineSums:{},updated:Date.now()}}
 function parseCell(t){const m=/^r([1-9])c([1-9])$/i.exec(t);return m?(m[1]-1)*9+(m[2]-1):-1}
 function parseGrid81(s){s=s.replace(/[\s|]/g,'');if(s.length!==81||/[^.0-9]/.test(s))return null;return [...s].map(ch=>ch==='.'?0:+ch)}
 function parsePuzzle(text){
@@ -97,6 +97,9 @@ function parsePuzzle(text){
   else if(kw==='renban'){const cs=toks.map(parseCell);
    if(cs.length<2||cs.some(c=>c<0)){errs.push(`Line ${ln}: expected "renban r1c1 r1c2 r2c3 ..." (2+ cells in order along the line)`);continue}
    const why=renbanProblem(cs);if(why)errs.push(`Line ${ln}: ${why} (kept anyway)`);p.renbans.push({cells:cs,elim:[]})}
+  else if(kw==='rsl'||kw==='regionsum'||kw==='region-sum'||kw==='region_sum'){const cs=toks.map(parseCell);
+   if(cs.length<2||cs.some(c=>c<0)){errs.push(`Line ${ln}: expected "rsl r1c1 r1c2 r2c3 ..." (2+ cells in order along the line)`);continue}
+   const why=rslProblem(cs);if(why)errs.push(`Line ${ln}: ${why} (kept anyway)`);p.rsls.push({cells:cs})}
   else if(kw==='arrow'){const gt=toks.indexOf('>');const circ=(gt>=0?toks.slice(0,gt):toks.slice(0,1)).map(parseCell),sh=(gt>=0?toks.slice(gt+1):toks.slice(1)).map(parseCell);
    if(!circ.length||circ.length>3||!sh.length||circ.some(c=>c<0)||sh.some(c=>c<0)){errs.push(`Line ${ln}: expected "arrow CIRCLE r1c2 r1c3 ..." (circle first, then the shaft to the arrowhead; a 2–3 cell circle: "arrow r1c1 r1c2 > r2c3 ...")`);continue}
    const a={cells:[...circ,...sh],b:circ.length},why=arrowProblem(a.cells,a.b);if(why)errs.push(`Line ${ln}: ${why} (kept anyway)`);p.arrows.push(a)}
@@ -175,6 +178,17 @@ function whisperProblem(cs){if(cs.length<2)return 'a whisper needs at least 2 ce
 // non-repeating digits in any order, so a renban acts like a small house (no repeats) and spans exactly n−1.
 function renbanProblem(cs){if(cs.length<2)return 'a renban needs at least 2 cells';if(new Set(cs).size!==cs.length)return `renban at ${RC(cs[0])} visits a cell twice`;if(cs.length>9)return `renban at ${RC(cs[0])} has ${cs.length} cells (max 9)`;
  for(let k=1;k<cs.length;k++)if(!kingAdj(cs[k-1],cs[k]))return `renban at ${RC(cs[0])}: ${RC(cs[k-1])} → ${RC(cs[k])} aren't neighbours`;return ''}
+// Region-sum lines (v46): {cells} in path order. Box borders split a line into segments; the digits
+// on each segment of a line have the same sum. Different lines may have different sums. If a line
+// re-enters a box, that visit is a new segment. Digits may repeat if sudoku rules allow.
+function rslProblem(cs){if(cs.length<2)return 'a region-sum line needs at least 2 cells';if(new Set(cs).size!==cs.length)return `region-sum line at ${RC(cs[0])} visits a cell twice`;
+ for(let k=1;k<cs.length;k++)if(!kingAdj(cs[k-1],cs[k]))return `region-sum line at ${RC(cs[0])}: ${RC(cs[k-1])} → ${RC(cs[k])} aren't neighbours`;return ''}
+function rslSegments(cs){if(!cs.length)return [];const out=[[cs[0]]];
+ for(let k=1;k<cs.length;k++){if(BOX(cs[k])===BOX(cs[k-1]))out[out.length-1].push(cs[k]);else out.push([cs[k]])}return out}
+function rslRange(seg){let s=0,e=0;for(const i of seg){const v=valAt(i);if(v)s+=v;else e++}return {lo:s+e,hi:s+9*e,full:!e,sum:s,empty:e}}
+function rslConflicts(r,out){const segs=rslSegments(r.cells);if(segs.length<2)return false;
+ const rs=segs.map(rslRange),lo=Math.max(...rs.map(x=>x.lo)),hi=Math.min(...rs.map(x=>x.hi));
+ if(lo>hi){r.cells.forEach(i=>{if(valAt(i))out.add(i)});return true}return false}
 function fmtArrow(a){const b=a.b||1,c=a.cells.map(RC);return 'arrow '+(b>1?c.slice(0,b).join(' ')+' > ':c[0]+' ')+c.slice(b).join(' ')}
 function gridStr(a){let s='';for(let r=0;r<9;r++)s+=(r?' ':'')+a.slice(r*9,r*9+9).map(x=>x||'.').join('');return s}
 function exportPuzzle(p,state){
@@ -185,6 +199,7 @@ function exportPuzzle(p,state){
  for(const a of p.arrows||[])L.push(fmtArrow(a));
  for(const w of p.whispers||[])L.push('whisper '+w.cells.map(RC).join(' '));
  for(const r of p.renbans||[])L.push('renban '+r.cells.map(RC).join(' '));
+ for(const r of p.rsls||[])L.push('rsl '+r.cells.map(RC).join(' '));
  for(const d of p.kropki||[])L.push(`kropki ${d.t} ${RC(d.a)} ${RC(d.b)}`);
  if(p.kropkiNeg)L.push('kropki-negative');
  for(const t of p.tips||[])L.push('tip '+t);
@@ -245,22 +260,24 @@ function exactArrowOfSel(){if(sel.size<1)return -1;const i0=[...sel][0];for(cons
 // Whispers: an exact whisper selection, or one cell on a whisper that's not in a cage/thermo/arrow → WHISPER sheet.
 function exactWhisperOfSel(){if(sel.size<2)return -1;const i0=[...sel][0];for(const k of whispersOf[i0]||[]){const cs=[...new Set(P.whispers[k].cells)];if(cs.length===sel.size&&cs.every(i=>sel.has(i)))return k}return -1}
 function exactRenbanOfSel(){if(sel.size<2)return -1;const i0=[...sel][0];for(const k of renbansOf[i0]||[]){const cs=P.renbans[k].cells;if(cs.length===sel.size&&cs.every(i=>sel.has(i)))return k}return -1}
+function exactRslOfSel(){if(sel.size<2)return -1;const i0=[...sel][0];for(const k of rslsOf[i0]||[]){const cs=P.rsls[k].cells;if(cs.length===sel.size&&cs.every(i=>sel.has(i)))return k}return -1}
 function calcTarget(){
  if(!sel.size)return null;
- if(sel.size===1){const i=[...sel][0],k=cageOfCells([i]);if(k>=0)return {type:'cage',k};const th=(thermosOf[i]||[])[0];if(th!=null)return {type:'thermo',k:th};const ar=(arrowsOf[i]||[])[0];if(ar!=null)return {type:'arrow',k:ar};const wh=(whispersOf[i]||[])[0];if(wh!=null)return {type:'whisper',k:wh};const rb=(renbansOf[i]||[])[0];return rb!=null?{type:'renban',k:rb}:null}
+ if(sel.size===1){const i=[...sel][0],k=cageOfCells([i]);if(k>=0)return {type:'cage',k};const th=(thermosOf[i]||[])[0];if(th!=null)return {type:'thermo',k:th};const ar=(arrowsOf[i]||[])[0];if(ar!=null)return {type:'arrow',k:ar};const wh=(whispersOf[i]||[])[0];if(wh!=null)return {type:'whisper',k:wh};const rb=(renbansOf[i]||[])[0];if(rb!=null)return {type:'renban',k:rb};const rs=(rslsOf[i]||[])[0];return rs!=null?{type:'rsl',k:rs}:null}
  const G=selGroup();if(G)return {type:'group',G};
  const k=exactCageOfSel();if(k>=0)return {type:'cage',k};
  const th=exactThermoOfSel();if(th>=0)return {type:'thermo',k:th};
  const ar=exactArrowOfSel();if(ar>=0)return {type:'arrow',k:ar};
  const wh=exactWhisperOfSel();if(wh>=0)return {type:'whisper',k:wh};
  const rb=exactRenbanOfSel();if(rb>=0)return {type:'renban',k:rb};
+ const rs=exactRslOfSel();if(rs>=0)return {type:'rsl',k:rs};
  if(sel.size===2){const [a,b]=[...sel],kd=dotAt(P,a,b);if(kd>=0)return {type:'kropki',k:kd}} // v27: exactly the two cells of a dot
  const L=setOfSel();return L?{type:'set',L}:null}
 
 // ---------- Storage ----------
 let DB=LS('sdk_puzzles')||{};let curId=LS('sdk_cur');
 if(!Object.keys(DB).length){const {p}=parsePuzzle(SAMPLE);DB[p.id]=p;curId=p.id}
-for(const p of Object.values(DB)){p.extra=p.extra||[];p.tips=p.tips||[];{const keep=[];for(const x of p.extra){if(/^tip\s/i.test(x))p.tips.push(x.slice(3).trim());else keep.push(x)}p.extra=keep}p.thermos=p.thermos||[];p.whispers=p.whispers||[];p.renbans=(p.renbans||[]).map(r=>({cells:r.cells,elim:r.elim||[]}));p.arrows=(p.arrows||[]).map(a=>({cells:a.cells,b:a.b||1,elim:a.elim||[]}));p.kropki=(p.kropki||[]).map(d=>({...d,elim:d.elim||[]}));p.kropkiNeg=!!p.kropkiNeg;p.groups=p.groups||{};p.lineSums=p.lineSums||{};p.sol=p.sol||null;p.cages.forEach(c=>c.elim=c.elim||[]);if(p.col)for(let i=0;i<81;i++)p.col[i]=normCol(p.col[i])}
+for(const p of Object.values(DB)){p.extra=p.extra||[];p.tips=p.tips||[];{const keep=[];for(const x of p.extra){if(/^tip\s/i.test(x))p.tips.push(x.slice(3).trim());else keep.push(x)}p.extra=keep}p.thermos=p.thermos||[];p.whispers=p.whispers||[];p.renbans=(p.renbans||[]).map(r=>({cells:r.cells,elim:r.elim||[]}));p.rsls=p.rsls||[];p.arrows=(p.arrows||[]).map(a=>({cells:a.cells,b:a.b||1,elim:a.elim||[]}));p.kropki=(p.kropki||[]).map(d=>({...d,elim:d.elim||[]}));p.kropkiNeg=!!p.kropkiNeg;p.groups=p.groups||{};p.lineSums=p.lineSums||{};p.sol=p.sol||null;p.cages.forEach(c=>c.elim=c.elim||[]);if(p.col)for(let i=0;i<81;i++)p.col[i]=normCol(p.col[i])}
 if(!DB[curId])curId=Object.values(DB).sort((a,b)=>b.updated-a.updated)[0].id;
 let P=DB[curId];
 let saveT=null;const saveNow=()=>{clearTimeout(saveT);saveT=null;SV('sdk_puzzles',DB);SV('sdk_cur',curId)};
@@ -269,7 +286,7 @@ const save=()=>{P.updated=Date.now();saveNow()};
 // ---------- Geometry / peers ----------
 const ROW=i=>Math.floor(i/9),COL=i=>i%9,BOX=i=>Math.floor(ROW(i)/3)*3+Math.floor(COL(i)/3);
 const HOUSES=[];for(let k=0;k<9;k++){HOUSES.push([...Array(9)].map((_,j)=>k*9+j));HOUSES.push([...Array(9)].map((_,j)=>j*9+k));HOUSES.push([...Array(9)].map((_,j)=>(Math.floor(k/3)*3+Math.floor(j/3))*9+(k%3)*3+j%3))}
-let cagesOf=[],thermosOf=[],arrowsOf=[],whispersOf=[],renbansOf=[];function indexCages(){renbansOf=Array.from({length:81},()=>[]);(P.renbans||[]).forEach((r,k)=>r.cells.forEach(i=>{if(!renbansOf[i].includes(k))renbansOf[i].push(k)}));whispersOf=Array.from({length:81},()=>[]);(P.whispers||[]).forEach((w,k)=>w.cells.forEach(i=>{if(!whispersOf[i].includes(k))whispersOf[i].push(k)}));cagesOf=Array.from({length:81},()=>[]);thermosOf=Array.from({length:81},()=>[]);arrowsOf=Array.from({length:81},()=>[]);(P.arrows||[]).forEach((a,k)=>a.cells.forEach(i=>{if(!arrowsOf[i].includes(k))arrowsOf[i].push(k)}));P.cages.forEach((c,k)=>c.cells.forEach(i=>cagesOf[i].push(k)));(P.thermos||[]).forEach((t,k)=>t.cells.forEach(i=>{if(!thermosOf[i].includes(k))thermosOf[i].push(k)}))}
+let cagesOf=[],thermosOf=[],arrowsOf=[],whispersOf=[],renbansOf=[],rslsOf=[];function indexCages(){renbansOf=Array.from({length:81},()=>[]);(P.renbans||[]).forEach((r,k)=>r.cells.forEach(i=>{if(!renbansOf[i].includes(k))renbansOf[i].push(k)}));rslsOf=Array.from({length:81},()=>[]);(P.rsls||[]).forEach((r,k)=>r.cells.forEach(i=>{if(!rslsOf[i].includes(k))rslsOf[i].push(k)}));whispersOf=Array.from({length:81},()=>[]);(P.whispers||[]).forEach((w,k)=>w.cells.forEach(i=>{if(!whispersOf[i].includes(k))whispersOf[i].push(k)}));cagesOf=Array.from({length:81},()=>[]);thermosOf=Array.from({length:81},()=>[]);arrowsOf=Array.from({length:81},()=>[]);(P.arrows||[]).forEach((a,k)=>a.cells.forEach(i=>{if(!arrowsOf[i].includes(k))arrowsOf[i].push(k)}));P.cages.forEach((c,k)=>c.cells.forEach(i=>cagesOf[i].push(k)));(P.thermos||[]).forEach((t,k)=>t.cells.forEach(i=>{if(!thermosOf[i].includes(k))thermosOf[i].push(k)}))}
 function peers(i){const s=new Set();for(let j=0;j<81;j++)if(j!==i&&(ROW(j)===ROW(i)||COL(j)===COL(i)||BOX(j)===BOX(i)))s.add(j);for(const k of cagesOf[i])for(const j of P.cages[k].cells)if(j!==i)s.add(j);for(const k of thermosOf[i]||[])for(const j of P.thermos[k].cells)if(j!==i)s.add(j);for(const k of renbansOf[i]||[])for(const j of P.renbans[k].cells)if(j!==i)s.add(j);return s}
 const valAt=i=>P.givens[i]||P.v[i];
 
@@ -345,14 +362,14 @@ function applyVisuals(paint){
  else st.setProperty('--cn-color',rgbCss(...shadeRgb([44.5,49.5,57.5],vis.cnDark)));
  applyContrast();
  if(paint&&typeof renderLines==='function'&&typeof P!=='undefined'&&P){
-  renderLines();renderThermos();renderWhispers();renderRenbans();renderArrows();renderDots()}
+  renderLines();renderThermos();renderWhispers();renderRenbans();renderRsl();renderArrows();renderDots()}
 }
 function saveVis(){SV('sdk_visuals',vis);SV('sdk_contrast',uiK)}
 
 applyContrast();
 applyVisuals(false);
-const snap=()=>JSON.stringify({rb:P.renbans,wh:P.whispers,ar:P.arrows,kd:P.kropki,kn:P.kropkiNeg,th:P.thermos,gr:P.groups,ls:P.lineSums,g:P.givens,c:P.cages,v:P.v,cn:P.cn,mn:P.mn,col:P.col,s:P.solved});
-function restore(s){const o=JSON.parse(s);Object.assign(P,{renbans:o.rb||[],whispers:o.wh||[],arrows:o.ar||[],kropki:o.kd||[],kropkiNeg:!!o.kn,thermos:o.th||[],groups:o.gr||{},lineSums:o.ls||{},givens:o.g,cages:o.c,v:o.v,cn:o.cn,mn:o.mn,col:o.col,solved:o.s})}
+const snap=()=>JSON.stringify({rb:P.renbans,rs:P.rsls,wh:P.whispers,ar:P.arrows,kd:P.kropki,kn:P.kropkiNeg,th:P.thermos,gr:P.groups,ls:P.lineSums,g:P.givens,c:P.cages,v:P.v,cn:P.cn,mn:P.mn,col:P.col,s:P.solved});
+function restore(s){const o=JSON.parse(s);Object.assign(P,{renbans:o.rb||[],rsls:o.rs||[],whispers:o.wh||[],arrows:o.ar||[],kropki:o.kd||[],kropkiNeg:!!o.kn,thermos:o.th||[],groups:o.gr||{},lineSums:o.ls||{},givens:o.g,cages:o.c,v:o.v,cn:o.cn,mn:o.mn,col:o.col,solved:o.s})}
 function act(fn){const before=snap();fn();const after=snap();if(after!==before){undoS.push(before);if(undoS.length>500)undoS.shift();redoS=[];save()}render()}
 function undo(){if(!undoS.length)return;redoS.push(snap());restore(undoS.pop());save();editCage=-1;editLine=-1;render()}
 function redo(){if(!redoS.length)return;undoS.push(snap());restore(redoS.pop());save();editCage=-1;editLine=-1;render()}
@@ -374,7 +391,7 @@ function pie(o){o=normCol(o);const cs=o.c;if(!cs.length)return'transparent';if(c
  let acc=0;const stops=cs.map((id,k)=>{const a=acc;acc+=share(id);return `${COLOURS[id-1]} ${a*100}% ${k===cs.length-1?100:acc*100}%`});
  // Start 30° clockwise from 12 o'clock so a 50-50 split has its dividing line 30° from vertical; all pies use this start.
  return 'conic-gradient(from 30deg,'+stops.join(',')+')'}
-let bad=new Set(),cageBad=new Set(),thermoBad=new Set(),arrowBad=new Set(),whisperBad=new Set(),renbanBad=new Set(),dotBad=new Set(),negBad=[];
+let bad=new Set(),cageBad=new Set(),thermoBad=new Set(),arrowBad=new Set(),whisperBad=new Set(),renbanBad=new Set(),rslBad=new Set(),dotBad=new Set(),negBad=[];
 // Thermo: digits at positions a<b need v[b]-v[a] >= b-a, and position k (of n) can only hold k+1 .. 9-(n-1-k).
 function thermoConflicts(t,out){const cs=t.cells,n=cs.length;let broke=false;
  for(let a=0;a<n;a++){const va=valAt(cs[a]);if(!va)continue;
@@ -402,7 +419,7 @@ function renbanConflicts(r,out){const cs=r.cells,vs=cs.map(valAt),pl=vs.filter(B
 function computeConflicts(){bad=new Set();cageBad=new Set();thermoBad=new Set();arrowBad=new Set();
  (P.arrows||[]).forEach((a,k)=>{if(arrowConflicts(a,bad))arrowBad.add(k)});
  whisperBad=new Set();(P.whispers||[]).forEach((w,k)=>{if(whisperConflicts(w,bad))whisperBad.add(k)});
- renbanBad=new Set();(P.renbans||[]).forEach((r,k)=>{if(renbanConflicts(r,bad))renbanBad.add(k)});dotBad=new Set();negBad=[];
+ renbanBad=new Set();(P.renbans||[]).forEach((r,k)=>{if(renbanConflicts(r,bad))renbanBad.add(k)});rslBad=new Set();(P.rsls||[]).forEach((r,k)=>{if(rslConflicts(r,bad))rslBad.add(k)});dotBad=new Set();negBad=[];
  (P.kropki||[]).forEach((d,k)=>{const x=valAt(d.a),y=valAt(d.b);if(x&&y&&!dotOK(d.t,x,y)){dotBad.add(k);bad.add(d.a);bad.add(d.b)}});
  if(P.kropkiNeg)for(let i=0;i<81;i++)for(const j of [COL(i)<8?i+1:-1,i<72?i+9:-1]){if(j<0||dotAt(P,i,j)>=0)continue;const x=valAt(i),y=valAt(j);if(x&&y&&dotAny(x,y)){bad.add(i);bad.add(j);negBad.push([i,j])}}
  (P.thermos||[]).forEach((t,k)=>{if(thermoConflicts(t,bad))thermoBad.add(k)});
@@ -490,6 +507,10 @@ function renderRenbans(){const el=$('#renbans');if(!el)return;let g='';
  (P.renbans||[]).forEach((r,k)=>{const hot=editing&&etab==='renban'&&k===editLine,L=lineStyle('#dd9ff3',.8);g+=whisperSVG(r.cells,hot?'#60a5fa':renbanBad.has(k)?'#f87171':L.col,hot?.9:L.op)});
  if(editing&&etab==='renban'&&sel.size&&editLine<0)g+=whisperSVG([...sel],'#60a5fa',.9);
  el.innerHTML=g}
+function renderRsl(){const el=$('#rsl');if(!el)return;let g='';
+ (P.rsls||[]).forEach((r,k)=>{const hot=editing&&etab==='rsl'&&k===editLine,L=lineStyle('#2ecbff',.8);g+=whisperSVG(r.cells,hot?'#60a5fa':rslBad.has(k)?'#f87171':L.col,hot?.9:L.op)});
+ if(editing&&etab==='rsl'&&sel.size&&editLine<0)g+=whisperSVG([...sel],'#60a5fa',.9);
+ el.innerHTML=g}
 // v32/v33: no SVG text mask. Placed digits and pencil marks are painted in #ink as the real
 // HTML, with a background-coloured text-stroke so the gap cannot drift on iOS Safari the way
 // the old SVG <text> mask did. Ink is above arrows/renbans and below thermos/whispers.
@@ -526,13 +547,14 @@ function near45(sum){
  const lo=Math.floor(sum/45)*45,hi=lo+45;
  return `${lo}+${sum-lo} · ${hi}−${hi-sum}`}
 // v27: Σ button says what the sheet will show.
-const SIGMA_LABEL={cage:'Σ Combos',group:'Σ Combos',set:'Σ Combos',thermo:'Σ Ranges',arrow:'Σ Sums',whisper:'Σ Digits',renban:'Σ Runs',kropki:'Σ Pairs'};
+const SIGMA_LABEL={cage:'Σ Combos',group:'Σ Combos',set:'Σ Combos',thermo:'Σ Ranges',arrow:'Σ Sums',whisper:'Σ Digits',renban:'Σ Runs',rsl:'Σ Sums',kropki:'Σ Pairs'};
 function selInfoText(){
  if(!sel.size)return numSel?(multi?`Number ${numSel} locked (Multi) — tap ${numSel} to clear`:`Number ${numSel} — tap ${numSel} again to clear`):(P.kropkiNeg?'Tap a cell · all dots given':'Tap a cell to select');
  const t=selTotal(),T0=calcTarget();
  if(T0&&T0.type==='thermo'&&!(t.known&&sel.size>1))return `Thermo (${P.thermos[T0.k].cells.length} cells) — Σ for ranges`;
  if(T0&&T0.type==='kropki'){const d=P.kropki[T0.k];return `${d.t==='w'?'White':'Black'} dot — Σ for pairs`}
  if(T0&&T0.type==='renban'&&!(t.known&&sel.size>1))return `Renban (${P.renbans[T0.k].cells.length} cells) — Σ for runs`;
+ if(T0&&T0.type==='rsl'&&!(t.known&&sel.size>1))return `Region-sum line (${P.rsls[T0.k].cells.length} cells) — Σ for sums`;
  if(T0&&T0.type==='whisper'&&!(t.known&&sel.size>1))return `Whisper (${P.whispers[T0.k].cells.length} cells) — Σ for options`;
  if(T0&&T0.type==='arrow'&&!(t.known&&sel.size>1)){const a=P.arrows[T0.k];return `Arrow (circle + ${a.cells.length-(a.b||1)}) — Σ for sums`}
  if(t.known)return `Total ${t.sum} (${t.n} cell${t.n>1?'s':''})  ${near45(t.sum)}`;
@@ -631,14 +653,14 @@ function renderControls(){
  $('#play').classList.toggle('hidden',editing);$('#edit').classList.toggle('hidden',!editing);
  $('#bEdit').textContent=editing?'✓':'✎';
  $$('.tabs button').forEach(b=>b.classList.toggle('on',b.dataset.t===etab));
- $('#eCage').classList.toggle('hidden',etab!=='cage');$('#eKropki').classList.toggle('hidden',etab!=='kropki');$('#bKNeg').classList.toggle('on',!!P.kropkiNeg);$('#bKNeg').setAttribute('aria-pressed',P.kropkiNeg?'true':'false');$('#eThermo').classList.toggle('hidden',etab!=='thermo');$('#eArrow').classList.toggle('hidden',etab!=='arrow');$('#eWhisper').classList.toggle('hidden',etab!=='whisper');$('#eRenban').classList.toggle('hidden',etab!=='renban');$('#bRbCreate').textContent=editLine>=0?'Update renban':'Create renban';$('#bRbDel').classList.toggle('hidden',editLine<0||etab!=='renban');$('#bWhCreate').textContent=editLine>=0?'Update whisper':'Create whisper';$('#bWhDel').classList.toggle('hidden',editLine<0||etab!=='whisper');$('#bArCreate').textContent=editLine>=0?'Update arrow':'Create arrow';$('#bArDel').classList.toggle('hidden',editLine<0||etab!=='arrow');$('#bArB').textContent='Circle: '+arrowB;
+ $('#eCage').classList.toggle('hidden',etab!=='cage');$('#eKropki').classList.toggle('hidden',etab!=='kropki');$('#bKNeg').classList.toggle('on',!!P.kropkiNeg);$('#bKNeg').setAttribute('aria-pressed',P.kropkiNeg?'true':'false');$('#eThermo').classList.toggle('hidden',etab!=='thermo');$('#eArrow').classList.toggle('hidden',etab!=='arrow');$('#eWhisper').classList.toggle('hidden',etab!=='whisper');$('#eRenban').classList.toggle('hidden',etab!=='renban');$('#eRsl').classList.toggle('hidden',etab!=='rsl');$('#bRbCreate').textContent=editLine>=0?'Update renban':'Create renban';$('#bRbDel').classList.toggle('hidden',editLine<0||etab!=='renban');$('#bRslCreate').textContent=editLine>=0?'Update region-sum line':'Create region-sum line';$('#bRslDel').classList.toggle('hidden',editLine<0||etab!=='rsl');$('#bWhCreate').textContent=editLine>=0?'Update whisper':'Create whisper';$('#bWhDel').classList.toggle('hidden',editLine<0||etab!=='whisper');$('#bArCreate').textContent=editLine>=0?'Update arrow':'Create arrow';$('#bArDel').classList.toggle('hidden',editLine<0||etab!=='arrow');$('#bArB').textContent='Circle: '+arrowB;
  $('#bThCreate').textContent=editLine>=0?'Update thermo':'Create thermo';$('#bThDel').classList.toggle('hidden',editLine<0);$('#eGiv').classList.toggle('hidden',etab!=='giv');
  $('#sumBuf').textContent=sumBuf||'–';
  $('#bCreate').textContent=editCage>=0?'Update cage':'Create cage';$('#bDelCage').classList.toggle('hidden',editCage<0);
  $('#bUndo').disabled=$('#eUndo').disabled=!undoS.length;$('#bRedo').disabled=$('#eRedo').disabled=!redoS.length;
  $('#pname').textContent=P.name;
 }
-function render(){indexCages();syncNumSel();renderCells();paintedNum=numSel;renderLines();renderThermos();renderWhispers();renderRenbans();renderArrows();renderDots();renderSel();renderControls();if(editing)renderWarn();checkSolved()}
+function render(){indexCages();syncNumSel();renderCells();paintedNum=numSel;renderLines();renderThermos();renderWhispers();renderRenbans();renderRsl();renderArrows();renderDots();renderSel();renderControls();if(editing)renderWarn();checkSolved()}
 
 // ---------- Cage validation ----------
 const minSum=n=>n*(n+1)/2,maxSum=n=>n*(19-n)/2;
@@ -655,10 +677,11 @@ function cageWarnings(){const w=[];let caged=0,total=0;
  (P.thermos||[]).forEach(t=>{const why=thermoProblem(t.cells);if(why)w.push(why[0].toUpperCase()+why.slice(1))});
  (P.whispers||[]).forEach(x=>{const why=whisperProblem(x.cells);if(why)w.push(why[0].toUpperCase()+why.slice(1))});
  (P.renbans||[]).forEach(x=>{const why=renbanProblem(x.cells);if(why)w.push(why[0].toUpperCase()+why.slice(1))});
+ (P.rsls||[]).forEach(x=>{const why=rslProblem(x.cells);if(why)w.push(why[0].toUpperCase()+why.slice(1))});
  (P.arrows||[]).forEach(a=>{const why=arrowProblem(a.cells,a.b);if(why)w.push(why[0].toUpperCase()+why.slice(1))});
  return {w,caged,total}}
 function renderWarn(){const {w,caged,total}=cageWarnings();
- $('#warn').innerHTML=w.map(x=>`<div>⚠️ ${esc(x)}</div>`).join('')+`<div class="${caged===81&&!w.length?'ok':'muted'}">${P.cages.length} cages${P.thermos.length?` · ${P.thermos.length} thermo${P.thermos.length>1?'s':''}`:''}${(P.arrows||[]).length?` · ${P.arrows.length} arrow${P.arrows.length>1?'s':''}`:''}${(P.whispers||[]).length?` · ${P.whispers.length} whisper${P.whispers.length>1?'s':''}`:''}${(P.renbans||[]).length?` · ${P.renbans.length} renban${P.renbans.length>1?'s':''}`:''}${(P.kropki||[]).length?` · ${P.kropki.length} dot${P.kropki.length>1?'s':''}${P.kropkiNeg?' (all given)':''}`:''} · ${caged}/81 cells caged · sums total ${total}${caged===81&&!w.length?' ✓':''}</div>`}
+ $('#warn').innerHTML=w.map(x=>`<div>⚠️ ${esc(x)}</div>`).join('')+`<div class="${caged===81&&!w.length?'ok':'muted'}">${P.cages.length} cages${P.thermos.length?` · ${P.thermos.length} thermo${P.thermos.length>1?'s':''}`:''}${(P.arrows||[]).length?` · ${P.arrows.length} arrow${P.arrows.length>1?'s':''}`:''}${(P.whispers||[]).length?` · ${P.whispers.length} whisper${P.whispers.length>1?'s':''}`:''}${(P.renbans||[]).length?` · ${P.renbans.length} renban${P.renbans.length>1?'s':''}`:''}${(P.rsls||[]).length?` · ${P.rsls.length} region-sum line${P.rsls.length>1?'s':''}`:''}${(P.kropki||[]).length?` · ${P.kropki.length} dot${P.kropki.length>1?'s':''}${P.kropkiNeg?' (all given)':''}`:''} · ${caged}/81 cells caged · sums total ${total}${caged===81&&!w.length?' ✓':''}</div>`}
 
 // ---------- Actions ----------
 const editable=()=>[...sel].filter(i=>!P.givens[i]);
@@ -810,6 +833,7 @@ function tapGroups(i){const L=[];for(const k of cagesOf[i])L.push(P.cages[k].cel
  for(const k of arrowsOf[i])L.push(P.arrows[k].cells);
  for(const k of whispersOf[i])L.push([...new Set(P.whispers[k].cells)]);
  for(const k of renbansOf[i])L.push(P.renbans[k].cells);
+ for(const k of rslsOf[i])L.push(P.rsls[k].cells);
  if(!cagesOf[i].length)L.push(BOXCELLS(i).filter(j=>!cagesOf[j].length));
  L.push(BOXCELLS(i));const seen=new Set();return L.filter(g=>{const key=[...g].sort((a,b)=>a-b).join(',');if(seen.has(key))return false;seen.add(key);return true})}
 let gp=null,multi=false,tapSeq={cell:-1,t:0,n:0,base:null};
@@ -824,7 +848,7 @@ function edgeAt(x,y){const r=grid.getBoundingClientRect(),fx=(x-r.left)/r.width*
 function cycleDot(a,b){const k=dotAt(P,a,b),cur=k>=0?P.kropki[k].t:'',nxt=cur===''?'w':cur==='w'?'b':'';lastDotEdge=[a,b];act(()=>{setDot(P,a,b,nxt);P.solved=false})}
 grid.addEventListener('pointerdown',e=>{if(editing&&etab==='kropki'){e.preventDefault();const ed=edgeAt(e.clientX,e.clientY);if(ed)cycleDot(ed[0],ed[1]);return}
  const i=cellAt(e.clientX,e.clientY);if(i<0)return;e.preventDefault();
- if(editing&&(etab==='thermo'||etab==='arrow'||etab==='whisper'||etab==='renban')){gp={id:e.pointerId,start:i,last:i,moved:false,thermo:true,fresh:!sel.size,added:false};try{grid.setPointerCapture(e.pointerId)}catch(_){}
+ if(editing&&(etab==='thermo'||etab==='arrow'||etab==='whisper'||etab==='renban'||etab==='rsl')){gp={id:e.pointerId,start:i,last:i,moved:false,thermo:true,fresh:!sel.size,added:false};try{grid.setPointerCapture(e.pointerId)}catch(_){}
   if(!sel.size){editLine=-1;sel=new Set([i])}else if(!sel.has(i)){sel.add(i);gp.added=true}
   renderSel();renderControls();return}
  const add=multi||e.shiftKey||e.metaKey||e.ctrlKey;const now=Date.now();
@@ -849,10 +873,10 @@ grid.addEventListener('pointermove',e=>{if(!gp||e.pointerId!==gp.id)return;const
 function endGP(e){if(!gp||(e&&e.pointerId!=null&&e.pointerId!==gp.id))return;const g=gp;gp=null;
  if(g.thermo){const i=g.start;
   if(!g.moved){
-   const OF=etab==='arrow'?arrowsOf:etab==='whisper'?whispersOf:etab==='renban'?renbansOf:thermosOf,LST=etab==='arrow'?P.arrows:etab==='whisper'?P.whispers:etab==='renban'?P.renbans:P.thermos;
+   const OF=etab==='arrow'?arrowsOf:etab==='whisper'?whispersOf:etab==='renban'?renbansOf:etab==='rsl'?rslsOf:thermosOf,LST=etab==='arrow'?P.arrows:etab==='whisper'?P.whispers:etab==='renban'?P.renbans:etab==='rsl'?P.rsls:P.thermos;
    if(g.fresh&&OF[i].length){const k=OF[i][0];editLine=k;sel=new Set(LST[k].cells);if(etab==='arrow')arrowB=LST[k].b||1}
    else if(!g.added&&!g.fresh&&[...sel].pop()===i){sel.delete(i);if(!sel.size)editLine=-1}}
-  renderThermos();renderWhispers();renderRenbans();renderArrows();renderSel();renderControls();return}
+  renderThermos();renderWhispers();renderRenbans();renderRsl();renderArrows();renderSel();renderControls();return}
  if(g.moved){if(editing&&editCage>=0){editCage=-1;sumBuf='';renderLines();renderControls()}renderSel();return}
  if(g.rep){tapSeq.n++;tapSeq.t=Date.now();const i=g.start,ks=cagesOf[i];let grp;
   const full=(mode==='k'&&tapSeq.n===1)?fullColour(i):0;
@@ -920,6 +944,10 @@ $('#bRbCreate').onclick=()=>{const cs=[...sel],why=renbanProblem(cs);if(why){nud
  const k=editLine;act(()=>{if(k>=0){P.renbans[k].cells=cs;P.renbans[k].elim=[]}else P.renbans.push({cells:cs,elim:[]});P.solved=false});sel.clear();editLine=-1;render()};
 $('#bRbDel').onclick=()=>{if(editLine<0)return;const k=editLine;act(()=>P.renbans.splice(k,1));editLine=-1;sel.clear();render()};
 $('#bRbClear').onclick=()=>{sel.clear();editLine=-1;render()};
+$('#bRslCreate').onclick=()=>{const cs=[...sel],why=rslProblem(cs);if(why){nudge($('#bRslCreate'));toast(cs.length<2?'Drag along the line first':why);return}
+ const k=editLine;act(()=>{if(k>=0)P.rsls[k].cells=cs;else P.rsls.push({cells:cs});P.solved=false});sel.clear();editLine=-1;render()};
+$('#bRslDel').onclick=()=>{if(editLine<0)return;const k=editLine;act(()=>P.rsls.splice(k,1));editLine=-1;sel.clear();render()};
+$('#bRslClear').onclick=()=>{sel.clear();editLine=-1;render()};
 $('#bWhClear').onclick=()=>{sel.clear();editLine=-1;render()};
 $('#bArDel').onclick=()=>{if(editLine<0)return;const k=editLine;act(()=>P.arrows.splice(k,1));editLine=-1;sel.clear();render()};
 $('#bArClear').onclick=()=>{sel.clear();editLine=-1;arrowB=1;render()};
@@ -985,7 +1013,7 @@ function openThermoCalc(k){const t=P.thermos[k];if(!t)return;const rs=thermoRang
  $('#mbox').innerHTML=`<h2>THERMO</h2><div class="muted">${rs.length} cells · digits increase from the bulb</div><div class="tlist">${rs.map(row).join('')}</div>
  <p class="muted cnote">Ranges come from the thermo's length and the digits already placed on it.${bad?' <b style="color:#b91c1c">Placed digits break the thermo.</b>':''}</p><div class="r"><button class="btn" id="mClose">Close</button></div>`;
  showModal();$('#mClose').onclick=closeModal}
-$('#bCalc').onclick=()=>{const T=calcTarget();if(!T)return;if(T.type==='thermo'){openThermoCalc(T.k);return}if(T.type==='arrow'){openArrowCalc(T.k);return}if(T.type==='whisper'){openWhisperCalc(T.k);return}if(T.type==='renban'){openRenbanCalc(T.k);return}if(T.type==='kropki'){openKropkiCalc(T.k);return}if(T.type==='cage')openCalculator(T.k);else if(T.type==='group')openGroupCalc(T.G);else openLineCalc(T.L)};
+$('#bCalc').onclick=()=>{const T=calcTarget();if(!T)return;if(T.type==='thermo'){openThermoCalc(T.k);return}if(T.type==='arrow'){openArrowCalc(T.k);return}if(T.type==='whisper'){openWhisperCalc(T.k);return}if(T.type==='renban'){openRenbanCalc(T.k);return}if(T.type==='rsl'){openRslCalc(T.k);return}if(T.type==='kropki'){openKropkiCalc(T.k);return}if(T.type==='cage')openCalculator(T.k);else if(T.type==='group')openGroupCalc(T.G);else openLineCalc(T.L)};
 // ARROW sheet: for each circle value still possible, the shaft digit sets that make it. Candidates
 // per cell are 1–9 minus digits already placed in its row, column, box, cage or thermo; shaft cells
 // that see each other (row/column/box/cage) must differ, others may repeat.
@@ -1036,6 +1064,14 @@ function openWhisperCalc(k){const w=P.whispers[k];if(!w)return;const rs=whisperO
  const row=(r,k)=>`<div class="trow wrow${r.d.length?'':' tbad'}"><span class="tpos">${k+1}</span><span class="tcell">${RC(r.i)}</span><span class="trng">${r.v?`<b>${r.v}</b> placed`:r.d.length?r.d.join(' '):'no digit fits'}</span></div>`;
  $('#mbox').innerHTML=`<h2>WHISPER</h2><div class="muted">${rs.length} cells · neighbours on the line differ by 5 or more</div><div class="tlist">${rs.map(row).join('')}</div>
  <p class="muted cnote">Possible digits from the line alone, narrowed by digits already placed on it. 5 can never go on a whisper; 4 needs 9 next to it and 6 needs 1. Digits can repeat on the line if sudoku rules allow.${bad?' <b style="color:#b91c1c">Placed digits break the whisper.</b>':''}</p><div class="r"><button class="btn" id="mClose">Close</button></div>`;
+ showModal();$('#mClose').onclick=closeModal}
+function openRslCalc(k){const r=P.rsls[k];if(!r)return;const segs=rslSegments(r.cells),rs=segs.map(rslRange);
+ const lo=rs.length?Math.max(...rs.map(x=>x.lo)):0,hi=rs.length?Math.min(...rs.map(x=>x.hi)):0,bad=lo>hi;
+ const row=(seg,rng,i)=>{const body=rng.full?`sum <b>${rng.sum}</b>`:rng.lo===rng.hi?`must sum to <b>${rng.lo}</b>`:`${rng.lo}–${rng.hi}`;
+  return `<div class="trow${rng.lo>hi||rng.hi<lo?' tbad':''}"><span class="tpos">Seg ${i+1}</span><span class="tcell">${seg.map(RC).join(' ')}</span><span class="trng">${body}</span></div>`};
+ const common=bad?'no common sum works':lo===hi?`common sum is <b>${lo}</b>`:`common sum ${lo}–${hi}`;
+ $('#mbox').innerHTML=`<h2>REGION SUM</h2><div class="muted">${r.cells.length} cells · ${segs.length} segment${segs.length>1?'s':''} · ${common}</div><div class="tlist">${segs.map((seg,i)=>row(seg,rs[i],i)).join('')}</div>
+ <p class="muted cnote">Box borders split the line into segments; each segment of a line has the same sum. If a line re-enters a box, that visit is a new segment. Digits can repeat if sudoku rules allow. Ranges come from digits already placed on the line.${bad?' <b style="color:#b91c1c">Placed digits break the region-sum line.</b>':''}</p><div class="r"><button class="btn" id="mClose">Close</button></div>`;
  showModal();$('#mClose').onclick=closeModal}
 // RENBAN sheet (v26): every run of consecutive digits the line's length allows (length 3: 123 … 789).
 // Grey = impossible: a digit placed on the line isn't in the run, or the line's cells can't be matched one-to-one
@@ -1191,15 +1227,16 @@ const HELP_ELEMENTS=[
  {id:'arrow',title:'Arrows',body:`<p>A grey <b>circle</b> with a line and an arrowhead is an arrow. The digits along the line (the <b>shaft</b>) <b>add up to the digit in the circle</b>.</p><p>Digits <b>can repeat</b> on an arrow, as long as the repeats aren't in the same row, column, box or cage. A 2-cell oval circle is read as a 2-digit number (left to right, or top to bottom).</p><p>Tips: the circle is at least the number of shaft cells, so a 3-cell shaft means the circle is 6+ if its cells all see each other. Select an arrow (or one uncaged cell on it) and press Σ to list each possible circle value with the shaft digits that make it. Tap a value to cross out that whole row, or tap one set of digits to cross out just that set; tap again to restore. Crossings are yours — the app never crosses anything out for you. Digits that can't add up turn the arrow red.</p>`},
  {id:'whisper',title:'German whispers',body:`<p>A thick <b>green line</b> is a German whisper. Any two cells <b>next to each other on the line</b> must differ by <b>at least 5</b>.</p><ul><li><b>5</b> can never be on a whisper (nothing is 5 away from it).</li><li>So digits alternate <b>low</b> (1–4) and <b>high</b> (6–9) along the line.</li><li><b>4</b> only fits next to 9, and <b>6</b> only next to 1 — so a 4 or 6 can't sit between two cells that see each other.</li><li>Digits can repeat on a whisper if sudoku rules allow.</li></ul><p>Select a whisper (or one uncaged cell on it) and press Σ to see the digits each cell can take, given the digits already placed on the line. Neighbours that break the rule turn red.</p>`},
  {id:'renban',title:'Renban lines',body:`<p>A thick <b>pink-purple line</b> is a renban. Its digits are a set of <b>consecutive</b> digits in <b>any order</b>, with <b>no repeats</b> — e.g. a 3-cell renban could be 4 6 5, but not 4 6 7 or 3 3 4.</p><ul><li>A renban of length n spans exactly n−1: if 2 and 6 are on a 5-cell renban it must be 23456.</li><li>Long renbans must contain the middle digits: a 5-cell renban always has 5; a 6-cell one always has 4, 5 and 6.</li><li>Cells on a renban that see each other in a box often decide which end of the run goes where.</li></ul><p>Select a renban (or one uncaged cell on it) and press Σ to list every possible run. Grey runs can't fit the digits already placed; tap a run to cross it out yourself. Repeats or digits too far apart turn the line red.</p>`},
+ {id:'rsl',title:'Region-sum lines',body:`<p>A thick <b>cyan line</b> is a region-sum line. <b>Box borders</b> split the line into <b>segments</b>, and the digits on <b>each segment of a line have the same sum</b>. Different lines may have different sums.</p><ul><li>If a line leaves a box and later comes back, that later visit is a <b>new</b> segment.</li><li>A 1-cell segment means that digit <b>is</b> the common sum of the other segments — so a 3-cell partner must be at least 6.</li><li>A 2-cell line with one cell in each of two boxes forces the two digits to be <b>equal</b>.</li><li>Digits can repeat on the line if sudoku rules allow.</li></ul><p>Select a region-sum line (or one uncaged cell on it) and press Σ to see each segment's possible sum range, narrowed by digits already placed. Segments that can't share a sum turn the line red.</p>`},
 ];
 const HELP_CONTROLS=[
- {id:'select',title:'Selecting cells',body:`<ul><li><b>Tap</b> a cell to select it; tap it again to deselect.</li><li><b>Double-tap</b> selects the cell's cage (or the uncaged cells of its box).</li><li>On a thermo, arrow, whisper or renban, the next tap selects that line: <b>double</b> = cage, <b>triple</b> = the line, then the box. An uncaged line cell goes line → uncaged group → box. (Order if a cell is on several: cage → thermo → arrow → whisper → renban.)</li><li>Otherwise <b>triple-tap</b> selects the whole box.</li><li><b>Drag</b> to select several cells, or turn on <b>Multi</b> to add/remove cells with taps (double-tapping a selected cell removes its group).</li><li>While <b>Multi</b> is on, the number highlight is <b>locked</b>: selecting cells won't change it. To change it, clear the selection (tap the status line) and tap a number key; tap the same key to turn it off.</li><li>Tap the status line to clear the selection.</li></ul>`},
+ {id:'select',title:'Selecting cells',body:`<ul><li><b>Tap</b> a cell to select it; tap it again to deselect.</li><li><b>Double-tap</b> selects the cell's cage (or the uncaged cells of its box).</li><li>On a thermo, arrow, whisper, renban or region-sum line, the next tap selects that line: <b>double</b> = cage, <b>triple</b> = the line, then the box. An uncaged line cell goes line → uncaged group → box. (Order if a cell is on several: cage → thermo → arrow → whisper → renban → region-sum line.)</li><li>Otherwise <b>triple-tap</b> selects the whole box.</li><li><b>Drag</b> to select several cells, or turn on <b>Multi</b> to add/remove cells with taps (double-tapping a selected cell removes its group).</li><li>While <b>Multi</b> is on, the number highlight is <b>locked</b>: selecting cells won't change it. To change it, clear the selection (tap the status line) and tap a number key; tap the same key to turn it off.</li><li>Tap the status line to clear the selection.</li></ul>`},
  {id:'modes',title:'Digit, Corner, Centre',body:`<p>Pick a mode, then a number. Digit places a value; Corner and Centre add pencil marks. Placing a digit clears that digit's marks from the same row, column, box, cage and thermo.</p><p>With nothing selected, the number keys <b>highlight</b> that number. Tap the key again to clear.</p>`},
  {id:'look',title:'Selection vs highlight',body:`<ul><li><b>Selected</b> cells get a navy outline drawn on the grid lines around the selection, and turn slightly brighter. Every unselected cell also darkens a little.</li><li><b>Highlighted</b> cells (holding the number, or a pencil mark of it — shown as an amber chip) have no border; every other cell darkens a little, and cells where the number can't go darken a bit more.</li><li>A cell that is both keeps the border and isn't darkened.</li><li>A cell that is neither selected nor highlighted gets both darkenings, so the three kinds stay easy to tell apart.</li><li><b>☰ → Visuals</b> opens a pane of sliders (mark darkness and outlines, cage darkness, line strength, placed-digit outlines, and UI contrast) so you can tune how the grid looks. The pane stays below the grid and updates it live.</li></ul>`},
  {id:'colour',title:'Colours',body:`<p>In Colour mode each key has a <b>+</b> half and a <b>−</b> half. + adds a colour (up to 3 per cell); + on a colour already there makes it 2/3 of the cell. − shrinks or removes it.</p><p>Long-press a key, or use ◎ Select colour, to <b>select</b> every cell that is <b>fully</b> that colour; cells with only <b>part</b> of it are <b>highlighted</b>. Double-tap a cell that is one solid colour does the same for its colour.</p>`},
- {id:'sigma',title:'Σ Combos and Total',body:`<p>Σ works on: one cell in a cage (the whole cage), an uncaged box group, 2+ cells all in one cage, row, column or 3×3 box (type their sum; a whole row, column or box is 45), a thermo (ranges), an arrow (circle values and shaft digits), a whisper (each cell's possible digits), a renban (the possible runs), or the two cells of a kropki dot (the possible pairs). The Σ button names what it will show (Combos, Ranges, Sums, Digits, Runs, Pairs). The status line adds up whole cages, known groups and placed digits.</p>`},
+ {id:'sigma',title:'Σ Combos and Total',body:`<p>Σ works on: one cell in a cage (the whole cage), an uncaged box group, 2+ cells all in one cage, row, column or 3×3 box (type their sum; a whole row, column or box is 45), a thermo (ranges), an arrow (circle values and shaft digits), a whisper (each cell's possible digits), a renban (the possible runs), a region-sum line (each segment's sum range), or the two cells of a kropki dot (the possible pairs). The Σ button names what it will show (Combos, Ranges, Sums, Digits, Runs, Pairs). The status line adds up whole cages, known groups and placed digits.</p>`},
  {id:'test',title:'Test',body:`<p>For puzzles that come with a solution, select cells with centre marks and press <b>Test</b>: a green ✓ means the right digit is among the marks, a red ✕ means it's missing. Wrong placed digits also show red.</p>`},
- {id:'other',title:'Timer, edit, menus',body:`<p>Tap the timer to pause. ✎ opens the editor for cages, thermos, arrows, whispers, renbans, dots and givens. In the Arrows tab, tap the circle then the shaft cells in order. In the Dots tab, tap the line between two cells to cycle no dot → white → black.</p><p><b>☰</b> has Visuals, Tips, Help and Main menu. <b>Tips</b> shows the puzzle's hints one at a time (Prev/Next); it is greyed out when the puzzle has none. In a puzzle code each hint is a line <code>tip your text</code>, in order. The <b>main menu</b> has Continue (your current unsolved puzzle), Select puzzle (tap one to open; <b>⋯</b> to edit, copy its code, rename, restart or delete) and Add puzzle (paste a code or start a blank one). The app opens straight into your puzzle if it isn't solved yet.</p>`},
+ {id:'other',title:'Timer, edit, menus',body:`<p>Tap the timer to pause. ✎ opens the editor for cages, thermos, arrows, whispers, renbans, region-sum lines, dots and givens. In the Arrows tab, tap the circle then the shaft cells in order. In the Dots tab, tap the line between two cells to cycle no dot → white → black.</p><p><b>☰</b> has Visuals, Tips, Help and Main menu. <b>Tips</b> shows the puzzle's hints one at a time (Prev/Next); it is greyed out when the puzzle has none. In a puzzle code each hint is a line <code>tip your text</code>, in order. The <b>main menu</b> has Continue (your current unsolved puzzle), Select puzzle (tap one to open; <b>⋯</b> to edit, copy its code, rename, restart or delete) and Add puzzle (paste a code or start a blank one). The app opens straight into your puzzle if it isn't solved yet.</p>`},
 ];
 function showHelp(){
  const sec=h=>`<details class="hs" id="help-${h.id}"><summary>${esc(h.title)}</summary><div class="hb2">${h.body}</div></details>`;

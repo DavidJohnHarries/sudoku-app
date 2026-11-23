@@ -1,0 +1,25 @@
+SUDOKU v1
+name Bent out of Shape
+# Author: MSDOS (Matt Tressel)
+# Source: https://logic-masters.de/Raetselportal/Raetsel/zeigen.php?id=000P97
+# Source: https://sudokupad.app/biz33hgyye
+# Rules: normal sudoku; blue region-sum lines are split into segments by box borders, and the digits on each segment of a line have the same sum (different lines may have different sums; if a line re-enters a box, that visit is a new segment); digits on a purple renban line are a set of consecutive, non-repeating digits in any order; digits separated by a black dot are in a 1:2 ratio; not all dots are given.
+givens .................................................................................
+solution 843765129 971842365 265931487 319654872 784293651 652178934 428516793 196327548 537489216
+renban r9c4 r8c4 r7c4 r6c3 r7c3 r8c3 r9c3
+renban r9c7 r8c7 r7c7 r6c7 r7c6 r6c6 r5c6 r4c6
+renban r6c2 r7c1 r6c1 r5c1 r4c1
+renban r3c1 r4c2
+rsl r1c6 r2c6 r3c6 r4c7 r3c7 r2c7 r1c7
+rsl r6c4 r5c4 r4c4 r3c4 r4c3 r3c3 r2c3 r1c3
+rsl r4c8 r3c9 r4c9 r5c9 r6c9
+rsl r6c8 r7c9
+kropki b r5c6 r5c7
+kropki b r2c5 r2c6
+kropki b r1c1 r1c2
+kropki b r2c7 r2c8
+kropki b r9c4 r9c5
+kropki b r9c7 r9c8
+tip The short blue line in the bottom-right (r6c8–r7c9) has one cell in each of two boxes, so those two digits are equal.
+tip The blue line that dips into r4c7 has that cell as a single-cell segment, so r4c7 is the common sum of the two 3-cell segments on that line — at least 6 (1+2+3). The long blue line through the centre works the same way: r3c4 and r4c3 are each a one-cell segment, so they equal each other and the two 3-cell sums (also at least 6).
+tip The 8-cell purple renban cannot contain both 1 and 9, so its set is 12345678 or 23456789. Black dots are a 1:2 ratio (pairs 1–2, 2–4, 3–6, 4–8); not all dots are given.
