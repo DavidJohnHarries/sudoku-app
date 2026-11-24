@@ -116,6 +116,7 @@ function parsePuzzle(text){
    const u=[...new Set(d)];if(kw==='corner')p.cn[c]=u.sort().join('');else p.mn[c]=u.sort().join('')}
   else if(kw==='elim'||kw==='groupsum'||kw==='linesum')pend.push([ln,toks,kw]);
   else if(kw==='time'){p.time=Math.max(0,parseInt(toks[0])||0)}
+  else if(kw==='rslsum'){const c=parseCell(toks[0]||''),r=p.rsls.find(x=>x.cells[0]===c),t=parseInt(toks[1]);if(!r){errs.push(`Line ${ln}: "rslsum" must name a region-sum line's first cell`);continue}if(!(t>=1&&t<=45)){errs.push(`Line ${ln}: expected "rslsum r1c1 SUM"`);continue}r.total=t}
   else if(kw==='solved')p.solved=true;
   else {p.extra.push(raw.trim());if(!errs.some(e=>e.includes(`"${kw}"`)))errs.push(`Note: "${kw}" lines aren't supported yet; kept and ignored.`)}
  }
@@ -128,6 +129,8 @@ function parsePuzzle(text){
    r.elim=toks.slice(2).filter(t=>/^[1-9]+$/.test(t));continue}
   if(kw==='elim'&&/^arrow$/i.test(toks[0]||'')){const c=parseCell(toks[1]||''),a=p.arrows.find(x=>x.cells[0]===c);if(!a){errs.push(`Line ${ln}: "elim arrow" must name an arrow's circle cell`);continue}
    a.elim=toks.slice(2).filter(t=>/^\d+(:[1-9](\+[1-9])*)?$/.test(t));continue}
+  if(kw==='elim'&&/^rsl$/i.test(toks[0]||'')){const c=parseCell(toks[1]||''),r=p.rsls.find(x=>x.cells[0]===c);if(!r){errs.push(`Line ${ln}: "elim rsl" must name a region-sum line's first cell`);continue}
+   r.elim=r.elim||{};for(const t of toks.slice(2)){const m=/^(\d+):([1-9]+)$/.exec(t);if(m)(r.elim[m[1]]=r.elim[m[1]]||[]).push(m[2])}continue}
   if(kw==='linesum'||(kw==='elim'&&/^line$/i.test(toks[0]||''))){
    const src=kw==='elim'?toks.slice(1):toks,cells=[],rest=[];
    for(const t of src){const c=parseCell(t);if(c>=0)cells.push(c);else rest.push(t)}
@@ -211,6 +214,7 @@ function exportPuzzle(p,state){
   for(const a of p.arrows||[])if(a.elim&&a.elim.length)L.push(`elim arrow ${RC(a.cells[0])} ${a.elim.join(' ')}`);
   for(const d of p.kropki||[])if(d.elim&&d.elim.length)L.push(`elim kropki ${RC(d.a)} ${RC(d.b)} ${d.elim.join(' ')}`);
   for(const r of p.renbans||[])if(r.elim&&r.elim.length)L.push(`elim renban ${RC(r.cells[0])} ${r.elim.join(' ')}`);
+  for(const r of p.rsls||[]){if(r.total)L.push(`rslsum ${RC(r.cells[0])} ${r.total}`);const e=r.elim||{},keys=[];for(const sm of Object.keys(e).sort((a,b)=>+a-+b))for(const c of e[sm]||[])keys.push(sm+':'+c);if(keys.length)L.push(`elim rsl ${RC(r.cells[0])} ${keys.join(' ')}`)}
   for(let b=0;b<9;b++){const G=groupOf(p,b);if(!G||!G.stored)continue;if(!G.derived&&G.sum)L.push(`groupsum ${G.key} ${G.sum}`);if(G.elim.length)L.push(`elim ${G.key} ${G.elim.join(' ')}`)}
   const ls=p.lineSums||{};for(const ck of Object.keys(ls).sort()){const g=ls[ck],cells=ck.split(',').map(Number);
    if(g.sum)L.push(`linesum ${g.sum} `+cells.map(RC).join(' '));if(g.elim&&g.elim.length)L.push(`elim line `+cells.map(RC).join(' ')+' '+g.elim.join(' '))}
@@ -277,7 +281,7 @@ function calcTarget(){
 // ---------- Storage ----------
 let DB=LS('sdk_puzzles')||{};let curId=LS('sdk_cur');
 if(!Object.keys(DB).length){const {p}=parsePuzzle(SAMPLE);DB[p.id]=p;curId=p.id}
-for(const p of Object.values(DB)){p.extra=p.extra||[];p.tips=p.tips||[];{const keep=[];for(const x of p.extra){if(/^tip\s/i.test(x))p.tips.push(x.slice(3).trim());else keep.push(x)}p.extra=keep}p.thermos=p.thermos||[];p.whispers=p.whispers||[];p.renbans=(p.renbans||[]).map(r=>({cells:r.cells,elim:r.elim||[]}));p.rsls=p.rsls||[];p.arrows=(p.arrows||[]).map(a=>({cells:a.cells,b:a.b||1,elim:a.elim||[]}));p.kropki=(p.kropki||[]).map(d=>({...d,elim:d.elim||[]}));p.kropkiNeg=!!p.kropkiNeg;p.groups=p.groups||{};p.lineSums=p.lineSums||{};p.sol=p.sol||null;p.cages.forEach(c=>c.elim=c.elim||[]);if(p.col)for(let i=0;i<81;i++)p.col[i]=normCol(p.col[i])}
+for(const p of Object.values(DB)){p.extra=p.extra||[];p.tips=p.tips||[];{const keep=[];for(const x of p.extra){if(/^tip\s/i.test(x))p.tips.push(x.slice(3).trim());else keep.push(x)}p.extra=keep}p.thermos=p.thermos||[];p.whispers=p.whispers||[];p.renbans=(p.renbans||[]).map(r=>({cells:r.cells,elim:r.elim||[]}));p.rsls=(p.rsls||[]).map(r=>({cells:r.cells,elim:r.elim&&typeof r.elim==='object'&&!Array.isArray(r.elim)?r.elim:{},total:r.total||null}));p.arrows=(p.arrows||[]).map(a=>({cells:a.cells,b:a.b||1,elim:a.elim||[]}));p.kropki=(p.kropki||[]).map(d=>({...d,elim:d.elim||[]}));p.kropkiNeg=!!p.kropkiNeg;p.groups=p.groups||{};p.lineSums=p.lineSums||{};p.sol=p.sol||null;p.cages.forEach(c=>c.elim=c.elim||[]);if(p.col)for(let i=0;i<81;i++)p.col[i]=normCol(p.col[i])}
 if(!DB[curId])curId=Object.values(DB).sort((a,b)=>b.updated-a.updated)[0].id;
 let P=DB[curId];
 let saveT=null;const saveNow=()=>{clearTimeout(saveT);saveT=null;SV('sdk_puzzles',DB);SV('sdk_cur',curId)};
@@ -431,8 +435,9 @@ function marksHTML(i){
  if(valAt(i))return '';
  let h='';
  const anc=cagesOf[i].find(k=>P.cages[k].cells[0]===i);
- if(P.cn[i]){const d=[...P.cn[i]],t=Math.ceil(d.length/2),w=!!(P.mn[i]&&P.mn[i].includes(String(numSel))),sp=a=>a.map(x=>noteMark(x,w)).join(''); // v28 CR1: centre mark gets the chip, corner twin stays grey
-  h+=`<div class="cn${anc!==undefined?' a':''}"><div>${sp(d.slice(0,t))}</div><div>${sp(d.slice(t))}</div></div>`}
+ if(P.cn[i]){const have=new Set([...P.cn[i]]),w=!!(P.mn[i]&&P.mn[i].includes(String(numSel))); // v47: fixed slots 1–5 top, 6–9 bottom
+  const slot=d=>have.has(String(d))?noteMark(String(d),w):'<span class="cne"></span>';
+  h+=`<div class="cn${anc!==undefined?' a':''}"><div class="cn-top">${[1,2,3,4,5].map(slot).join('')}</div><div class="cn-bot">${[6,7,8,9].map(slot).join('')}</div></div>`}
  if(P.mn[i])h+=`<span class="mn m${P.mn[i].length}">${[...P.mn[i]].map(x=>noteMark(x)).join('')}</span>`; // v29: pass only the digit — .map(noteMark) was feeding the index as `weak`
  return h}
 function inkHTML(i){const v=valAt(i);return v?`<span class="val">${v}</span>`:marksHTML(i)}
@@ -513,7 +518,8 @@ function renderRsl(){const el=$('#rsl');if(!el)return;let g='';
  el.innerHTML=g}
 // v32/v33: no SVG text mask. Placed digits and pencil marks are painted in #ink as the real
 // HTML, with a background-coloured text-stroke so the gap cannot drift on iOS Safari the way
-// the old SVG <text> mask did. Ink is above arrows/renbans and below thermos/whispers.
+// the old SVG <text> mask did. v47: ink sits above arrows, renbans, region-sum lines, thermos
+// and whispers, so the white halo cuts every constraint line.
 function renderArrows(){const el=$('#arrows');if(!el)return;let g='';
  (P.arrows||[]).forEach((a,k)=>{const hot=editing&&etab==='arrow'&&k===editLine,L=lineStyle('#9ca3af',1);g+=arrowSVG(a.cells,a.b,hot?'#3b82f6':arrowBad.has(k)?'#ef4444':L.col,hot||arrowBad.has(k)?1:L.op)});
  if(editing&&etab==='arrow'&&sel.size&&editLine<0)g+=arrowSVG([...sel],arrowB,'#3b82f6');
@@ -922,7 +928,14 @@ padBtns.forEach(b=>{let t=null;
  b.addEventListener('contextmenu',e=>e.preventDefault())});
 
 // ---------- Controls ----------
-$$('.modes button').forEach(b=>b.onclick=()=>{mode=b.dataset.m;if(mode!=='k')setPick(false);renderControls();renderSel()});
+let lastMTap=0,lastMAlready=false;
+function mergeCornersToCentre(){const t=[...sel].filter(i=>!valAt(i)&&P.cn[i]);if(!t.length)return;
+ act(()=>{for(const i of t){P.mn[i]=[...new Set((P.mn[i]||'')+P.cn[i])].sort().join('');P.cn[i]=''}})}
+$$('.modes button').forEach(b=>b.onclick=()=>{
+ if(b.dataset.m==='m'){const now=Date.now(),already=mode==='m';
+  if(already&&lastMAlready&&now-lastMTap<TAP_MS&&sel.size&&!editing){mergeCornersToCentre();lastMTap=now;lastMAlready=true;return}
+  mode='m';if(mode!=='k')setPick(false);renderControls();renderSel();lastMTap=now;lastMAlready=already;return}
+ lastMAlready=false;mode=b.dataset.m;if(mode!=='k')setPick(false);renderControls();renderSel()});
 padBtns.forEach(b=>b.onclick=e=>{if(b.dataset.lp){delete b.dataset.lp;return}if(mode==='k'&&pickColour){selectColour(+b.dataset.d);return}
  if(mode==='k'){pressColour(+b.dataset.d,!e.target.closest('.cpm.minus'),b);return}
  pressDigit(+b.dataset.d,b)});
@@ -945,7 +958,7 @@ $('#bRbCreate').onclick=()=>{const cs=[...sel],why=renbanProblem(cs);if(why){nud
 $('#bRbDel').onclick=()=>{if(editLine<0)return;const k=editLine;act(()=>P.renbans.splice(k,1));editLine=-1;sel.clear();render()};
 $('#bRbClear').onclick=()=>{sel.clear();editLine=-1;render()};
 $('#bRslCreate').onclick=()=>{const cs=[...sel],why=rslProblem(cs);if(why){nudge($('#bRslCreate'));toast(cs.length<2?'Drag along the line first':why);return}
- const k=editLine;act(()=>{if(k>=0)P.rsls[k].cells=cs;else P.rsls.push({cells:cs});P.solved=false});sel.clear();editLine=-1;render()};
+ const k=editLine;act(()=>{if(k>=0)P.rsls[k].cells=cs;else P.rsls.push({cells:cs,elim:{},total:null});P.solved=false});sel.clear();editLine=-1;render()};
 $('#bRslDel').onclick=()=>{if(editLine<0)return;const k=editLine;act(()=>P.rsls.splice(k,1));editLine=-1;sel.clear();render()};
 $('#bRslClear').onclick=()=>{sel.clear();editLine=-1;render()};
 $('#bWhClear').onclick=()=>{sel.clear();editLine=-1;render()};
@@ -1065,14 +1078,30 @@ function openWhisperCalc(k){const w=P.whispers[k];if(!w)return;const rs=whisperO
  $('#mbox').innerHTML=`<h2>WHISPER</h2><div class="muted">${rs.length} cells · neighbours on the line differ by 5 or more</div><div class="tlist">${rs.map(row).join('')}</div>
  <p class="muted cnote">Possible digits from the line alone, narrowed by digits already placed on it. 5 can never go on a whisper; 4 needs 9 next to it and 6 needs 1. Digits can repeat on the line if sudoku rules allow.${bad?' <b style="color:#b91c1c">Placed digits break the whisper.</b>':''}</p><div class="r"><button class="btn" id="mClose">Close</button></div>`;
  showModal();$('#mClose').onclick=closeModal}
-function openRslCalc(k){const r=P.rsls[k];if(!r)return;const segs=rslSegments(r.cells),rs=segs.map(rslRange);
+function rslFitsCombo(seg,combo){const placed=seg.map(valAt).filter(Boolean).map(String);if(placed.length>combo.length)return false;const left=[...combo];for(const d of placed){const i=left.indexOf(d);if(i<0)return false;left.splice(i,1)}return true}
+function openRslCalc(k){const r=P.rsls[k];if(!r)return;r.elim=r.elim&&typeof r.elim==='object'&&!Array.isArray(r.elim)?r.elim:{};const segs=rslSegments(r.cells),rs=segs.map(rslRange);
  const lo=rs.length?Math.max(...rs.map(x=>x.lo)):0,hi=rs.length?Math.min(...rs.map(x=>x.hi)):0,bad=lo>hi;
- const row=(seg,rng,i)=>{const body=rng.full?`sum <b>${rng.sum}</b>`:rng.lo===rng.hi?`must sum to <b>${rng.lo}</b>`:`${rng.lo}–${rng.hi}`;
-  return `<div class="trow${rng.lo>hi||rng.hi<lo?' tbad':''}"><span class="tpos">Seg ${i+1}</span><span class="tcell">${seg.map(RC).join(' ')}</span><span class="trng">${body}</span></div>`};
+ if(r.total==null&&lo===hi&&lo>0)r.total=lo;
  const common=bad?'no common sum works':lo===hi?`common sum is <b>${lo}</b>`:`common sum ${lo}–${hi}`;
- $('#mbox').innerHTML=`<h2>REGION SUM</h2><div class="muted">${r.cells.length} cells · ${segs.length} segment${segs.length>1?'s':''} · ${common}</div><div class="tlist">${segs.map((seg,i)=>row(seg,rs[i],i)).join('')}</div>
- <p class="muted cnote">Box borders split the line into segments; each segment of a line has the same sum. If a line re-enters a box, that visit is a new segment. Digits can repeat if sudoku rules allow. Ranges come from digits already placed on the line.${bad?' <b style="color:#b91c1c">Placed digits break the region-sum line.</b>':''}</p><div class="r"><button class="btn" id="mClose">Close</button></div>`;
- showModal();$('#mClose').onclick=closeModal}
+ const elimOf=sm=>{r.elim[sm]=r.elim[sm]||[];return r.elim[sm]};
+ const draw=()=>{const sum=r.total,inp=$('#cSum');if(inp&&inp.value!==(sum==null?'':String(sum)))inp.value=sum==null?'':String(sum);
+  $('#cMeta').innerHTML=`${r.cells.length} cells · ${segs.length} segment${segs.length>1?'s':''} · ${common}`;
+  let html='';
+  segs.forEach((seg,i)=>{const n=seg.length,rng=rs[i],list=sum?combos(n,sum):[];
+   const placed=seg.map(valAt).filter(Boolean);
+   html+=`<div class="rslseg"><b>Seg ${i+1}</b> · ${n} cell${n>1?'s':''} · ${seg.map(RC).join(' ')} · ${rng.full?`sum <b>${rng.sum}</b>`:rng.lo===rng.hi?`must sum to <b>${rng.lo}</b>`:`${rng.lo}–${rng.hi}`}${placed.length?` · placed ${placed.join(',')}`:''}</div>`;
+   if(!sum){html+='<p class="muted">Enter the common sum to see combinations.</p>';return}
+   if(!list.length){html+=`<p class="rslimp">No ${n}-cell set of different digits makes ${sum} (range ${minSum(n)}–${maxSum(n)}).</p>`;return}
+   const el=elimOf(String(sum)),cols=list.length<=5||n>=7?1:list.length<=10||n>=6?2:3;
+   html+=`<div class="clist c${cols}">`+list.map(x=>{const fit=rslFitsCombo(seg,x),off=el.includes(x);return `<button class="combo${off?' off':''}${fit?'':' imp'}" data-seg="${i}" data-x="${x}">${[...x].map(d=>`<span>${d}</span>`).join('')}</button>`}).join('')+'</div>'});
+  $('#cList').innerHTML=html};
+ const change=fn=>{const before=snap();fn();if(snap()!==before){undoS.push(before);redoS=[];save()}draw()};
+ $('#mbox').innerHTML=`<h2 class="ch">REGION SUM: <input id="cSum" inputmode="numeric" pattern="[0-9]*" maxlength="2" value="${r.total||''}" placeholder="?"></h2><div class="muted" id="cMeta"></div><div id="cList"></div>
+ <p class="muted cnote">Type the common sum, then each segment lists the sets of different digits that make it. Tap a set to cross it out (tap again to restore); crossings are remembered per sum on this line. Grey sets clash with digits already placed on that segment. A total outside a segment's possible range is flagged.${bad?' <b style="color:#b91c1c">Placed digits break the region-sum line.</b>':''}</p><div class="r"><button class="btn" id="mClose">Close</button></div>`;
+ draw();showModal();$('#mClose').onclick=closeModal;
+ $('#cSum').addEventListener('input',()=>{const v=parseInt($('#cSum').value);const nv=v>=1&&v<=45?v:null;if(nv===r.total)return;change(()=>{r.total=nv})});
+ $('#cList').onclick=e=>{const b=e.target.closest('.combo');if(!b||b.classList.contains('imp'))return;const sum=r.total;if(!sum)return;const x=b.dataset.x,el=elimOf(String(sum));change(()=>{const ix=el.indexOf(x);ix>=0?el.splice(ix,1):el.push(x)})}}
+
 // RENBAN sheet (v26): every run of consecutive digits the line's length allows (length 3: 123 … 789).
 // Grey = impossible: a digit placed on the line isn't in the run, or the line's cells can't be matched one-to-one
 // to the run's digits given what their rows, columns, boxes and cages already hold. Tap a run to cross it out
@@ -1227,14 +1256,14 @@ const HELP_ELEMENTS=[
  {id:'arrow',title:'Arrows',body:`<p>A grey <b>circle</b> with a line and an arrowhead is an arrow. The digits along the line (the <b>shaft</b>) <b>add up to the digit in the circle</b>.</p><p>Digits <b>can repeat</b> on an arrow, as long as the repeats aren't in the same row, column, box or cage. A 2-cell oval circle is read as a 2-digit number (left to right, or top to bottom).</p><p>Tips: the circle is at least the number of shaft cells, so a 3-cell shaft means the circle is 6+ if its cells all see each other. Select an arrow (or one uncaged cell on it) and press Σ to list each possible circle value with the shaft digits that make it. Tap a value to cross out that whole row, or tap one set of digits to cross out just that set; tap again to restore. Crossings are yours — the app never crosses anything out for you. Digits that can't add up turn the arrow red.</p>`},
  {id:'whisper',title:'German whispers',body:`<p>A thick <b>green line</b> is a German whisper. Any two cells <b>next to each other on the line</b> must differ by <b>at least 5</b>.</p><ul><li><b>5</b> can never be on a whisper (nothing is 5 away from it).</li><li>So digits alternate <b>low</b> (1–4) and <b>high</b> (6–9) along the line.</li><li><b>4</b> only fits next to 9, and <b>6</b> only next to 1 — so a 4 or 6 can't sit between two cells that see each other.</li><li>Digits can repeat on a whisper if sudoku rules allow.</li></ul><p>Select a whisper (or one uncaged cell on it) and press Σ to see the digits each cell can take, given the digits already placed on the line. Neighbours that break the rule turn red.</p>`},
  {id:'renban',title:'Renban lines',body:`<p>A thick <b>pink-purple line</b> is a renban. Its digits are a set of <b>consecutive</b> digits in <b>any order</b>, with <b>no repeats</b> — e.g. a 3-cell renban could be 4 6 5, but not 4 6 7 or 3 3 4.</p><ul><li>A renban of length n spans exactly n−1: if 2 and 6 are on a 5-cell renban it must be 23456.</li><li>Long renbans must contain the middle digits: a 5-cell renban always has 5; a 6-cell one always has 4, 5 and 6.</li><li>Cells on a renban that see each other in a box often decide which end of the run goes where.</li></ul><p>Select a renban (or one uncaged cell on it) and press Σ to list every possible run. Grey runs can't fit the digits already placed; tap a run to cross it out yourself. Repeats or digits too far apart turn the line red.</p>`},
- {id:'rsl',title:'Region-sum lines',body:`<p>A thick <b>cyan line</b> is a region-sum line. <b>Box borders</b> split the line into <b>segments</b>, and the digits on <b>each segment of a line have the same sum</b>. Different lines may have different sums.</p><ul><li>If a line leaves a box and later comes back, that later visit is a <b>new</b> segment.</li><li>A 1-cell segment means that digit <b>is</b> the common sum of the other segments — so a 3-cell partner must be at least 6.</li><li>A 2-cell line with one cell in each of two boxes forces the two digits to be <b>equal</b>.</li><li>Digits can repeat on the line if sudoku rules allow.</li></ul><p>Select a region-sum line (or one uncaged cell on it) and press Σ to see each segment's possible sum range, narrowed by digits already placed. Segments that can't share a sum turn the line red.</p>`},
+ {id:'rsl',title:'Region-sum lines',body:`<p>A thick <b>cyan line</b> is a region-sum line. <b>Box borders</b> split the line into <b>segments</b>, and the digits on <b>each segment of a line have the same sum</b>. Different lines may have different sums.</p><ul><li>If a line leaves a box and later comes back, that later visit is a <b>new</b> segment.</li><li>A 1-cell segment means that digit <b>is</b> the common sum of the other segments — so a 3-cell partner must be at least 6.</li><li>A 2-cell line with one cell in each of two boxes forces the two digits to be <b>equal</b>.</li><li>Digits can repeat on the line if sudoku rules allow.</li></ul><p>Select a region-sum line (or one uncaged cell on it) and press Σ. Type the common sum at the top to list each segment's combinations; a total that a segment's cell count can't make is flagged. Tap a set to cross it out — crossings are remembered per sum on that line and saved with the puzzle. Sets that clash with digits already placed on the segment go grey. Segments that can't share a sum turn the line red.</p>`},
 ];
 const HELP_CONTROLS=[
  {id:'select',title:'Selecting cells',body:`<ul><li><b>Tap</b> a cell to select it; tap it again to deselect.</li><li><b>Double-tap</b> selects the cell's cage (or the uncaged cells of its box).</li><li>On a thermo, arrow, whisper, renban or region-sum line, the next tap selects that line: <b>double</b> = cage, <b>triple</b> = the line, then the box. An uncaged line cell goes line → uncaged group → box. (Order if a cell is on several: cage → thermo → arrow → whisper → renban → region-sum line.)</li><li>Otherwise <b>triple-tap</b> selects the whole box.</li><li><b>Drag</b> to select several cells, or turn on <b>Multi</b> to add/remove cells with taps (double-tapping a selected cell removes its group).</li><li>While <b>Multi</b> is on, the number highlight is <b>locked</b>: selecting cells won't change it. To change it, clear the selection (tap the status line) and tap a number key; tap the same key to turn it off.</li><li>Tap the status line to clear the selection.</li></ul>`},
- {id:'modes',title:'Digit, Corner, Centre',body:`<p>Pick a mode, then a number. Digit places a value; Corner and Centre add pencil marks. Placing a digit clears that digit's marks from the same row, column, box, cage and thermo.</p><p>With nothing selected, the number keys <b>highlight</b> that number. Tap the key again to clear.</p>`},
+ {id:'modes',title:'Digit, Corner, Centre',body:`<p>Pick a mode, then a number. Digit places a value; Corner and Centre add pencil marks. Corner marks always sit in fixed slots: <b>1–5 along the top</b>, <b>6–9 along the bottom</b>; empty slots stay empty. Placing a digit clears that digit's marks from the same row, column, box, cage and thermo.</p><p>With cells selected, <b>double-tap Centre</b> while Centre is already on to move every corner mark into the centre marks (a single undo). A tap when Centre is not already on just switches mode. With nothing selected, the number keys <b>highlight</b> that number. Tap the key again to clear.</p>`},
  {id:'look',title:'Selection vs highlight',body:`<ul><li><b>Selected</b> cells get a navy outline drawn on the grid lines around the selection, and turn slightly brighter. Every unselected cell also darkens a little.</li><li><b>Highlighted</b> cells (holding the number, or a pencil mark of it — shown as an amber chip) have no border; every other cell darkens a little, and cells where the number can't go darken a bit more.</li><li>A cell that is both keeps the border and isn't darkened.</li><li>A cell that is neither selected nor highlighted gets both darkenings, so the three kinds stay easy to tell apart.</li><li><b>☰ → Visuals</b> opens a pane of sliders (mark darkness and outlines, cage darkness, line strength, placed-digit outlines, and UI contrast) so you can tune how the grid looks. The pane stays below the grid and updates it live.</li></ul>`},
  {id:'colour',title:'Colours',body:`<p>In Colour mode each key has a <b>+</b> half and a <b>−</b> half. + adds a colour (up to 3 per cell); + on a colour already there makes it 2/3 of the cell. − shrinks or removes it.</p><p>Long-press a key, or use ◎ Select colour, to <b>select</b> every cell that is <b>fully</b> that colour; cells with only <b>part</b> of it are <b>highlighted</b>. Double-tap a cell that is one solid colour does the same for its colour.</p>`},
- {id:'sigma',title:'Σ Combos and Total',body:`<p>Σ works on: one cell in a cage (the whole cage), an uncaged box group, 2+ cells all in one cage, row, column or 3×3 box (type their sum; a whole row, column or box is 45), a thermo (ranges), an arrow (circle values and shaft digits), a whisper (each cell's possible digits), a renban (the possible runs), a region-sum line (each segment's sum range), or the two cells of a kropki dot (the possible pairs). The Σ button names what it will show (Combos, Ranges, Sums, Digits, Runs, Pairs). The status line adds up whole cages, known groups and placed digits.</p>`},
+ {id:'sigma',title:'Σ Combos and Total',body:`<p>Σ works on: one cell in a cage (the whole cage), an uncaged box group, 2+ cells all in one cage, row, column or 3×3 box (type their sum; a whole row, column or box is 45), a thermo (ranges), an arrow (circle values and shaft digits), a whisper (each cell's possible digits), a renban (the possible runs), a region-sum line (type the common sum and list each segment's combinations), or the two cells of a kropki dot (the possible pairs). The Σ button names what it will show (Combos, Ranges, Sums, Digits, Runs, Pairs). The status line adds up whole cages, known groups and placed digits.</p>`},
  {id:'test',title:'Test',body:`<p>For puzzles that come with a solution, select cells with centre marks and press <b>Test</b>: a green ✓ means the right digit is among the marks, a red ✕ means it's missing. Wrong placed digits also show red.</p>`},
  {id:'other',title:'Timer, edit, menus',body:`<p>Tap the timer to pause. ✎ opens the editor for cages, thermos, arrows, whispers, renbans, region-sum lines, dots and givens. In the Arrows tab, tap the circle then the shaft cells in order. In the Dots tab, tap the line between two cells to cycle no dot → white → black.</p><p><b>☰</b> has Visuals, Tips, Help and Main menu. <b>Tips</b> shows the puzzle's hints one at a time (Prev/Next); it is greyed out when the puzzle has none. In a puzzle code each hint is a line <code>tip your text</code>, in order. The <b>main menu</b> has Continue (your current unsolved puzzle), Select puzzle (tap one to open; <b>⋯</b> to edit, copy its code, rename, restart or delete) and Add puzzle (paste a code or start a blank one). The app opens straight into your puzzle if it isn't solved yet.</p>`},
 ];

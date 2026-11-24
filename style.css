@@ -18,20 +18,20 @@ header{display:flex;align-items:center;gap:6px;height:50px}
    hidden in #grid so we do not paint them twice. Stroke width is in em so it scales with the
    actual font size (a fixed cqh stroke stayed heavy as long centre strings shrank). Marks use
    calc(1.7em / 26) — 1.7cqh at the default 26cqh centre size. Placed digits use calc(1.5em / 66)
-   (≈1.5cqh). Halo colour is the cell colour at 60% opacity (cr6 option C). Ink sits above
-   arrows/renbans so that stroke cuts a gap in those lines, and below thermos/whispers so those
-   layers still multiply over the digits (no painted ring on a thermo bulb or a split-colour
-   cell). Split-colour cells still use a transparent --halo. */
+   (≈1.5cqh). Halo colour is the cell colour at 60% opacity (cr6 option C).
+   v47: ink sits above arrows, renbans, region-sum lines, thermos and whispers, so the white
+   digit halo cuts every constraint line the same way. Thermo/whisper multiply still applies
+   under the ink (bulbs stay grey; the halo is the ink stroke). */
 #grid .mn,#grid .cn,#grid .val{visibility:hidden}
 #grid,#renbans,#rsl,#arrows,#ink,#thermo,#whispers,#lines,#selsvg,#dots,#sums{position:absolute;inset:0}
-#renbans,#arrows,#rsl{z-index:1}
+#renbans,#arrows,#rsl,#thermo,#whispers{z-index:1}
 #ink{z-index:2;display:grid;grid-template-columns:repeat(9,1fr);grid-template-rows:repeat(9,1fr);pointer-events:none}
 /* v44: all grid digit outlines are white (placed, givens, marks, highlighted/error). Opacity is
    --outline-a (default 60%). At 200, marks are 5× and placed/given digits 4× the v40 width. */
 #ink .mn span{paint-order:stroke fill;-webkit-text-stroke-width:calc(1.7em / 26 * var(--mn-outline,1));-webkit-text-stroke-color:color-mix(in srgb,#fff var(--outline-a,60%),transparent)}
 #ink .cn span{paint-order:stroke fill;-webkit-text-stroke-width:calc(1.7em / 26 * var(--cn-outline,1));-webkit-text-stroke-color:color-mix(in srgb,#fff var(--outline-a,60%),transparent)}
 #ink .val{paint-order:stroke fill;-webkit-text-stroke-width:calc(1.5em / 66 * var(--val-outline,1));-webkit-text-stroke-color:color-mix(in srgb,#fff var(--outline-a,60%),transparent)}
-#thermo,#whispers{z-index:3}
+/* v47: thermos and whispers share z-index 1 with arrows/renbans/rsl; #ink (2) paints the white halo over them. */
 #lines,#selsvg,#dots{z-index:4;width:100%;height:100%;pointer-events:none}
 /* v37: cage sums sit in #sums above the cage/grid lines, as they did in v28 (a white rounded
    label covering the dashed corner). v33's z-index:4 on #lines painted those dashes over the
@@ -46,8 +46,11 @@ header{display:flex;align-items:center;gap:6px;height:50px}
 .sum{position:absolute;left:3%;top:1%;font-size:21cqh;line-height:1;background:#fff;padding:0 2px;border-radius:2px;color:#111827;font-weight:600}
 .sum.bad{color:#fff;background:#dc2626}
 .cn{position:absolute;inset:6% 9%;display:flex;flex-direction:column;justify-content:space-between;font-size:23cqh;line-height:1;color:var(--cn-color,color-mix(in srgb,#222 50%,#374151))}
-.cn.a>div:first-child{padding-left:30%}.cn>div{display:flex;justify-content:space-between}.cn>div:only-child{}
-.cn.top-only{justify-content:flex-start}
+/* v47: fixed slots — 1–5 along the top, 6–9 along the bottom; empty slots stay empty. */
+.cn-top,.cn-bot{display:grid;justify-items:center;align-items:center}
+.cn-top{grid-template-columns:repeat(5,1fr)}.cn-bot{grid-template-columns:repeat(4,1fr)}
+.cn.a .cn-top{padding-left:30%}
+.cn .cne{visibility:hidden}
 /* v40: centre-mark colour follows font size, not count. --mn-size is the only per-class size,
    used for both font-size and the mix so they cannot drift. 1–4 stay 26cqh / #374151.
    t = clamp((--mn-max - --mn-size) / (--mn-max - --mn-s6), 0, 1); 100% #222 at the 6-digit
@@ -279,3 +282,8 @@ header{display:flex;align-items:center;gap:6px;height:50px}
 
 /* Region-sum lines (v46): thick translucent cyan line, same layer as renbans/arrows so white digit halos cut the stroke. */
 #rsl{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;mix-blend-mode:multiply}
+
+/* v47 Region-sum Σ pane: a total box at the top, then per-segment combo lists. */
+.rslseg{margin:10px 0 4px;font-size:14px;color:#374151}
+.rslseg b{font-weight:600}
+.rslimp{color:#b91c1c;font-size:14px;margin:4px 0 8px}

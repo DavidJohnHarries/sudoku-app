@@ -1,0 +1,29 @@
+SUDOKU v1
+name Middling
+# Author: FullDeck and Missing a Few Cards
+# Source: https://logic-masters.de/Raetselportal/Raetsel/zeigen.php?id=000NFZ
+# Source: https://sudokupad.app/fa1pfahst4
+# Rules: normal sudoku; box borders split blue region-sum lines into segments, and the digits on each segment of a line have the same sum (if a line has more than one visit to a box, those visits are summed separately); digits in a cage sum to the total in the corner, and do not repeat.
+givens .................................................................................
+solution 427396815 159478623 683152497 842935176 371264589 965817234 794521368 238649751 516783942
+cage 12 r1c1 r1c2 r2c1 r2c2
+cage 12 r8c8 r8c9 r9c8 r9c9
+cage 11 r1c8 r1c9 r2c8 r2c9
+cage 11 r8c1 r8c2 r9c1 r9c2
+cage 12 r4c1 r4c2
+cage 13 r5c7 r5c8
+cage 12 r8c6 r9c6
+cage 12 r2c5 r3c5
+cage 11 r6c2 r6c3
+cage 11 r7c4 r8c4
+cage 10 r3c4 r4c4
+cage 9 r6c6 r6c7
+rsl r2c5 r2c6 r2c7 r3c8 r4c8 r5c8
+rsl r4c1 r5c1 r6c2 r7c2 r8c3 r8c4 r9c5 r9c6
+rsl r8c8 r7c9 r6c9 r5c9
+rsl r1c5 r1c4 r1c3 r2c2
+rsl r5c2 r4c2 r3c1 r2c1 r1c1
+rsl r4c3 r5c3 r6c3 r7c4 r7c5 r7c6 r6c7 r5c7 r4c7 r3c6 r3c5 r3c4
+tip The 11-cages in r1c8–r2c9 and r8c1–r9c2 are 1235. The 12-cages in r1c1–r2c2 and r8c8–r9c9 are 1236 or 1245. Those four 2×2 corners sum to 46.
+tip Phistomefel: those 16 corner cells match the 16-cell ring around the centre. Twelve of the ring cells are the closed region-sum line — four 3-cell segments in boxes 2, 4, 6 and 8, all with the same sum S — so the leftover ring corners r3c3, r3c7, r7c3 and r7c7 sum to 46−4S, and S is 6–9. The box-6 segment includes r5c7 from the 13-cage (at least 4), so S is at least 7.
+tip Each of those 3-cell segments is 124 (S=7), 125 or 134 (S=8), or 126, 135 or 234 (S=9). The 9-cage r6c6–r6c7 puts r6c7 (on the ring in box 6) in 1–6 or 8. Use the 10-cage r3c4–r4c4 and the 12-cage r2c5–r3c5 on the box-2 segment, and the 11-cages r6c2–r6c3 and r7c4–r8c4, to pin S.
