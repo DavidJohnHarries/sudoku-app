@@ -23,15 +23,16 @@ header{display:flex;align-items:center;gap:6px;height:50px}
    digit halo cuts every constraint line the same way. Thermo/whisper multiply still applies
    under the ink (bulbs stay grey; the halo is the ink stroke). */
 #grid .mn,#grid .cn,#grid .val{visibility:hidden}
-#grid,#renbans,#rsl,#arrows,#ink,#thermo,#whispers,#lines,#selsvg,#dots,#sums{position:absolute;inset:0}
-#renbans,#arrows,#rsl,#thermo,#whispers{z-index:1}
+#grid,#renbans,#rsl,#arrows,#parity,#ink,#thermo,#whispers,#lines,#selsvg,#dots,#sums{position:absolute;inset:0}
+#renbans,#arrows,#rsl,#parity,#thermo,#whispers{z-index:1}
 #ink{z-index:2;display:grid;grid-template-columns:repeat(9,1fr);grid-template-rows:repeat(9,1fr);pointer-events:none}
 /* v44: all grid digit outlines are white (placed, givens, marks, highlighted/error). Opacity is
    --outline-a (default 60%). At 200, marks are 5× and placed/given digits 4× the v40 width. */
 #ink .mn span{paint-order:stroke fill;-webkit-text-stroke-width:calc(1.7em / 26 * var(--mn-outline,1));-webkit-text-stroke-color:color-mix(in srgb,#fff var(--outline-a,60%),transparent)}
 #ink .cn span{paint-order:stroke fill;-webkit-text-stroke-width:calc(1.7em / 26 * var(--cn-outline,1));-webkit-text-stroke-color:color-mix(in srgb,#fff var(--outline-a,60%),transparent)}
 #ink .val{paint-order:stroke fill;-webkit-text-stroke-width:calc(1.5em / 66 * var(--val-outline,1));-webkit-text-stroke-color:color-mix(in srgb,#fff var(--outline-a,60%),transparent)}
-/* v47: thermos and whispers share z-index 1 with arrows/renbans/rsl; #ink (2) paints the white halo over them. */
+/* v47: thermos and whispers share z-index 1 with arrows/renbans/rsl; #ink (2) paints the white halo over them.
+   v48: #parity (odd circles / even squares) sits with those layers, under the ink, so the white halo cuts the grey shape. */
 #lines,#selsvg,#dots{z-index:4;width:100%;height:100%;pointer-events:none}
 /* v37: cage sums sit in #sums above the cage/grid lines, as they did in v28 (a white rounded
    label covering the dashed corner). v33's z-index:4 on #lines painted those dashes over the
@@ -273,7 +274,7 @@ header{display:flex;align-items:center;gap:6px;height:50px}
    v42: mark halo is always white (opacity --mark-halo-a, default 60%); 200 = 5× mark / 4× placed outline.
    v44: every digit outline is white (placed, givens, marks); opacity is --outline-a, default 60%, shared. */
 #renbans{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;mix-blend-mode:multiply}
-.tabs{grid-template-columns:repeat(4,1fr)}
+.tabs{grid-template-columns:repeat(5,1fr)} /* v48: 5 + 4 (Odd/Even tab) */
 
 /* v28: CR1 corner twin of a highlighted centre mark; CR3 disabled Tips item */
 .nh2{font-weight:800;color:#111827}
@@ -287,3 +288,6 @@ header{display:flex;align-items:center;gap:6px;height:50px}
 .rslseg{margin:10px 0 4px;font-size:14px;color:#374151}
 .rslseg b{font-weight:600}
 .rslimp{color:#b91c1c;font-size:14px;margin:4px 0 8px}
+
+.mech{font-size:15px;margin:6px 0 4px;color:#1f2937;line-height:1.35}
+#parity{pointer-events:none;mix-blend-mode:multiply}

@@ -1,0 +1,37 @@
+SUDOKU v1
+name A Square Odd & Even Ring
+# Author: meggen033
+# Source: https://logic-masters.de/Raetselportal/Raetsel/zeigen.php?id=000N4O
+# Source: https://sudokupad.app/m5cxtn0406
+# Rules: normal sudoku; a grey circle is odd (1, 3, 5, 7 or 9); a grey square is even (2, 4, 6 or 8); digits in a cage do not repeat and sum to the total in the corner if one is given; cells joined by an X sum to 10; a black dot means a 1:2 ratio; a white dot means consecutive digits; not all dots are given (and not all X pairs are given).
+givens .................................................................................
+solution 286419537 143756928 957328416 591847263 462931875 378562194 614283759 829675341 735194682
+cage 12 r8c8 r9c8
+cage 12 r1c2 r2c2
+cage 13 r4c8 r5c8
+cage 13 r5c2 r6c2
+cage 12 r2c4 r2c5
+cage 12 r8c5 r8c6
+cage r6c6 r6c7 r7c6
+cage r3c4 r4c3 r4c4 r5c4
+odd r4c3 r3c3 r3c4 r7c6 r7c7 r6c7
+even r5c3 r6c3 r7c3 r7c4 r7c5 r5c7 r4c7 r3c7 r3c6 r3c5
+xv x r8c1 r8c2
+xv x r9c1 r9c2
+xv x r2c8 r2c9
+xv x r1c8 r1c9
+xv x r9c4 r9c5
+kropki w r8c9 r9c9
+kropki w r1c1 r2c1
+kropki w r8c4 r8c5
+kropki w r2c5 r2c6
+kropki w r4c1 r5c1
+kropki w r5c9 r6c9
+kropki w r4c5 r5c5
+kropki w r5c6 r6c6
+kropki b r7c3 r7c4
+kropki b r3c6 r3c7
+kropki b r5c5 r6c5
+tip The grey circles (odd) and squares (even) sit exactly on the 16-cell ring around the centre: six odd cells and ten even cells. By Phistomefel, the four 2×2 corners of the grid contain the same 16 digits, so they also have six odd and ten even.
+tip The top-right 2×2 (r1c8–r2c9) has an X on each row, so each of those pairs sums to 10 and the four cells sum to 20. The bottom-left 2×2 (r8c1–r9c2) is the same. The top-left 2×2 has a 12-cage on r1c2–r2c2 and a white (consecutive) dot on r1c1–r2c1; the bottom-right 2×2 is the mirror of that (12-cage r8c8–r9c8, white dot r8c9–r9c9).
+tip The two black dots on the ring join even cells: r3c6–r3c7 and r7c3–r7c4, so those pairs are 2–4 or 4–8. The 13-cages r4c8–r5c8 and r5c2–r6c2 are 4–9, 5–8 or 6–7. Two cages have no total — they only say the digits don't repeat: r3c4/r4c3/r4c4/r5c4, and r6c6/r6c7/r7c6 (the last two of those are odd cells on the ring).
