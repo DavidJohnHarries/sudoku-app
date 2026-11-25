@@ -1,0 +1,32 @@
+SUDOKU v1
+name Paired Constraint
+# Author: ebiggie
+# Source: https://logic-masters.de/Raetselportal/Raetsel/zeigen.php?id=000N15
+# Source: https://sudokupad.app/oz3s1ehzdr
+# Rules: normal sudoku; cells joined by an X sum to 10; cells joined by a V sum to 5; all possible X and V pairs are given; digits along a purple renban line are a set of consecutive non-repeating digits, in any order.
+givens .................................................................................
+solution 527968134 361745298 894213576 615397842 249856713 783421659 178639425 952184367 436572981
+renban r2c2 r3c3 r3c4 r3c5 r3c6 r3c7 r3c8 r2c9
+renban r4c3 r4c4 r4c5 r4c6 r4c7 r4c8 r3c9
+renban r7c2 r6c3 r6c4 r6c5 r6c6 r6c7 r6c8
+renban r8c2 r7c3 r7c4 r7c5 r7c6 r7c7 r7c8 r8c9
+xv v r2c3 r3c3
+xv v r2c5 r3c5
+xv v r3c4 r4c4
+xv v r4c8 r5c8
+xv v r4c9 r5c9
+xv v r6c5 r7c5
+xv v r4c2 r5c2
+xv x r3c2 r4c2
+xv x r3c5 r4c5
+xv x r3c6 r4c6
+xv x r1c5 r2c5
+xv x r6c4 r7c4
+xv x r6c6 r7c6
+xv x r6c7 r7c7
+xv x r7c3 r8c3
+xv x r7c1 r8c1
+xv-negative
+tip All X and V pairs are given, so two cells that share an edge with no letter cannot sum to 5 or to 10. A V is only 14 or 23. Each of the four purple lines contains a 5: an 8-cell line is 1-8 or 2-9, and a 7-cell line is 1-7, 2-8 or 3-9. Cells on a V or an X cannot be 5, so the 5 on the upper 8-cell line (r2c2, along r3c3-r3c8, then r2c9) is in r2c2, r3c7, r3c8 or r2c9; the 5 on the lower 8-cell line is in r8c2, r7c8 or r8c9; the 5 on the upper 7-cell line is in r4c3, r4c7 or r3c9; and the 5 on the lower 7-cell line is in r7c2, r6c3 or r6c8.
+tip r3c3, r3c4 and r3c5 lie on that upper 8-cell line and each belongs to a V, so they are three different digits from 1-4. There is no V between those neighbours, so neither r3c3+r3c4 nor r3c4+r3c5 is 5. The V at r3c4-r4c4 and the Xs at r3c5-r4c5 and r3c6-r4c6 join this line to the 7-cell line along r4c3-r4c8. The same pattern appears between the two lower lines: a V at r6c5-r7c5 and Xs at r6c4-r7c4, r6c6-r7c6 and r6c7-r7c7.
+tip A cell on a V is low (1-4), so the other cell of an X from that V is high (6-9). That makes r1c5 high (it is X'd to r2c5, which is on a V), r3c2 high (X'd to r4c2, which is on a V) and r4c5 high (X'd to r3c5). Two 5-candidates that share a row, column or box cannot both be 5: in particular r2c2 and r8c2 see each other, r7c8 and r6c8 see each other, and r8c2 and r7c2 are in the same box.
