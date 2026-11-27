@@ -221,3 +221,7 @@ A published hard killer is in `puzzles/escape-room-sujoyku.txt` — *Escape Room
 ## v50: Letter tiles in the four diagonal gaps
 - Letters are capped at **4 per cell** (same as colours). Adding a fifth is ignored, with a brief “Max 4 letters per cell” toast. Old saves (and `letter` lines) with more than 4 load the first 4 in palette order (a–g, then ★, ◆).
 - Tiles sit in the four diagonal gaps between the centre marks and the corners: 1st top-left, 2nd top-right, 3rd bottom-left, 4th bottom-right. A strict 30%-in diagonal would land on a 4- or 5-digit centre string, so the 11cqh tiles sit closer to the corners (centres at 13% / 32.5% and the three mirrors) to clear corner slots 1–5 / 6–9 and those centre strings. On a placed digit the tiles stay visible behind the digit and its white halo, peeking out in the corners.
+
+## v51: Larger on-diagonal letter tiles; Letters size slider
+- Letter tiles are **22cqh** (double v50's 11cqh) with 17cqh type, centred on the true diagonals from the cell centre to each corner (27% in on both axes). A 22cqh tile cannot sit fully clear of both the corner slots (1–5 / 6–9) and a 4- or 5-digit centre string; readability and on-diagonal placement come first, and a thin white rim plus slightly translucent magenta keep the tiles distinct where they meet a pencil mark.
+- **Visuals → Letters → Size** scales the tiles from 50% to 150% of that default (100%). The value is saved with the other Visuals settings (`letSize` in `sdk_visuals`) and updates the grid live. Reset to defaults returns it to 100%.

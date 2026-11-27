@@ -292,18 +292,19 @@ header{display:flex;align-items:center;gap:6px;height:50px}
 .mech{font-size:15px;margin:6px 0 4px;color:#1f2937;line-height:1.35}
 #parity{pointer-events:none;mix-blend-mode:multiply}
 
-/* v50: up to 4 letters in the four diagonal gaps between centre and corner marks.
-   Centres at 13%/32.5% (and the three mirrors) — closer to the corners than a strict
-   30% diagonal, so an 11cqh tile clears corner slots 1–5 / 6–9 and a 4- or 5-digit
-   centre string. On a placed digit the same tiles sit under the digit and its white
-   halo and peek out in the corners. */
-.lets{position:absolute;inset:0;pointer-events:none;z-index:2;line-height:1}
-.lets span{position:absolute;display:flex;align-items:center;justify-content:center;width:11cqh;height:11cqh;border-radius:2.5cqh;background:#9d174d;color:#fff;font-weight:700;font-size:8.5cqh;line-height:1;transform:translate(-50%,-50%)}
-.lets span.tl{top:32.5%;left:13%}
-.lets span.tr{top:32.5%;left:87%}
-.lets span.bl{top:67.5%;left:13%}
-.lets span.br{top:67.5%;left:87%}
-.cell .cn,.cell .mn{z-index:3}
+/* v51: letter tiles are 22cqh (double v50) with 17cqh type, centred on the true
+   diagonals from the cell centre to each corner (27% in on both axes). --let-scale
+   (Visuals → Letters size, 0.5–1.5, default 1) scales the tile. A thin white rim
+   and slightly translucent magenta keep them readable where they meet pencil marks
+   (unavoidable at this size in the gap between corner and centre marks). */
+.lets{position:absolute;inset:0;pointer-events:none;z-index:3;line-height:1}
+.lets span{position:absolute;display:flex;align-items:center;justify-content:center;width:calc(22cqh * var(--let-scale,1));height:calc(22cqh * var(--let-scale,1));border-radius:calc(5cqh * var(--let-scale,1));background:color-mix(in srgb,#9d174d 88%,transparent);color:#fff;font-weight:700;font-size:calc(17cqh * var(--let-scale,1));line-height:1;transform:translate(-50%,-50%);box-shadow:0 0 0 calc(1.4cqh * var(--let-scale,1)) #fff}
+.lets span.tl{top:27%;left:27%}
+.lets span.tr{top:27%;left:73%}
+.lets span.bl{top:73%;left:27%}
+.lets span.br{top:73%;left:73%}
+.cell .cn,.cell .mn{z-index:2}
+.cell .lets{z-index:3}
 .cell .val{z-index:4}
 .pad.lmode button{font-size:0}
 .pad .lg{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:700;color:#1f2937;pointer-events:none;z-index:3}
