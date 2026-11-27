@@ -6,10 +6,11 @@ const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[c]);
 const RC=i=>`r${Math.floor(i/9)+1}c${i%9+1}`;
 const COLOURS=['#fca5a5','#fdba74','#fde047','#86efac','#5eead4','#93c5fd','#c4b5fd','#f9a8d4','#cbd5e1'];
-const MAXCOL=3;
+const MAXCOL=4;
+const LETTERS=['a','b','c','d','e','f','g','★','◆'];
 // Feature flags / hooks for later variants (thermometers, arrows, kropki...): add a parser section + a draw layer.
-const FEATURES={calculator:true,thermo:true,kropki:true,arrows:true,whispers:true,renban:true,rsl:true,xv:true,parity:true};
-// Colours: up to 3 per cell, drawn in palette order. At most one may be boosted
+const FEATURES={calculator:true,thermo:true,kropki:true,arrows:true,whispers:true,renban:true,rsl:true,xv:true,parity:true,letters:true};
+// Colours: up to 4 per cell, drawn in palette order as pie wedges. At most one may be boosted
 // (2/3 of the pie; the others share the remaining 1/3 equally). No boost = equal shares.
 function normCol(x){
  let ids=[],boost=0;
@@ -29,6 +30,9 @@ function parseColourToks(toks){
  return normCol({c:ids,b:boost})
 }
 function fmtColour(o){o=normCol(o);return o.c.map(d=>o.b===d?d+'*':String(d)).join(' ')}
+function normLetters(s){const seen=new Set(),out=[];for(const ch of String(s||'')){if(LETTERS.includes(ch)&&!seen.has(ch)){seen.add(ch);out.push(ch)}}
+ out.sort((a,b)=>LETTERS.indexOf(a)-LETTERS.indexOf(b));return out.join('')}
+function fmtLetters(s){return normLetters(s).split('').join(' ')}
 const SAMPLE=`SUDOKU v1
 name Sample killer
 givens .................................................................................
@@ -67,7 +71,7 @@ cage 8 r8c9 r9c9
 cage 4 r9c3`;
 
 // ---------- Puzzle format (see README) ----------
-function blankPuzzle(name){return {id:uid(),name:name||'Untitled',givens:Array(81).fill(0),sol:null,cages:[],thermos:[],arrows:[],whispers:[],renbans:[],rsls:[],kropki:[],kropkiNeg:false,xv:[],xvNegX:false,xvNegV:false,parity:Array(81).fill(''),tips:[],v:Array(81).fill(0),cn:Array(81).fill(''),mn:Array(81).fill(''),col:Array.from({length:81},()=>({c:[],b:0})),time:0,solved:false,extra:[],groups:{},lineSums:{},updated:Date.now()}}
+function blankPuzzle(name){return {id:uid(),name:name||'Untitled',givens:Array(81).fill(0),sol:null,cages:[],thermos:[],arrows:[],whispers:[],renbans:[],rsls:[],kropki:[],kropkiNeg:false,xv:[],xvNegX:false,xvNegV:false,parity:Array(81).fill(''),tips:[],v:Array(81).fill(0),cn:Array(81).fill(''),mn:Array(81).fill(''),col:Array.from({length:81},()=>({c:[],b:0})),lt:Array(81).fill(''),time:0,solved:false,extra:[],groups:{},lineSums:{},updated:Date.now()}}
 function parseCell(t){const m=/^r([1-9])c([1-9])$/i.exec(t);return m?(m[1]-1)*9+(m[2]-1):-1}
 function parseGrid81(s){s=s.replace(/[\s|]/g,'');if(s.length!==81||/[^.0-9]/.test(s))return null;return [...s].map(ch=>ch==='.'?0:+ch)}
 function parsePuzzle(text){
@@ -103,9 +107,11 @@ function parsePuzzle(text){
   else if(kw==='rsl'||kw==='regionsum'||kw==='region-sum'||kw==='region_sum'){const cs=toks.map(parseCell);
    if(cs.length<2||cs.some(c=>c<0)){errs.push(`Line ${ln}: expected "rsl r1c1 r1c2 r2c3 ..." (2+ cells in order along the line)`);continue}
    const why=rslProblem(cs);if(why)errs.push(`Line ${ln}: ${why} (kept anyway)`);p.rsls.push({cells:cs})}
-  else if(kw==='arrow'){const gt=toks.indexOf('>');const circ=(gt>=0?toks.slice(0,gt):toks.slice(0,1)).map(parseCell),sh=(gt>=0?toks.slice(gt+1):toks.slice(1)).map(parseCell);
-   if(!circ.length||circ.length>3||!sh.length||circ.some(c=>c<0)||sh.some(c=>c<0)){errs.push(`Line ${ln}: expected "arrow CIRCLE r1c2 r1c3 ..." (circle first, then the shaft to the arrowhead; a 2–3 cell circle: "arrow r1c1 r1c2 > r2c3 ...")`);continue}
-   const a={cells:[...circ,...sh],b:circ.length},why=arrowProblem(a.cells,a.b);if(why)errs.push(`Line ${ln}: ${why} (kept anyway)`);p.arrows.push(a)}
+  else if(kw==='arrow'){const parts=[],cur=[];for(const t of toks){if(t==='|'){parts.push(cur.splice(0,cur.length))}else cur.push(t)}parts.push(cur);
+   const first=parts[0]||[],gt=first.indexOf('>'),circ=(gt>=0?first.slice(0,gt):first.slice(0,1)).map(parseCell),sh=(gt>=0?first.slice(gt+1):first.slice(1)).map(parseCell);
+   const forks=parts.slice(1).map(p=>p.filter(t=>t!=='>').map(parseCell));
+   if(!circ.length||circ.length>3||!sh.length||circ.some(c=>c<0)||sh.some(c=>c<0)||forks.some(f=>!f.length||f.some(c=>c<0))){errs.push(`Line ${ln}: expected "arrow CIRCLE r1c2 r1c3 ..." (circle first, then the shaft to the arrowhead; a 2–3 cell circle: "arrow r1c1 r1c2 > r2c3 ..."; extra shafts: " ... | r2c6 r3c6")`);continue}
+   const a={cells:[...circ,...sh],b:circ.length,forks,elim:[]},why=arrowProblem(a);if(why)errs.push(`Line ${ln}: ${why} (kept anyway)`);p.arrows.push(a)}
   else if(kw==='kropki'){const t=(toks[0]||'').toLowerCase(),a=parseCell(toks[1]||''),b=parseCell(toks[2]||'');
    if(!(t==='w'||t==='b')||a<0||b<0||toks.length!==3){errs.push(`Line ${ln}: expected "kropki w r1c1 r1c2" (w = white, b = black)`);continue}
    if(!orthAdj(a,b)){errs.push(`Line ${ln}: kropki cells ${RC(a)} and ${RC(b)} must share an edge`);continue}
@@ -127,6 +133,9 @@ function parsePuzzle(text){
   else if(kw==='colour'||kw==='color'){const c=parseCell(toks[0]||'');
    if(c<0){errs.push(`Line ${ln}: expected "${kw} r1c1 COLOURS"`);continue}
    p.col[c]=parseColourToks(toks.slice(1))}
+  else if(kw==='letter'||kw==='letters'){const c=parseCell(toks[0]||'');
+   if(c<0){errs.push(`Line ${ln}: expected "letter r1c1 a c ★"`);continue}
+   p.lt=p.lt||Array(81).fill('');p.lt[c]=normLetters(toks.slice(1).join(''))}
   else if(kw==='corner'||kw==='centre'||kw==='center'){const c=parseCell(toks[0]||''),d=(toks.slice(1).join('')).replace(/[^1-9]/g,'');
    if(c<0){errs.push(`Line ${ln}: expected "${kw} r1c1 DIGITS"`);continue}
    const u=[...new Set(d)];if(kw==='corner')p.cn[c]=u.sort().join('');else p.mn[c]=u.sort().join('')}
@@ -187,15 +196,27 @@ const kingAdj=(a,b)=>a!==b&&Math.abs(Math.floor(a/9)-Math.floor(b/9))<=1&&Math.a
 function thermoProblem(cs){if(cs.length<2)return 'a thermo needs at least 2 cells';if(cs.length>9)return `thermo at ${RC(cs[0])} has ${cs.length} cells (max 9)`;
  if(new Set(cs).size<cs.length)return `thermo at ${RC(cs[0])} visits a cell twice`;
  for(let k=1;k<cs.length;k++)if(!kingAdj(cs[k-1],cs[k]))return `thermo at ${RC(cs[0])}: ${RC(cs[k-1])} → ${RC(cs[k])} aren't neighbours`;return ''}
-// Arrows (v16): {cells:[circle…, shaft…], b}. The first b cells (1, or a 2–3 cell "pill" read as a
-// number left-to-right / top-to-bottom) are the circle; the rest is the shaft in order, arrowhead last.
-// Shaft digits add up to the circle. Digits may repeat on an arrow if sudoku rules allow.
-function arrowProblem(cs,b){b=b||1;const at=RC(cs[0]);if(cs.length<b+1)return 'an arrow needs a circle and at least 1 shaft cell';
- if(new Set(cs).size<cs.length)return `arrow at ${at} visits a cell twice`;
+// Arrows (v16/v49): {cells:[circle…, first shaft…], b, forks:[[shaft2…],…]}. The first b cells
+// (1, or a 2–3 cell "pill" read as a number left-to-right / top-to-bottom) are the circle; each
+// shaft is a path from a neighbour of the circle to its arrowhead. Each shaft sums to the circle
+// on its own (a fork is not a combined total). Digits may repeat on an arrow if sudoku rules
+// allow. Forks: extra shafts from the same circle (`arrow r1c6 r1c5 r1c4 | r2c6 r3c6`).
+function arrowShafts(a){const b=a.b||1;return [a.cells.slice(b),...(a.forks||[])].filter(s=>s&&s.length)}
+function arrowAllCells(a){const b=a.b||1,out=a.cells.slice(0,b);for(const sh of arrowShafts(a))for(const i of sh)if(!out.includes(i))out.push(i);return out}
+function arrowShaftProblem(circ,sh,at){if(!sh.length)return `arrow at ${at} has an empty shaft`;
+ if(!circ.some(c=>kingAdj(c,sh[0])))return `arrow at ${at}: a shaft must start next to the circle`;
+ for(let k=1;k<sh.length;k++)if(!kingAdj(sh[k-1],sh[k]))return `arrow at ${at}: ${RC(sh[k-1])} → ${RC(sh[k])} aren't neighbours`;return ''}
+function arrowProblem(a,b){
+ // Accept an arrow object, or the old (cells, b) form used by the editor when creating a single shaft.
+ if(Array.isArray(a))a={cells:a,b:b||1,forks:[]};
+ b=a.b||1;const cs=a.cells||[],at=cs.length?RC(cs[0]):'';
+ if(cs.length<b+1)return 'an arrow needs a circle and at least 1 shaft cell';
  const circ=cs.slice(0,b),r0=Math.floor(circ[0]/9),c0=circ[0]%9;
  for(let k=1;k<b;k++)if(!orthAdj(circ[k-1],circ[k])||!(circ.every(i=>Math.floor(i/9)===r0)||circ.every(i=>i%9===c0)))return `arrow circle at ${at} must be cells side by side in a straight line`;
- if(!circ.some(c=>kingAdj(c,cs[b])))return `arrow at ${at}: the shaft must start next to the circle`;
- for(let k=b+1;k<cs.length;k++)if(!kingAdj(cs[k-1],cs[k]))return `arrow at ${at}: ${RC(cs[k-1])} → ${RC(cs[k])} aren't neighbours`;return ''}
+ const shafts=arrowShafts(a),all=[...circ,...shafts.flat()];
+ if(new Set(all).size<all.length)return `arrow at ${at} visits a cell twice`;
+ for(const sh of shafts){const why=arrowShaftProblem(circ,sh,at);if(why)return why}
+ return ''}
 // German whispers (v20): {cells} in order along the line; neighbours on the line differ by at least 5.
 // Digits may repeat (unless sudoku rules forbid); 5 can never be on a whisper.
 const WGAP=5;
@@ -220,7 +241,8 @@ function rslRange(seg){let s=0,used=new Set(),e=0;for(const i of seg){const v=va
 function rslConflicts(r,out){const segs=rslSegments(r.cells);if(segs.length<2)return false;
  const rs=segs.map(rslRange),lo=Math.max(...rs.map(x=>x.lo)),hi=Math.min(...rs.map(x=>x.hi));
  if(lo>hi){r.cells.forEach(i=>{if(valAt(i))out.add(i)});return true}return false}
-function fmtArrow(a){const b=a.b||1,c=a.cells.map(RC);return 'arrow '+(b>1?c.slice(0,b).join(' ')+' > ':c[0]+' ')+c.slice(b).join(' ')}
+function fmtArrow(a){const b=a.b||1,c=a.cells.map(RC),head='arrow '+(b>1?c.slice(0,b).join(' ')+' > ':c[0]+' ')+c.slice(b).join(' ');
+ const extra=(a.forks||[]).filter(s=>s&&s.length).map(s=>' | '+s.map(RC).join(' ')).join('');return head+extra}
 function gridStr(a){let s='';for(let r=0;r<9;r++)s+=(r?' ':'')+a.slice(r*9,r*9+9).map(x=>x||'.').join('');return s}
 function exportPuzzle(p,state){
  const L=['SUDOKU v1','name '+p.name,'givens '+gridStr(p.givens)];
@@ -241,7 +263,7 @@ function exportPuzzle(p,state){
  L.push(...p.extra);
  if(state){
   if(p.v.some(x=>x))L.push('values '+gridStr(p.v));
-  for(let i=0;i<81;i++){if(p.cn[i])L.push(`corner ${RC(i)} ${p.cn[i]}`);if(p.mn[i])L.push(`centre ${RC(i)} ${p.mn[i]}`);const co=normCol(p.col[i]);if(co.c.length)L.push(`colour ${RC(i)} ${fmtColour(co)}`)}
+  for(let i=0;i<81;i++){if(p.cn[i])L.push(`corner ${RC(i)} ${p.cn[i]}`);if(p.mn[i])L.push(`centre ${RC(i)} ${p.mn[i]}`);const co=normCol(p.col[i]);if(co.c.length)L.push(`colour ${RC(i)} ${fmtColour(co)}`);if((p.lt||[])[i])L.push(`letter ${RC(i)} ${fmtLetters(p.lt[i])}`)}
   for(const c of p.cages)if(c.elim&&c.elim.length)L.push(`elim ${RC(c.cells[0])} ${c.elim.join(' ')}`);
   for(const a of p.arrows||[])if(a.elim&&a.elim.length)L.push(`elim arrow ${RC(a.cells[0])} ${a.elim.join(' ')}`);
   for(const d of p.kropki||[])if(d.elim&&d.elim.length)L.push(`elim kropki ${RC(d.a)} ${RC(d.b)} ${d.elim.join(' ')}`);
@@ -292,13 +314,26 @@ function ensureLine(L){P.lineSums=P.lineSums||{};let g=P.lineSums[L.ck];if(!g)g=
 // Checked after exact cages/groups and before line/cage-subset sets.
 function exactThermoOfSel(){if(sel.size<2)return -1;const i0=[...sel][0];for(const k of thermosOf[i0]||[]){const t=P.thermos[k];if(t.cells.length===sel.size&&t.cells.every(i=>sel.has(i)))return k}return -1}
 // Arrows: an exact arrow (circle + shaft) or exact shaft selection, or one uncaged, non-thermo arrow cell → the ARROW sheet.
-function exactArrowOfSel(){if(sel.size<1)return -1;const i0=[...sel][0];for(const k of arrowsOf[i0]||[]){const a=P.arrows[k],sh=a.cells.slice(a.b||1);
- for(const cs of [a.cells,sh])if(cs.length===sel.size&&cs.every(i=>sel.has(i))&&(sel.size>1||cs===sh))return k}return -1}
+function exactArrowOfSel(){if(sel.size<1)return -1;const i0=[...sel][0];for(const k of arrowsOf[i0]||[]){const a=P.arrows[k],all=arrowAllCells(a),sh=all.slice(a.b||1);
+ for(const cs of [all,sh])if(cs.length===sel.size&&cs.every(i=>sel.has(i))&&(sel.size>1||cs===sh))return k}return -1}
 // Whispers: an exact whisper selection, or one cell on a whisper that's not in a cage/thermo/arrow → WHISPER sheet.
 function exactWhisperOfSel(){if(sel.size<2)return -1;const i0=[...sel][0];for(const k of whispersOf[i0]||[]){const cs=[...new Set(P.whispers[k].cells)];if(cs.length===sel.size&&cs.every(i=>sel.has(i)))return k}return -1}
 function exactRenbanOfSel(){if(sel.size<2)return -1;const i0=[...sel][0];for(const k of renbansOf[i0]||[]){const cs=P.renbans[k].cells;if(cs.length===sel.size&&cs.every(i=>sel.has(i)))return k}return -1}
 function exactRslOfSel(){if(sel.size<2)return -1;const i0=[...sel][0];for(const k of rslsOf[i0]||[]){const cs=P.rsls[k].cells;if(cs.length===sel.size&&cs.every(i=>sel.has(i)))return k}return -1}
-function calcTarget(){
+function exactMechanicMatches(){
+ // Mechanics whose cells are exactly the current selection, in the current Σ priority order.
+ const out=[];
+ const G=selGroup();if(G)out.push({type:'group',G});
+ const k=exactCageOfSel();if(k>=0)out.push({type:'cage',k});
+ const th=exactThermoOfSel();if(th>=0)out.push({type:'thermo',k:th});
+ const ar=exactArrowOfSel();if(ar>=0)out.push({type:'arrow',k:ar});
+ const wh=exactWhisperOfSel();if(wh>=0)out.push({type:'whisper',k:wh});
+ const rb=exactRenbanOfSel();if(rb>=0)out.push({type:'renban',k:rb});
+ const rs=exactRslOfSel();if(rs>=0)out.push({type:'rsl',k:rs});
+ if(sel.size===2){const [a,b]=[...sel],kd=dotAt(P,a,b);if(kd>=0)out.push({type:'kropki',k:kd});const xv=xvAt(P,a,b);if(xv>=0)out.push({type:'xv',k:xv})}
+ if(sel.size===1){const i=[...sel][0],par=(P.parity||[])[i];if(par==='o')out.push({type:'odd',i});else if(par==='e')out.push({type:'even',i})}
+ return out}
+function calcTargetFallback(){
  if(!sel.size)return null;
  if(sel.size===1){const i=[...sel][0],k=cageOfCells([i]);if(k>=0)return {type:'cage',k};const th=(thermosOf[i]||[])[0];if(th!=null)return {type:'thermo',k:th};const ar=(arrowsOf[i]||[])[0];if(ar!=null)return {type:'arrow',k:ar};const wh=(whispersOf[i]||[])[0];if(wh!=null)return {type:'whisper',k:wh};const rb=(renbansOf[i]||[])[0];if(rb!=null)return {type:'renban',k:rb};const rs=(rslsOf[i]||[])[0];if(rs!=null)return {type:'rsl',k:rs};const par=(P.parity||[])[i];return par==='o'?{type:'odd',i}:par==='e'?{type:'even',i}:null}
  const G=selGroup();if(G)return {type:'group',G};
@@ -308,13 +343,18 @@ function calcTarget(){
  const wh=exactWhisperOfSel();if(wh>=0)return {type:'whisper',k:wh};
  const rb=exactRenbanOfSel();if(rb>=0)return {type:'renban',k:rb};
  const rs=exactRslOfSel();if(rs>=0)return {type:'rsl',k:rs};
- if(sel.size===2){const [a,b]=[...sel],kd=dotAt(P,a,b);if(kd>=0)return {type:'kropki',k:kd};const xv=xvAt(P,a,b);if(xv>=0)return {type:'xv',k:xv}} // v27/v48: exactly the two cells of a dot or an X/V
+ if(sel.size===2){const [a,b]=[...sel],kd=dotAt(P,a,b);if(kd>=0)return {type:'kropki',k:kd};const xv=xvAt(P,a,b);if(xv>=0)return {type:'xv',k:xv}}
  const L=setOfSel();return L?{type:'set',L}:null}
+function calcTarget(){
+ if(!sel.size)return null;
+ // v49: in non-multi, an exact match (one odd/even cell, both cells of an X/V, a whole cage or line) wins.
+ if(!multi){const exact=exactMechanicMatches();if(exact.length)return exact[0]}
+ return calcTargetFallback()}
 
 // ---------- Storage ----------
 let DB=LS('sdk_puzzles')||{};let curId=LS('sdk_cur');
 if(!Object.keys(DB).length){const {p}=parsePuzzle(SAMPLE);DB[p.id]=p;curId=p.id}
-for(const p of Object.values(DB)){p.extra=p.extra||[];p.tips=p.tips||[];{const keep=[];for(const x of p.extra){if(/^tip\s/i.test(x))p.tips.push(x.slice(3).trim());else keep.push(x)}p.extra=keep}p.thermos=p.thermos||[];p.whispers=p.whispers||[];p.renbans=(p.renbans||[]).map(r=>({cells:r.cells,elim:r.elim||[]}));p.rsls=(p.rsls||[]).map(r=>({cells:r.cells,elim:r.elim&&typeof r.elim==='object'&&!Array.isArray(r.elim)?r.elim:{},total:r.total||null}));p.arrows=(p.arrows||[]).map(a=>({cells:a.cells,b:a.b||1,elim:a.elim||[]}));p.kropki=(p.kropki||[]).map(d=>({...d,elim:d.elim||[]}));p.kropkiNeg=!!p.kropkiNeg;p.xv=(p.xv||[]).map(d=>({...d,elim:d.elim||[]}));p.xvNegX=!!p.xvNegX;p.xvNegV=!!p.xvNegV;p.parity=p.parity&&p.parity.length===81?p.parity:Array(81).fill('');p.groups=p.groups||{};p.lineSums=p.lineSums||{};p.sol=p.sol||null;p.cages.forEach(c=>c.elim=c.elim||[]);if(p.col)for(let i=0;i<81;i++)p.col[i]=normCol(p.col[i])}
+for(const p of Object.values(DB)){p.extra=p.extra||[];p.tips=p.tips||[];{const keep=[];for(const x of p.extra){if(/^tip\s/i.test(x))p.tips.push(x.slice(3).trim());else keep.push(x)}p.extra=keep}p.thermos=p.thermos||[];p.whispers=p.whispers||[];p.renbans=(p.renbans||[]).map(r=>({cells:r.cells,elim:r.elim||[]}));p.rsls=(p.rsls||[]).map(r=>({cells:r.cells,elim:r.elim&&typeof r.elim==='object'&&!Array.isArray(r.elim)?r.elim:{},total:r.total||null}));p.arrows=(p.arrows||[]).map(a=>({cells:a.cells,b:a.b||1,forks:(a.forks||[]).map(s=>s.slice()),elim:a.elim||[]}));p.kropki=(p.kropki||[]).map(d=>({...d,elim:d.elim||[]}));p.kropkiNeg=!!p.kropkiNeg;p.xv=(p.xv||[]).map(d=>({...d,elim:d.elim||[]}));p.xvNegX=!!p.xvNegX;p.xvNegV=!!p.xvNegV;p.parity=p.parity&&p.parity.length===81?p.parity:Array(81).fill('');p.groups=p.groups||{};p.lineSums=p.lineSums||{};p.sol=p.sol||null;p.cages.forEach(c=>c.elim=c.elim||[]);if(p.col)for(let i=0;i<81;i++)p.col[i]=normCol(p.col[i]);p.lt=p.lt&&p.lt.length===81?p.lt.map(normLetters):Array(81).fill('')}
 if(!DB[curId])curId=Object.values(DB).sort((a,b)=>b.updated-a.updated)[0].id;
 let P=DB[curId];
 let saveT=null;const saveNow=()=>{clearTimeout(saveT);saveT=null;SV('sdk_puzzles',DB);SV('sdk_cur',curId)};
@@ -323,7 +363,7 @@ const save=()=>{P.updated=Date.now();saveNow()};
 // ---------- Geometry / peers ----------
 const ROW=i=>Math.floor(i/9),COL=i=>i%9,BOX=i=>Math.floor(ROW(i)/3)*3+Math.floor(COL(i)/3);
 const HOUSES=[];for(let k=0;k<9;k++){HOUSES.push([...Array(9)].map((_,j)=>k*9+j));HOUSES.push([...Array(9)].map((_,j)=>j*9+k));HOUSES.push([...Array(9)].map((_,j)=>(Math.floor(k/3)*3+Math.floor(j/3))*9+(k%3)*3+j%3))}
-let cagesOf=[],thermosOf=[],arrowsOf=[],whispersOf=[],renbansOf=[],rslsOf=[];function indexCages(){renbansOf=Array.from({length:81},()=>[]);(P.renbans||[]).forEach((r,k)=>r.cells.forEach(i=>{if(!renbansOf[i].includes(k))renbansOf[i].push(k)}));rslsOf=Array.from({length:81},()=>[]);(P.rsls||[]).forEach((r,k)=>r.cells.forEach(i=>{if(!rslsOf[i].includes(k))rslsOf[i].push(k)}));whispersOf=Array.from({length:81},()=>[]);(P.whispers||[]).forEach((w,k)=>w.cells.forEach(i=>{if(!whispersOf[i].includes(k))whispersOf[i].push(k)}));cagesOf=Array.from({length:81},()=>[]);thermosOf=Array.from({length:81},()=>[]);arrowsOf=Array.from({length:81},()=>[]);(P.arrows||[]).forEach((a,k)=>a.cells.forEach(i=>{if(!arrowsOf[i].includes(k))arrowsOf[i].push(k)}));P.cages.forEach((c,k)=>c.cells.forEach(i=>cagesOf[i].push(k)));(P.thermos||[]).forEach((t,k)=>t.cells.forEach(i=>{if(!thermosOf[i].includes(k))thermosOf[i].push(k)}))}
+let cagesOf=[],thermosOf=[],arrowsOf=[],whispersOf=[],renbansOf=[],rslsOf=[];function indexCages(){renbansOf=Array.from({length:81},()=>[]);(P.renbans||[]).forEach((r,k)=>r.cells.forEach(i=>{if(!renbansOf[i].includes(k))renbansOf[i].push(k)}));rslsOf=Array.from({length:81},()=>[]);(P.rsls||[]).forEach((r,k)=>r.cells.forEach(i=>{if(!rslsOf[i].includes(k))rslsOf[i].push(k)}));whispersOf=Array.from({length:81},()=>[]);(P.whispers||[]).forEach((w,k)=>w.cells.forEach(i=>{if(!whispersOf[i].includes(k))whispersOf[i].push(k)}));cagesOf=Array.from({length:81},()=>[]);thermosOf=Array.from({length:81},()=>[]);arrowsOf=Array.from({length:81},()=>[]);(P.arrows||[]).forEach((a,k)=>arrowAllCells(a).forEach(i=>{if(!arrowsOf[i].includes(k))arrowsOf[i].push(k)}));P.cages.forEach((c,k)=>c.cells.forEach(i=>cagesOf[i].push(k)));(P.thermos||[]).forEach((t,k)=>t.cells.forEach(i=>{if(!thermosOf[i].includes(k))thermosOf[i].push(k)}))}
 function peers(i){const s=new Set();for(let j=0;j<81;j++)if(j!==i&&(ROW(j)===ROW(i)||COL(j)===COL(i)||BOX(j)===BOX(i)))s.add(j);for(const k of cagesOf[i])for(const j of P.cages[k].cells)if(j!==i)s.add(j);for(const k of thermosOf[i]||[])for(const j of P.thermos[k].cells)if(j!==i)s.add(j);for(const k of renbansOf[i]||[])for(const j of P.renbans[k].cells)if(j!==i)s.add(j);return s}
 const valAt=i=>P.givens[i]||P.v[i];
 
@@ -405,8 +445,8 @@ function saveVis(){SV('sdk_visuals',vis);SV('sdk_contrast',uiK)}
 
 applyContrast();
 applyVisuals(false);
-const snap=()=>JSON.stringify({rb:P.renbans,rs:P.rsls,wh:P.whispers,ar:P.arrows,kd:P.kropki,kn:P.kropkiNeg,xv:P.xv,xnX:P.xvNegX,xnV:P.xvNegV,par:P.parity,th:P.thermos,gr:P.groups,ls:P.lineSums,g:P.givens,c:P.cages,v:P.v,cn:P.cn,mn:P.mn,col:P.col,s:P.solved});
-function restore(s){const o=JSON.parse(s);Object.assign(P,{renbans:o.rb||[],rsls:o.rs||[],whispers:o.wh||[],arrows:o.ar||[],kropki:o.kd||[],kropkiNeg:!!o.kn,xv:o.xv||[],xvNegX:!!o.xnX,xvNegV:!!o.xnV,parity:o.par&&o.par.length===81?o.par:Array(81).fill(''),thermos:o.th||[],groups:o.gr||{},lineSums:o.ls||{},givens:o.g,cages:o.c,v:o.v,cn:o.cn,mn:o.mn,col:o.col,solved:o.s})}
+const snap=()=>JSON.stringify({rb:P.renbans,rs:P.rsls,wh:P.whispers,ar:P.arrows,kd:P.kropki,kn:P.kropkiNeg,xv:P.xv,xnX:P.xvNegX,xnV:P.xvNegV,par:P.parity,th:P.thermos,gr:P.groups,ls:P.lineSums,g:P.givens,c:P.cages,v:P.v,cn:P.cn,mn:P.mn,col:P.col,lt:P.lt,s:P.solved});
+function restore(s){const o=JSON.parse(s);Object.assign(P,{renbans:o.rb||[],rsls:o.rs||[],whispers:o.wh||[],arrows:o.ar||[],kropki:o.kd||[],kropkiNeg:!!o.kn,xv:o.xv||[],xvNegX:!!o.xnX,xvNegV:!!o.xnV,parity:o.par&&o.par.length===81?o.par:Array(81).fill(''),thermos:o.th||[],groups:o.gr||{},lineSums:o.ls||{},givens:o.g,cages:o.c,v:o.v,cn:o.cn,mn:o.mn,col:o.col,lt:o.lt&&o.lt.length===81?o.lt.map(normLetters):Array(81).fill(''),solved:o.s})}
 function act(fn){const before=snap();fn();const after=snap();if(after!==before){undoS.push(before);if(undoS.length>500)undoS.shift();redoS=[];save()}render()}
 function undo(){if(!undoS.length)return;redoS.push(snap());restore(undoS.pop());save();editCage=-1;editLine=-1;render()}
 function redo(){if(!redoS.length)return;undoS.push(snap());restore(redoS.pop());save();editCage=-1;editLine=-1;render()}
@@ -438,11 +478,13 @@ function thermoConflicts(t,out){const cs=t.cells,n=cs.length;let broke=false;
 // Arrow: unknown circle digits count as 1..9, empty shaft cells as 1..9. Broken when the shaft's
 // smallest possible total is above the circle's largest, or its largest is below the circle's smallest
 // (so a full arrow with the wrong sum, or a shaft that already adds up to the circle or more with cells left).
-function arrowConflicts(a,out){const b=a.b||1,circ=a.cells.slice(0,b),sh=a.cells.slice(b);let lo=0,hi=0,s=0,e=0;
+function arrowConflicts(a,out){const b=a.b||1,circ=a.cells.slice(0,b);let lo=0,hi=0;
  for(const i of circ){const v=valAt(i);lo=lo*10+(v||1);hi=hi*10+(v||9)}
- for(const i of sh){const v=valAt(i);if(v)s+=v;else e++}
- if(s+e<=hi&&s+9*e>=lo)return false;
- for(const i of a.cells)if(valAt(i))out.add(i);return true}
+ // Each shaft sums to the circle independently; a conflict is when no circle value in [lo,hi] can be a sum of every shaft.
+ let slo=lo,shi=hi;
+ for(const sh of arrowShafts(a)){let s=0,e=0;for(const i of sh){const v=valAt(i);if(v)s+=v;else e++}slo=Math.max(slo,s+e);shi=Math.min(shi,s+9*e)}
+ if(slo<=shi)return false;
+ for(const i of arrowAllCells(a))if(valAt(i))out.add(i);return true}
 // Whisper: two neighbours on the line with placed digits less than 5 apart, or a 5 anywhere on the line.
 function whisperConflicts(w,out){const cs=w.cells;let broke=false;
  for(let k=0;k<cs.length;k++){const v=valAt(cs[k]);if(v===5){out.add(cs[k]);broke=true}
@@ -479,6 +521,8 @@ function marksHTML(i){
   const slot=d=>have.has(String(d))?noteMark(String(d),w):'<span class="cne"></span>';
   h+=`<div class="cn${anc!==undefined?' a':''}"><div class="cn-top">${[1,2,3,4,5].map(slot).join('')}</div><div class="cn-bot">${[6,7,8,9].map(slot).join('')}</div></div>`}
  if(P.mn[i])h+=`<span class="mn m${P.mn[i].length}">${[...P.mn[i]].map(x=>noteMark(x)).join('')}</span>`; // v29: pass only the digit — .map(noteMark) was feeding the index as `weak`
+ const lets=normLetters((P.lt||[])[i]);
+ if(lets)h+=`<div class="lets n${lets.length}">${[...lets].map(ch=>`<span>${ch}</span>`).join('')}</div>`;
  return h}
 function inkHTML(i){const v=valAt(i);return v?`<span class="val">${v}</span>`:marksHTML(i)}
 function sumHTML(i){
@@ -540,11 +584,11 @@ function thermoSVG(cs,col,op){if(!cs.length)return '';const b=cs[0];
 // Arrows: SudokuPad-style grey ring (or pill) around the circle and a thin line with an open
 // arrowhead through the shaft cell centres, under the cage outlines, multiplied so digits show through.
 const AR_R=37;
-function arrowSVG(cs,b,col,op){if(!cs.length)return '';const wrap=op!=null&&op<1?o=>`<g opacity="${op}">`+o+'</g>':o=>o;b=Math.min(b||1,cs.length);const X=i=>COL(i)*100+50,Y=i=>ROW(i)*100+50;
- const circ=cs.slice(0,b),sh=cs.slice(b);let g='';
+function arrowSVG(cs,b,col,op,forks){if(!cs.length)return '';const wrap=op!=null&&op<1?o=>`<g opacity="${op}">`+o+'</g>':o=>o;b=Math.min(b||1,cs.length);const X=i=>COL(i)*100+50,Y=i=>ROW(i)*100+50;
+ const circ=cs.slice(0,b),shafts=[cs.slice(b),...(forks||[])].filter(sh=>sh&&sh.length);let g='';
  const xs=circ.map(X),ys=circ.map(Y),x0=Math.min(...xs)-AR_R,y0=Math.min(...ys)-AR_R,w=Math.max(...xs)-Math.min(...xs)+2*AR_R,h=Math.max(...ys)-Math.min(...ys)+2*AR_R;
  g+=`<rect x="${x0}" y="${y0}" width="${w}" height="${h}" rx="${AR_R}" ry="${AR_R}" fill="none" stroke="${col}" stroke-width="5"/>`;
- if(sh.length){let best=circ[0],bd=1e9;for(const c of circ){const d=Math.hypot(X(c)-X(sh[0]),Y(c)-Y(sh[0]));if(d<bd){bd=d;best=c}}
+ for(const sh of shafts){let best=circ[0],bd=1e9;for(const c of circ){const d=Math.hypot(X(c)-X(sh[0]),Y(c)-Y(sh[0]));if(d<bd){bd=d;best=c}}
   const dx=X(sh[0])-X(best),dy=Y(sh[0])-Y(best),L=Math.hypot(dx,dy)||1,sx=X(best)+dx/L*AR_R,sy=Y(best)+dy/L*AR_R;
   const pts=[[sx,sy],...sh.map(i=>[X(i),Y(i)])];
   g+=`<path d="${pts.map((p,k)=>(k?'L':'M')+p[0].toFixed(1)+' '+p[1].toFixed(1)).join('')}" fill="none" stroke="${col}" stroke-width="5" stroke-linejoin="round" stroke-linecap="round"/>`;
@@ -574,7 +618,7 @@ function renderRsl(){const el=$('#rsl');if(!el)return;let g='';
 // the old SVG <text> mask did. v47: ink sits above arrows, renbans, region-sum lines, thermos
 // and whispers, so the white halo cuts every constraint line.
 function renderArrows(){const el=$('#arrows');if(!el)return;let g='';
- (P.arrows||[]).forEach((a,k)=>{const hot=editing&&etab==='arrow'&&k===editLine,L=lineStyle('#9ca3af',1);g+=arrowSVG(a.cells,a.b,hot?'#3b82f6':arrowBad.has(k)?'#ef4444':L.col,hot||arrowBad.has(k)?1:L.op)});
+ (P.arrows||[]).forEach((a,k)=>{const hot=editing&&etab==='arrow'&&k===editLine,L=lineStyle('#9ca3af',1);g+=arrowSVG(a.cells,a.b,hot?'#3b82f6':arrowBad.has(k)?'#ef4444':L.col,hot||arrowBad.has(k)?1:L.op,a.forks)});
  if(editing&&etab==='arrow'&&sel.size&&editLine<0)g+=arrowSVG([...sel],arrowB,'#3b82f6');
  el.innerHTML=g}
 function renderThermos(){const el=$('#thermo');if(!el)return;let g='';
@@ -591,7 +635,7 @@ function selGroup(){if(!sel.size)return null;const b=BOX([...sel][0]);const G=gr
 function selTotal(){
  const n=sel.size;if(!n)return {n:0,sum:null,known:false};
  const T=calcTarget();
- if(T&&T.type==='cage'){const c=P.cages[T.k];return {n:c.cells.length,sum:c.sum,known:true}}
+ if(T&&T.type==='cage'){const c=P.cages[T.k];return {n:c.cells.length,sum:c.sum,known:c.sum!=null}}
  if(T&&T.type==='group'&&T.G.sum!=null)return {n,sum:T.G.sum,known:true};
  if(T&&T.type==='set'&&T.L.sum!=null)return {n,sum:T.L.sum,known:true};
  const covered=new Set();let sum=0;
@@ -615,9 +659,9 @@ function selInfoText(){
  if(T0&&T0.type==='renban'&&!(t.known&&sel.size>1))return `Renban (${P.renbans[T0.k].cells.length} cells) — Σ for runs`;
  if(T0&&T0.type==='rsl'&&!(t.known&&sel.size>1))return `Region-sum line (${P.rsls[T0.k].cells.length} cells) — Σ for sums`;
  if(T0&&T0.type==='whisper'&&!(t.known&&sel.size>1))return `Whisper (${P.whispers[T0.k].cells.length} cells) — Σ for options`;
- if(T0&&T0.type==='arrow'&&!(t.known&&sel.size>1)){const a=P.arrows[T0.k];return `Arrow (circle + ${a.cells.length-(a.b||1)}) — Σ for sums`}
+ if(T0&&T0.type==='arrow'&&!(t.known&&sel.size>1)){const a=P.arrows[T0.k],shs=arrowShafts(a),shN=shs.reduce((n,s)=>n+s.length,0);return shs.length>1?`Arrow (${shs.length} shafts) — Σ for sums`:`Arrow (circle + ${shN}) — Σ for sums`}
  if(t.known)return `Total ${t.sum} (${t.n} cell${t.n>1?'s':''})  ${near45(t.sum)}`;
- if(calcTarget())return `${sel.size} cell${sel.size>1?'s':''} — Σ to enter a sum`;
+ if(T0)return `${sel.size} cell${sel.size>1?'s':''} — ${SIGMA_LABEL[T0.type]||'Σ'}`;
  return `${sel.size} cell${sel.size>1?'s':''}`}
 function fitInfo(){const el=$('#infoTxt');el.style.fontSize='';let fs=15;while(el.scrollWidth>el.clientWidth&&fs>11){fs--;el.style.fontSize=fs+'px'}}
 // Number selection (digit highlight): numSel is 1–9 or 0.
@@ -680,15 +724,15 @@ function renderSel(){
  const hlOn=!editing&&(numSel>0||colHl>0);
  for(let i=0;i<81;i++){const same=!!numSel&&valAt(i)===numSel,nm=hasPencil(i,numSel),inCol=colHl>0&&normCol(P.col[i]).c.includes(colHl);
   const c=cells[i].classList;c.toggle('sel',sel.has(i));c.toggle('same',same);c.toggle('nmark',nm);c.toggle('hl',hlOn&&(colHl?inCol:same||nm));c.toggle('blocked',!colHl&&blocked.has(i))}
- padBtns.forEach((b,k)=>b.classList.toggle('nsel',mode!=='k'&&!editing&&numSel===k+1));
+ padBtns.forEach((b,k)=>b.classList.toggle('nsel',mode!=='k'&&mode!=='l'&&!editing&&numSel===k+1));
  grid.classList.toggle('hlon',hlOn);
  // v24/v25: a selection darkens every unselected cell (every grid since v25: the tint mode is gone); this stacks with the highlight darkening.
  grid.classList.toggle('sdim',!editing&&sel.size>0);
  renderInk();
  drawSelOutline();
- pad.classList.toggle('hlmode',!editing&&mode!=='k'&&!sel.size);
+ pad.classList.toggle('hlmode',!editing&&mode!=='k'&&mode!=='l'&&!sel.size);
  if(editing){if(etab==='thermo')renderThermos();if(etab==='arrow')renderArrows();if(etab==='whisper')renderWhispers();if(etab==='renban')renderRenbans();$('#bPick').classList.add('hidden');$('#infoTxt').textContent=etab==='kropki'?`${(P.kropki||[]).length} dot${(P.kropki||[]).length===1?'':'s'} · ${(P.xv||[]).length} X/V — tap an edge to cycle`:etab==='parity'?'Tap a cell to cycle: none → odd (circle) → even (square)':etab==='thermo'?(sel.size?(editLine>=0?`Editing thermo: ${sel.size} cells — tap cells to extend`:`${sel.size} cell${sel.size>1?'s':''} · bulb ${RC([...sel][0])}`):'Drag from the bulb to the tip'):etab==='renban'?(sel.size?(editLine>=0?`Editing renban: ${sel.size} cells — tap cells to extend`:`${sel.size} cell${sel.size>1?'s':''} on the line`):'Drag along the renban line'):etab==='whisper'?(sel.size?(editLine>=0?`Editing whisper: ${sel.size} cells — tap cells to extend`:`${sel.size} cell${sel.size>1?'s':''} on the line`):'Drag along the whisper line'):etab==='arrow'?(sel.size?(editLine>=0?`Editing arrow: ${sel.size} cells — tap cells to extend`:sel.size<=arrowB?`Circle ${[...sel].map(RC).join(' ')} — now the shaft`:`Circle ${RC([...sel][0])} · shaft ${sel.size-arrowB}`):'Tap the circle, then the shaft'):sel.size?`${sel.size} cell${sel.size>1?'s':''} selected`:'Drag across cells to make a cage';$('#bCalc').classList.add('hidden');$('#bTest').disabled=true;return}
- $('#bCalc').classList.toggle('hidden',!FEATURES.calculator||mode==='k');$('#bPick').classList.toggle('hidden',mode!=='k');
+ $('#bCalc').classList.toggle('hidden',!FEATURES.calculator||mode==='k'||mode==='l');$('#bPick').classList.toggle('hidden',mode!=='k'&&mode!=='l');
  $('#infoTxt').textContent=selInfoText();
  {const T=calcTarget();$('#bCalc').disabled=!T;$('#bCalc').textContent=SIGMA_LABEL[T?T.type:'']||'Σ'}
  $('#bTest').disabled=!canTest();
@@ -705,14 +749,16 @@ function drawSelOutline(){let d='';for(const i of sel){const r=ROW(i),c=COL(i),x
   if(c===8||!sel.has(i+1))d+=`M${X} ${y}V${Y}`}
  const p=$('#selPath');if(p.getAttribute('d')!==d)p.setAttribute('d',d)}
 function renderControls(){
- $$('.modes button').forEach(b=>b.classList.toggle('on',b.dataset.m===mode));
- pad.classList.toggle('cmode',mode==='k');pad.classList.toggle('nmode',mode==='c'||mode==='m');pad.classList.toggle('hlmode',!editing&&mode!=='k'&&!sel.size);
- padBtns.forEach((b,k)=>{b.querySelector('.sw').style.background=mode==='k'?COLOURS[k]:'transparent'});
- $('#bErase').textContent=mode==='k'?'⌫ Colours':'⌫ Erase';
+ $$('.modes button').forEach(b=>{const on=b.dataset.m===mode||(b.dataset.m==='k'&&mode==='l');b.classList.toggle('on',on);
+  if(b.dataset.m==='k'){const ml=b.querySelector('.ml');if(ml)ml.textContent=mode==='l'?'Letter':'Colour'}});
+ pad.classList.toggle('cmode',mode==='k');pad.classList.toggle('lmode',mode==='l');pad.classList.toggle('nmode',mode==='c'||mode==='m'||mode==='l');pad.classList.toggle('hlmode',!editing&&mode!=='k'&&mode!=='l'&&!sel.size);
+ padBtns.forEach((b,k)=>{b.querySelector('.sw').style.background=mode==='k'?COLOURS[k]:'transparent';
+  let lg=b.querySelector('.lg');if(mode==='l'){if(!lg){lg=document.createElement('span');lg.className='lg';b.appendChild(lg)}lg.textContent=LETTERS[k]}else if(lg)lg.remove()});
+ $('#bErase').textContent=mode==='k'?'⌫ Colours':mode==='l'?'⌫ Letters':'⌫ Erase';
  $('#play').classList.toggle('hidden',editing);$('#edit').classList.toggle('hidden',!editing);
  $('#bEdit').textContent=editing?'✓':'✎';
  $$('.tabs button').forEach(b=>b.classList.toggle('on',b.dataset.t===etab));
- $('#eCage').classList.toggle('hidden',etab!=='cage');$('#eKropki').classList.toggle('hidden',etab!=='kropki');$('#eParity').classList.toggle('hidden',etab!=='parity');$('#bKNeg').classList.toggle('on',!!P.kropkiNeg);$('#bKNeg').setAttribute('aria-pressed',P.kropkiNeg?'true':'false');$('#bXVNeg').classList.toggle('on',!!(P.xvNegX&&P.xvNegV));$('#bXVNeg').setAttribute('aria-pressed',(P.xvNegX&&P.xvNegV)?'true':'false');$('#eThermo').classList.toggle('hidden',etab!=='thermo');$('#eArrow').classList.toggle('hidden',etab!=='arrow');$('#eWhisper').classList.toggle('hidden',etab!=='whisper');$('#eRenban').classList.toggle('hidden',etab!=='renban');$('#eRsl').classList.toggle('hidden',etab!=='rsl');$('#bRbCreate').textContent=editLine>=0?'Update renban':'Create renban';$('#bRbDel').classList.toggle('hidden',editLine<0||etab!=='renban');$('#bRslCreate').textContent=editLine>=0?'Update region-sum line':'Create region-sum line';$('#bRslDel').classList.toggle('hidden',editLine<0||etab!=='rsl');$('#bWhCreate').textContent=editLine>=0?'Update whisper':'Create whisper';$('#bWhDel').classList.toggle('hidden',editLine<0||etab!=='whisper');$('#bArCreate').textContent=editLine>=0?'Update arrow':'Create arrow';$('#bArDel').classList.toggle('hidden',editLine<0||etab!=='arrow');$('#bArB').textContent='Circle: '+arrowB;
+ $('#eCage').classList.toggle('hidden',etab!=='cage');$('#eKropki').classList.toggle('hidden',etab!=='kropki');$('#eParity').classList.toggle('hidden',etab!=='parity');$('#bKNeg').classList.toggle('on',!!P.kropkiNeg);$('#bKNeg').setAttribute('aria-pressed',P.kropkiNeg?'true':'false');$('#bXVNeg').classList.toggle('on',!!(P.xvNegX&&P.xvNegV));$('#bXVNeg').setAttribute('aria-pressed',(P.xvNegX&&P.xvNegV)?'true':'false');$('#eThermo').classList.toggle('hidden',etab!=='thermo');$('#eArrow').classList.toggle('hidden',etab!=='arrow');$('#eWhisper').classList.toggle('hidden',etab!=='whisper');$('#eRenban').classList.toggle('hidden',etab!=='renban');$('#eRsl').classList.toggle('hidden',etab!=='rsl');$('#bRbCreate').textContent=editLine>=0?'Update renban':'Create renban';$('#bRbDel').classList.toggle('hidden',editLine<0||etab!=='renban');$('#bRslCreate').textContent=editLine>=0?'Update region-sum line':'Create region-sum line';$('#bRslDel').classList.toggle('hidden',editLine<0||etab!=='rsl');$('#bWhCreate').textContent=editLine>=0?'Update whisper':'Create whisper';$('#bWhDel').classList.toggle('hidden',editLine<0||etab!=='whisper');$('#bArCreate').textContent=editLine>=0?'Update arrow':'Create arrow';$('#bArDel').classList.toggle('hidden',editLine<0||etab!=='arrow');if($('#bArFork'))$('#bArFork').classList.toggle('hidden',editLine<0||etab!=='arrow');$('#bArB').textContent='Circle: '+arrowB;
  $('#bThCreate').textContent=editLine>=0?'Update thermo':'Create thermo';$('#bThDel').classList.toggle('hidden',editLine<0);$('#eGiv').classList.toggle('hidden',etab!=='giv');
  $('#sumBuf').textContent=sumBuf||'–';
  $('#bCreate').textContent=editCage>=0?'Update cage':'Create cage';$('#bDelCage').classList.toggle('hidden',editCage<0);
@@ -737,7 +783,7 @@ function cageWarnings(){const w=[];let caged=0,total=0;
  (P.whispers||[]).forEach(x=>{const why=whisperProblem(x.cells);if(why)w.push(why[0].toUpperCase()+why.slice(1))});
  (P.renbans||[]).forEach(x=>{const why=renbanProblem(x.cells);if(why)w.push(why[0].toUpperCase()+why.slice(1))});
  (P.rsls||[]).forEach(x=>{const why=rslProblem(x.cells);if(why)w.push(why[0].toUpperCase()+why.slice(1))});
- (P.arrows||[]).forEach(a=>{const why=arrowProblem(a.cells,a.b);if(why)w.push(why[0].toUpperCase()+why.slice(1))});
+ (P.arrows||[]).forEach(a=>{const why=arrowProblem(a);if(why)w.push(why[0].toUpperCase()+why.slice(1))});
  return {w,caged,total}}
 function renderWarn(){const {w,caged,total}=cageWarnings();
  $('#warn').innerHTML=w.map(x=>`<div>⚠️ ${esc(x)}</div>`).join('')+`<div class="${caged===81&&!w.length?'ok':'muted'}">${P.cages.length} cages${P.thermos.length?` · ${P.thermos.length} thermo${P.thermos.length>1?'s':''}`:''}${(P.arrows||[]).length?` · ${P.arrows.length} arrow${P.arrows.length>1?'s':''}`:''}${(P.whispers||[]).length?` · ${P.whispers.length} whisper${P.whispers.length>1?'s':''}`:''}${(P.renbans||[]).length?` · ${P.renbans.length} renban${P.renbans.length>1?'s':''}`:''}${(P.rsls||[]).length?` · ${P.rsls.length} region-sum line${P.rsls.length>1?'s':''}`:''}${(P.kropki||[]).length?` · ${P.kropki.length} dot${P.kropki.length>1?'s':''}${P.kropkiNeg?' (all given)':''}`:''}${((P.xv||[]).length||P.xvNegX||P.xvNegV)?` · ${(P.xv||[]).length} X/V${P.xvNegX&&P.xvNegV?' (all given)':P.xvNegX?' (all X given)':P.xvNegV?' (all V given)':''}`:''}${(P.parity||[]).some(x=>x)?` · odd/even`:''} · ${caged}/81 cells caged · sums total ${total}${caged===81&&!w.length?' ✓':''}</div>`}
@@ -769,8 +815,9 @@ function runTest(){
 }
 function pressDigit(d,el){
  // No cell selected (and not in Colour mode): the pad selects / toggles that number's highlight.
- if(!editing&&!sel.size&&mode!=='k'){numSel=numSel===d?0:d;render();return}
+ if(!editing&&!sel.size&&mode!=='k'&&mode!=='l'){numSel=numSel===d?0:d;render();return}
  if(mode==='k'){pressColour(d,true,el);return}
+ if(mode==='l'){pressLetter(LETTERS[d-1],el);return}
  const cs=editable();if(!cs.length){if(el)nudge(el);return}
  act(()=>{
   if(mode==='v'){const all=cs.every(i=>P.v[i]===d);
@@ -802,9 +849,20 @@ function pressColour(d,add,el){
   if(full)toast(`Max ${MAXCOL} colours per cell`);
  })
 }
-function erase(){const cs=editable();if(mode==='k'){clearColours();return}
- act(()=>{if(cs.some(i=>P.v[i]))cs.forEach(i=>P.v[i]=0);else if(cs.some(i=>P.cn[i]||P.mn[i]))cs.forEach(i=>{P.cn[i]='';P.mn[i]=''});else [...sel].forEach(i=>P.col[i]={c:[],b:0})})}
+function pressLetter(ch,el){
+ if(!sel.size){if(el)nudge(el);return}
+ if(!LETTERS.includes(ch))return;
+ act(()=>{
+  const t=[...sel].filter(i=>!valAt(i));if(!t.length){if(el)nudge(el);return}
+  const all=t.every(i=>normLetters((P.lt||[])[i]).includes(ch));
+  P.lt=P.lt&&P.lt.length===81?P.lt:Array(81).fill('');
+  for(const i of t){const s=new Set(normLetters(P.lt[i]));all?s.delete(ch):s.add(ch);P.lt[i]=normLetters([...s].join(''))}
+ })
+}
+function erase(){const cs=editable();if(mode==='k'){clearColours();return}if(mode==='l'){clearLetters();return}
+ act(()=>{if(cs.some(i=>P.v[i]))cs.forEach(i=>P.v[i]=0);else if(cs.some(i=>P.cn[i]||P.mn[i]||(P.lt||[])[i]))cs.forEach(i=>{P.cn[i]='';P.mn[i]='';if(P.lt)P.lt[i]=''});else [...sel].forEach(i=>P.col[i]={c:[],b:0})})}
 function clearColours(){act(()=>[...sel].forEach(i=>P.col[i]={c:[],b:0}))}
+function clearLetters(){act(()=>{P.lt=P.lt&&P.lt.length===81?P.lt:Array(81).fill('');[...sel].forEach(i=>P.lt[i]='')}) }
 let lastPlace=40,celebT=0,celebRAF=0;
 function reducedMotion(){return window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches}
 function checkSolved(){if(P.solved||editing)return;for(let i=0;i<81;i++)if(!valAt(i)||solWrong(i))return;if(bad.size||cageBad.size)return;P.solved=true;save();celebrate()}
@@ -889,7 +947,7 @@ const TAP_MS=250;
 // triple = second, and so on; extra taps stay on the last. Without thermos this is the old cage/group → box.
 function tapGroups(i){const L=[];for(const k of cagesOf[i])L.push(P.cages[k].cells);
  for(const k of thermosOf[i])L.push(P.thermos[k].cells);
- for(const k of arrowsOf[i])L.push(P.arrows[k].cells);
+ for(const k of arrowsOf[i])L.push(arrowAllCells(P.arrows[k]));
  for(const k of whispersOf[i])L.push([...new Set(P.whispers[k].cells)]);
  for(const k of renbansOf[i])L.push(P.renbans[k].cells);
  for(const k of rslsOf[i])L.push(P.rsls[k].cells);
@@ -947,7 +1005,7 @@ function endGP(e){if(!gp||(e&&e.pointerId!=null&&e.pointerId!==gp.id))return;con
  if(g.rep){tapSeq.n++;tapSeq.t=Date.now();const i=g.start,ks=cagesOf[i];let grp;
   const full=(mode==='k'&&tapSeq.n===1)?fullColour(i):0;
   if(full){grp=cellsOfFullColour(full);colHl=full}
-  else{colHl=0;const L=tapGroups(i);grp=L[Math.min(tapSeq.n-1,L.length-1)]}
+  else{colHl=0;const L=tapGroups(i);grp=(!multi&&L.length)?L[(tapSeq.n-1)%L.length]:L[Math.min(tapSeq.n-1,Math.max(0,L.length-1))]}
   // Use tapSeq.base (selection before the first tap): the first tap of a double-tap may already have toggled/deselected the cell.
   if(multi&&tapSeq.n===1&&tapSeq.base.has(i)){sel=new Set(tapSeq.base);for(const j of grp)sel.delete(j)}
   else sel=new Set([...(multi?tapSeq.base:[]),...grp]);
@@ -972,7 +1030,7 @@ let lastTE=0;document.addEventListener('touchend',e=>{const now=Date.now();
 function setMulti(on){multi=on;const b=$('#bMulti');b.classList.toggle('on',on);b.setAttribute('aria-pressed',on?'true':'false')}
 $('#bMulti').onclick=()=>setMulti(!multi);
 let pickColour=false;
-function setPick(on){pickColour=on;$('#bPick').classList.toggle('on',on);$('#bPick').textContent=on?'Tap a colour…':'◎ Select colour';pad.classList.toggle('picking',on)}
+function setPick(on){pickColour=on;$('#bPick').classList.toggle('on',on);const letter=mode==='l';$('#bPick').textContent=on?(letter?'Tap a letter…':'Tap a colour…'):(letter?'◎ Select letter':'◎ Select colour');pad.classList.toggle('picking',on)}
 $('#bPick').onclick=()=>setPick(!pickColour);
 // Tap the status line to drop the cell selection (number highlight stays). A quick second tap on a cell is a double-tap (cage/box), so this is the reliable way to get to 'no cell selected' without waiting for the double-tap window.
 $('#infoTxt').addEventListener('click',()=>{if(editing||!sel.size)return;sel.clear();renderSel()});
@@ -981,9 +1039,12 @@ const CNAMES=['red','orange','yellow','green','teal','blue','purple','pink','gre
 function selectColour(d){const full=cellsOfFullColour(d),any=P.col.some(o=>normCol(o).c.includes(d));
  sel=new Set([...(multi?sel:[]),...full]);colHl=any?d:0;setPick(false);
  if(!any)toast(`No ${CNAMES[d-1]} cells`);else if(!full.length)toast(`No cells fully ${CNAMES[d-1]} — partly ${CNAMES[d-1]} cells are highlighted`);renderSel()}
-// long-press a colour key (Colour mode) = select all cells with that colour
+function cellsOfLetter(ch){const h=[];if(!ch)return h;for(let i=0;i<81;i++)if(normLetters((P.lt||[])[i]).includes(ch))h.push(i);return h}
+function selectLetter(ch){const cells=cellsOfLetter(ch);sel=new Set([...(multi?sel:[]),...cells]);colHl=0;setPick(false);
+ if(!cells.length)toast(`No cells with ${ch}`);renderSel()}
+// long-press a colour key (Colour mode) = select all cells with that colour; in Letter mode, that letter.
 padBtns.forEach(b=>{let t=null;
- b.addEventListener('pointerdown',()=>{delete b.dataset.lp;if(mode!=='k')return;t=setTimeout(()=>{t=null;b.dataset.lp='1';selectColour(+b.dataset.d)},500)});
+ b.addEventListener('pointerdown',()=>{delete b.dataset.lp;if(mode!=='k'&&mode!=='l')return;t=setTimeout(()=>{t=null;b.dataset.lp='1';if(mode==='l')selectLetter(LETTERS[+b.dataset.d-1]);else selectColour(+b.dataset.d)},500)});
  const cancel=()=>{if(t){clearTimeout(t);t=null}};['pointerup','pointercancel','pointerleave'].forEach(x=>b.addEventListener(x,cancel));
  b.addEventListener('contextmenu',e=>e.preventDefault())});
 
@@ -994,10 +1055,14 @@ function mergeCornersToCentre(){const t=[...sel].filter(i=>!valAt(i)&&P.cn[i]);i
 $$('.modes button').forEach(b=>b.onclick=()=>{
  if(b.dataset.m==='m'){const now=Date.now(),already=mode==='m';
   if(already&&lastMAlready&&now-lastMTap<TAP_MS&&sel.size&&!editing){mergeCornersToCentre();lastMTap=now;lastMAlready=true;return}
-  mode='m';if(mode!=='k')setPick(false);renderControls();renderSel();lastMTap=now;lastMAlready=already;return}
- lastMAlready=false;mode=b.dataset.m;if(mode!=='k')setPick(false);renderControls();renderSel()});
-padBtns.forEach(b=>b.onclick=e=>{if(b.dataset.lp){delete b.dataset.lp;return}if(mode==='k'&&pickColour){selectColour(+b.dataset.d);return}
+  mode='m';if(mode!=='k'&&mode!=='l')setPick(false);renderControls();renderSel();lastMTap=now;lastMAlready=already;return}
+ if(b.dataset.m==='k'&&(mode==='k'||mode==='l')){mode=mode==='k'?'l':'k';setPick(false);lastMAlready=false;renderControls();renderSel();return}
+ lastMAlready=false;mode=b.dataset.m;if(mode!=='k'&&mode!=='l')setPick(false);renderControls();renderSel()});
+padBtns.forEach(b=>b.onclick=e=>{if(b.dataset.lp){delete b.dataset.lp;return}
+ if(mode==='k'&&pickColour){selectColour(+b.dataset.d);return}
+ if(mode==='l'&&pickColour){selectLetter(LETTERS[b.dataset.d-1]);return}
  if(mode==='k'){pressColour(+b.dataset.d,!e.target.closest('.cpm.minus'),b);return}
+ if(mode==='l'){pressLetter(LETTERS[b.dataset.d-1],b);return}
  pressDigit(+b.dataset.d,b)});
 $('#bErase').onclick=erase;$('#bTest').onclick=runTest;$('#bUndo').onclick=$('#eUndo').onclick=undo;$('#bRedo').onclick=$('#eRedo').onclick=redo;
 $('#bEdit').onclick=()=>setEditing(!editing);$('#bDone').onclick=()=>setEditing(false);
@@ -1010,7 +1075,12 @@ $('#bThCreate').onclick=()=>{const cs=[...sel],why=thermoProblem(cs);if(why){nud
 $('#bThDel').onclick=()=>{if(editLine<0)return;const k=editLine;act(()=>P.thermos.splice(k,1));editLine=-1;sel.clear();render()};
 $('#bThClear').onclick=()=>{sel.clear();editLine=-1;render()};
 $('#bArCreate').onclick=()=>{const cs=[...sel],why=arrowProblem(cs,arrowB);if(why){nudge($('#bArCreate'));toast(cs.length<=arrowB?'Tap the circle, then the shaft cells':why);return}
- const k=editLine,b=arrowB;act(()=>{if(k>=0)P.arrows[k]={cells:cs,b};else P.arrows.push({cells:cs,b});P.solved=false});sel.clear();editLine=-1;render()};
+ const k=editLine,b=arrowB;act(()=>{if(k>=0){const old=P.arrows[k],same=old.b===b&&old.cells.slice(0,b).every((c,i)=>c===cs[i]);P.arrows[k]={cells:cs,b,forks:same?(old.forks||[]):[],elim:old.elim||[]} }else P.arrows.push({cells:cs,b,forks:[],elim:[]});P.solved=false});sel.clear();editLine=-1;render()};
+$('#bArFork').onclick=()=>{if(editLine<0){nudge($('#bArFork'));toast('Select an arrow first, then tap the new shaft');return}
+ const a=P.arrows[editLine],b=a.b||1,circ=a.cells.slice(0,b);let sh=[...sel].filter(i=>!circ.includes(i));
+ if(!sh.length){nudge($('#bArFork'));toast('Tap the new shaft cells (the circle is already set)');return}
+ const why=arrowProblem({cells:[...circ,...sh],b,forks:a.forks||[]});if(why){nudge($('#bArFork'));toast(why);return}
+ act(()=>{a.forks=a.forks||[];a.forks.push(sh);P.solved=false});sel.clear();render()};
 $('#bWhCreate').onclick=()=>{const cs=[...sel],why=whisperProblem(cs);if(why){nudge($('#bWhCreate'));toast(cs.length<2?'Drag along the line first':why);return}
  const k=editLine;act(()=>{if(k>=0)P.whispers[k].cells=cs;else P.whispers.push({cells:cs});P.solved=false});sel.clear();editLine=-1;render()};
 $('#bWhDel').onclick=()=>{if(editLine<0)return;const k=editLine;act(()=>P.whispers.splice(k,1));editLine=-1;sel.clear();render()};
@@ -1095,33 +1165,36 @@ $('#bCalc').onclick=()=>{const T=calcTarget();if(!T)return;if(T.type==='thermo')
 // per cell are 1–9 minus digits already placed in its row, column, box, cage or thermo; shaft cells
 // that see each other (row/column/box/cage) must differ, others may repeat.
 function sees(a,b){return a!==b&&(ROW(a)===ROW(b)||COL(a)===COL(b)||BOX(a)===BOX(b)||cagesOf[a].some(k=>cagesOf[b].includes(k)))}
-function arrowOptions(a){const b=a.b||1,cs=a.cells,n=cs.length;
+function arrowOptions(a){const b=a.b||1,shafts=arrowShafts(a),cs=[...a.cells.slice(0,b),...shafts.flat()],n=cs.length;
  const cand=cs.map(i=>{const v=valAt(i);if(v)return [v];const used=new Set();for(const j of peers(i)){const w=valAt(j);if(w)used.add(w)}return [1,2,3,4,5,6,7,8,9].filter(d=>!used.has(d))});
  const S=cs.map((i,x)=>cs.map((j,y)=>y<x&&sees(i,j)).map((f,y)=>f?y:-1).filter(y=>y>=0));
+ const ends=[];let p=b;for(const sh of shafts){p+=sh.length;ends.push(p)}
  const res=new Map(),asg=Array(n);let nodes=0,capped=false;
- const shMin=k=>{let m=0;for(let x=k;x<n;x++)m+=Math.min(...cand[x]);return m},shMax=k=>{let m=0;for(let x=k;x<n;x++)m+=Math.max(...cand[x]);return m};
- const mins=[],maxs=[];for(let k=0;k<=n;k++){mins[k]=k<b?0:shMin(k);maxs[k]=k<b?0:shMax(k)}
- (function rec(k,circle,sum){if(capped)return;if(++nodes>400000){capped=true;return}
-  if(k<b){for(const d of cand[k]){if(S[k].some(y=>asg[y]===d))continue;asg[k]=d;rec(k+1,circle*10+d,0)}return}
-  if(sum+mins[k]>circle||sum+maxs[k]<circle)return;
-  if(k===n){const key=asg.slice(b).slice().sort((p,q)=>p-q).join('+');if(!res.has(circle))res.set(circle,new Set());res.get(circle).add(key);return}
-  for(const d of cand[k]){if(S[k].some(y=>asg[y]===d))continue;asg[k]=d;rec(k+1,circle,sum+d)}})(0,0,0);
+ const minFrom=(k,end)=>{let m=0;for(let x=k;x<end;x++)m+=Math.min(...cand[x]);return m};
+ const maxFrom=(k,end)=>{let m=0;for(let x=k;x<end;x++)m+=Math.max(...cand[x]);return m};
+ const keyOf=()=>ends.map((end,s)=>{const start=s?ends[s-1]:b;return asg.slice(start,end).slice().sort((p,q)=>p-q).join('+')}).join('|');
+ (function rec(k,circle,sum,end){if(capped)return;if(++nodes>400000){capped=true;return}
+  if(k<b){for(const d of cand[k]){if(S[k].some(y=>asg[y]===d))continue;asg[k]=d;rec(k+1,circle*10+d,0,ends[0])}return}
+  if(sum+minFrom(k,end)>circle||sum+maxFrom(k,end)<circle)return;
+  for(const d of cand[k]){if(S[k].some(y=>asg[y]===d))continue;asg[k]=d;const nsum=sum+d;
+   if(k+1===end){if(nsum!==circle)continue;if(end===n){if(!res.has(circle))res.set(circle,new Set());res.get(circle).add(keyOf())}else rec(k+1,circle,0,ends[ends.indexOf(end)+1])}
+   else rec(k+1,circle,nsum,end)}})(0,0,0,ends[0]||n);
  return {res,capped}}
 // Crossings are manual and stored per arrow in a.elim: "9" = the whole circle value 9 crossed out,
 // "9:1+2+6" = just that shaft set. Keyed by value + digits, so they survive placed digits changing the list.
-function openArrowCalc(k){const a=P.arrows[k];if(!a)return;const b=a.b||1,shN=a.cells.length-b,{res,capped}=arrowOptions(a);
+function openArrowCalc(k){const a=P.arrows[k];if(!a)return;const b=a.b||1,shN=arrowShafts(a).reduce((n,s)=>n+s.length,0),nFork=arrowShafts(a).length,{res,capped}=arrowOptions(a);
  a.elim=a.elim||[];const vals=[...res.keys()].sort((x,y)=>x-y),MAXC=8,open=new Set();
- const lists=new Map(vals.map(v=>[v,[...res.get(v)].sort((p,q)=>{const P2=p.split('+').map(Number),Q=q.split('+').map(Number);for(let x=0;x<P2.length;x++)if(P2[x]!==Q[x])return P2[x]-Q[x];return 0})]));
+ const parts=s=>s.split('|').map(x=>x.split('+').map(Number));const lists=new Map(vals.map(v=>[v,[...res.get(v)].sort((p,q)=>{const P2=parts(p),Q=parts(q);for(let i=0;i<Math.max(P2.length,Q.length);i++){const A=P2[i]||[],B=Q[i]||[];for(let x=0;x<Math.max(A.length,B.length);x++)if((A[x]||0)!==(B[x]||0))return (A[x]||0)-(B[x]||0)}return 0})]));
  const E=()=>P.arrows[k].elim||(P.arrows[k].elim=[]);
  const comboOff=(v,c)=>E().includes(String(v))||E().includes(v+':'+c);
  const valOff=v=>E().includes(String(v))||lists.get(v).every(c=>E().includes(v+':'+c));
  const row=v=>{const L=lists.get(v),show=open.has(v)?L:L.slice(0,MAXC),off=valOff(v);
   return `<div class="arow${off?' off':''}" data-v="${v}"><button class="av" data-v="${v}">${v}</button><span class="ac">${show.map(x=>`<button class="acb${comboOff(v,x)?' off':''}" data-v="${v}" data-c="${x}">${x}</button>`).join('')}${L.length>show.length?`<button class="more" data-more="${v}">+${L.length-show.length} more</button>`:''}</span></div>`};
  const draw=()=>{const live=vals.filter(v=>!valOff(v));$('#aList').innerHTML=vals.length?vals.map(row).join(''):'<div class="trow tbad">No circle value works with the digits placed.</div>';
-  $('#aMeta').textContent=`${b>1?`${b}-cell circle (${b}-digit number)`:'Circle'} ${a.cells.slice(0,b).map(RC).join(' ')} · shaft ${shN} cell${shN>1?'s':''}`+(vals.length?` · ${live.length} of ${vals.length} values left`:'')};
+  $('#aMeta').textContent=`${b>1?`${b}-cell circle (${b}-digit number)`:'Circle'} ${a.cells.slice(0,b).map(RC).join(' ')} · ${nFork>1?`${nFork} shafts, `:''}shaft ${shN} cell${shN>1?'s':''}`+(vals.length?` · ${live.length} of ${vals.length} values left`:'')};
  const change=fn=>{const before=snap();fn(P.arrows[k]);if(snap()!==before){undoS.push(before);redoS=[];save()}draw()};
- $('#mbox').innerHTML=`<h2>ARROW</h2><p class="mech">The digits on the shaft <b>sum to the number in the circle</b>.</p><div class="muted" id="aMeta"></div><div class="tlist" id="aList"></div>
- <p class="muted cnote">Circle value, then each set of shaft digits that adds up to it. Tap a value to cross out the whole row, or one set to cross out just that set; tap again to restore. Uses digits already placed on the arrow and in each cell's row, column, box and cage; shaft cells that see each other can't repeat.${capped?' <b>Too many options to list them all.</b>':''}</p><div class="r"><button class="btn" id="mClose">Close</button></div>`;
+ $('#mbox').innerHTML=`<h2>ARROW</h2><p class="mech">The digits on the shaft${nFork>1?'s':''} <b>sum to the number in the circle</b>${nFork>1?' (each shaft on its own)':''}.</p><div class="muted" id="aMeta"></div><div class="tlist" id="aList"></div>
+ <p class="muted cnote">Circle value, then each set of shaft digits that adds up to it. On a forked arrow each shaft sums to the circle on its own (sets for each shaft are shown separated by |). Tap a value to cross out the whole row, or one set to cross out just that set; tap again to restore. Uses digits already placed on the arrow and in each cell's row, column, box and cage; shaft cells that see each other can't repeat.${capped?' <b>Too many options to list them all.</b>':''}</p><div class="r"><button class="btn" id="mClose">Close</button></div>`;
  draw();showModal();$('#mClose').onclick=closeModal;
  $('#aList').onclick=e=>{const t=e.target.closest('button,.arow');if(!t)return;
   if(t.dataset.more){open.add(+t.dataset.more);draw();return}
@@ -1276,7 +1349,7 @@ function puzzleSheet(id){const p=DB[id];if(!p)return;const st=statusOf(p);
   if(a==='edit'){closeModal();openPuzzle(id);setEditing(true);return}
   if(a==='copy'){closeModal();exportDialog(p);return}
   if(a==='ren'){const n=prompt('Puzzle name',p.name);if(n&&n.trim()){p.name=n.trim();saveNow();closeModal();renderList()}return}
-  if(a==='restart'){if(confirm(`Restart "${p.name}"? Your digits, notes, colours, ruled-out combos and time will be cleared.`)){Object.assign(p,{v:Array(81).fill(0),cn:Array(81).fill(''),mn:Array(81).fill(''),col:Array.from({length:81},()=>({c:[],b:0})),time:0,solved:false});p.cages.forEach(c=>c.elim=[]);(p.arrows||[]).forEach(a=>a.elim=[]);p.groups={};p.lineSums={};if(id===curId){undoS=[];redoS=[];cellCache=Array(81).fill(null)}saveNow();closeModal();renderList()}return}
+  if(a==='restart'){if(confirm(`Restart "${p.name}"? Your digits, notes, colours, letters, ruled-out combos and time will be cleared.`)){Object.assign(p,{v:Array(81).fill(0),cn:Array(81).fill(''),mn:Array(81).fill(''),col:Array.from({length:81},()=>({c:[],b:0})),lt:Array(81).fill(''),time:0,solved:false});p.cages.forEach(c=>c.elim=[]);(p.arrows||[]).forEach(a=>a.elim=[]);p.groups={};p.lineSums={};if(id===curId){undoS=[];redoS=[];cellCache=Array(81).fill(null)}saveNow();closeModal();renderList()}return}
   if(a==='del'){if(confirm(`Delete "${p.name}"? This can't be undone.`)){delete DB[id];if(!Object.keys(DB).length){const n=blankPuzzle('Untitled');DB[n.id]=n}if(id===curId){curId=Object.values(DB).sort((a,b)=>b.updated-a.updated)[0].id;P=DB[curId];undoS=[];redoS=[];cellCache=Array(81).fill(null)}saveNow();closeModal();renderList()}return}}}
 $('#hCont').onclick=()=>go('game');$('#hSel').onclick=()=>go('list');$('#hAdd').onclick=()=>go('add');$('#hHelp').onclick=showHelp;
 $('#lBack').onclick=back;$('#aBack').onclick=back;
@@ -1341,7 +1414,7 @@ const HELP_ELEMENTS=[
  {id:'45',title:'Uncaged sums and the rule of 45',body:`<p>Every row, column and box adds up to <b>45</b>. If a box's other cells are all in cages that stay inside it, the leftover cells must make 45 minus those cages. Double-tap an uncaged cell to select that leftover group and see its sum.</p><p>You can also select 2+ cells in one row, column or box (or part of a cage) and type a sum for them with Σ. The status line shows the total and how far it is from a multiple of 45.</p>`},
  {id:'kropki',title:'Kropki dots',body:`<p>A dot on the line between two cells links their digits.</p><ul><li><span class="hdots"></span> <b>White</b>: the digits are <b>consecutive</b> (differ by 1), e.g. 4 and 5.</li><li><span class="hdots b"></span> <b>Black</b>: one digit is <b>double</b> the other, e.g. 3 and 6. Possible pairs: 1–2, 2–4, 3–6, 4–8.</li><li>1 and 2 fit either colour.</li></ul><p>Usually <b>not all dots are given</b>: a missing dot tells you nothing. If a puzzle says <b>all dots are given</b>, two neighbours with no dot can be neither consecutive nor double.</p><p>Tips: 9 can't be on a black dot, and 5 or 7 only pair with 1 less or 1 more. A dot turns red when the digits beside it break its rule.</p><p>Select exactly the two cells beside a dot and press <b>Σ Pairs</b> to list its pairs (white: 12 23 34 45 56 67 78 89; black: 12 24 36 48). Grey pairs can't fit; tap a pair to cross it out.</p>`},
  {id:'thermo',title:'Thermometers',body:`<p>A grey line with a round <b>bulb</b> is a thermometer. Digits must <b>strictly increase</b> from the bulb to the far end, so no digit repeats on a thermo.</p><p>On a 4-cell thermo the bulb can only be 1–6 and the tip 4–9. Select a thermo (or one uncaged cell on it) and press Σ to see each cell's possible range, narrowed by digits you've placed. Digits that break the order turn red.</p>`},
- {id:'arrow',title:'Arrows',body:`<p>A grey <b>circle</b> with a line and an arrowhead is an arrow. The digits along the line (the <b>shaft</b>) <b>add up to the digit in the circle</b>.</p><p>Digits <b>can repeat</b> on an arrow, as long as the repeats aren't in the same row, column, box or cage. A 2-cell oval circle is read as a 2-digit number (left to right, or top to bottom).</p><p>Tips: the circle is at least the number of shaft cells, so a 3-cell shaft means the circle is 6+ if its cells all see each other. Select an arrow (or one uncaged cell on it) and press Σ to list each possible circle value with the shaft digits that make it. Tap a value to cross out that whole row, or tap one set of digits to cross out just that set; tap again to restore. Crossings are yours — the app never crosses anything out for you. Digits that can't add up turn the arrow red.</p>`},
+ {id:'arrow',title:'Arrows',body:`<p>A grey <b>circle</b> with a line and an arrowhead is an arrow. The digits along the line (the <b>shaft</b>) <b>add up to the digit in the circle</b>.</p><p>Some arrows <b>fork</b>: two or more shafts leave the same circle. <b>Each shaft sums to the circle on its own</b> (the shafts are not added together).</p><p>Digits <b>can repeat</b> on an arrow, as long as the repeats aren't in the same row, column, box or cage. A 2-cell oval circle is read as a 2-digit number (left to right, or top to bottom).</p><p>Tips: the circle is at least the number of shaft cells, so a 3-cell shaft means the circle is 6+ if its cells all see each other. Select an arrow (or one uncaged cell on it) and press Σ to list each possible circle value with the shaft digits that make it. Tap a value to cross out that whole row, or one set of digits to cross out just that set; tap again to restore. Digits that can't add up turn the arrow red.</p>`},
  {id:'whisper',title:'German whispers',body:`<p>A thick <b>green line</b> is a German whisper. Any two cells <b>next to each other on the line</b> must differ by <b>at least 5</b>.</p><ul><li><b>5</b> can never be on a whisper (nothing is 5 away from it).</li><li>So digits alternate <b>low</b> (1–4) and <b>high</b> (6–9) along the line.</li><li><b>4</b> only fits next to 9, and <b>6</b> only next to 1 — so a 4 or 6 can't sit between two cells that see each other.</li><li>Digits can repeat on a whisper if sudoku rules allow.</li></ul><p>Select a whisper (or one uncaged cell on it) and press Σ to see the digits each cell can take, given the digits already placed on the line. Neighbours that break the rule turn red.</p>`},
  {id:'renban',title:'Renban lines',body:`<p>A thick <b>pink-purple line</b> is a renban. Its digits are a set of <b>consecutive</b> digits in <b>any order</b>, with <b>no repeats</b> — e.g. a 3-cell renban could be 4 6 5, but not 4 6 7 or 3 3 4.</p><ul><li>A renban of length n spans exactly n−1: if 2 and 6 are on a 5-cell renban it must be 23456.</li><li>Long renbans must contain the middle digits: a 5-cell renban always has 5; a 6-cell one always has 4, 5 and 6.</li><li>Cells on a renban that see each other in a box often decide which end of the run goes where.</li></ul><p>Select a renban (or one uncaged cell on it) and press Σ to list every possible run. Grey runs can't fit the digits already placed; tap a run to cross it out yourself. Repeats or digits too far apart turn the line red.</p>`},
  {id:'parity',title:'Odd and even cells',body:`<p>A grey <b>circle</b> is <b>odd</b> (1, 3, 5, 7 or 9). A grey <b>square</b> is <b>even</b> (2, 4, 6 or 8). These are the usual SudokuPad shapes.</p><p>Select a marked cell and press Σ for a one-line reminder. There are no combinations to cross out — it's that simple. A placed digit that breaks the mark turns red.</p>`},
@@ -1349,13 +1422,13 @@ const HELP_ELEMENTS=[
  {id:'rsl',title:'Region-sum lines',body:`<p>A thick <b>cyan line</b> is a region-sum line. <b>Box borders</b> split the line into <b>segments</b>, and the digits on <b>each segment of a line have the same sum</b>. Different lines may have different sums.</p><ul><li>If a line leaves a box and later comes back, that later visit is a <b>new</b> segment.</li><li>A 1-cell segment means that digit <b>is</b> the common sum of the other segments — so a 3-cell partner must be at least 6.</li><li>A 2-cell line with one cell in each of two boxes forces the two digits to be <b>equal</b>.</li><li>Digits can repeat on the line if sudoku rules allow.</li></ul><p>Select a region-sum line (or one uncaged cell on it) and press Σ. Type the common sum at the top to list each segment's combinations; a total that a segment's cell count can't make is flagged. Tap a set to cross it out — crossings are remembered per sum on that line and saved with the puzzle. Sets that clash with digits already placed on the segment go grey. Segments that can't share a sum turn the line red.</p>`},
 ];
 const HELP_CONTROLS=[
- {id:'select',title:'Selecting cells',body:`<ul><li><b>Tap</b> a cell to select it; tap it again to deselect.</li><li><b>Double-tap</b> selects the cell's cage (or the uncaged cells of its box).</li><li>On a thermo, arrow, whisper, renban or region-sum line, the next tap selects that line: <b>double</b> = cage, <b>triple</b> = the line, then the box. An uncaged line cell goes line → uncaged group → box. (Order if a cell is on several: cage → thermo → arrow → whisper → renban → region-sum line.)</li><li>Otherwise <b>triple-tap</b> selects the whole box.</li><li><b>Drag</b> to select several cells, or turn on <b>Multi</b> to add/remove cells with taps (double-tapping a selected cell removes its group).</li><li>While <b>Multi</b> is on, the number highlight is <b>locked</b>: selecting cells won't change it. To change it, clear the selection (tap the status line) and tap a number key; tap the same key to turn it off.</li><li>Tap the status line to clear the selection.</li></ul>`},
- {id:'modes',title:'Digit, Corner, Centre',body:`<p>Pick a mode, then a number. Digit places a value; Corner and Centre add pencil marks. Corner marks always sit in fixed slots: <b>1–5 along the top</b>, <b>6–9 along the bottom</b>; empty slots stay empty. Placing a digit clears that digit's marks from the same row, column, box, cage and thermo.</p><p>With cells selected, <b>double-tap Centre</b> while Centre is already on to move every corner mark into the centre marks (a single undo). A tap when Centre is not already on just switches mode. With nothing selected, the number keys <b>highlight</b> that number. Tap the key again to clear.</p>`},
+ {id:'select',title:'Selecting cells',body:`<ul><li><b>Tap</b> a cell to select just that cell (and clear any other selected cells). Tap it again (after a short pause) to deselect.</li><li><b>Double-tap</b> selects the whole top-priority mechanic covering that cell (cage, then thermo, arrow, whisper, renban, region-sum line, then the box). Each further double-tap cycles to the next mechanic, then back to the first.</li><li>If the cell is not in a cage, the uncaged cells of its box are in the cycle too, just before the whole box.</li><li>A single tap is instant — it is not delayed to see whether a double-tap is coming.</li><li><b>Drag</b> to select several cells, or turn on <b>Multi</b> to add/remove cells with taps (in Multi, double-tap still adds or removes a group, as before).</li><li>While <b>Multi</b> is on, the number highlight is <b>locked</b>: selecting cells won't change it. To change it, clear the selection (tap the status line) and tap a number key; tap the same key to turn it off.</li><li>Tap the status line to clear the selection.</li></ul>`},
+ {id:'modes',title:'Digit, Corner, Centre, Colour',body:`<p>Pick a mode, then a number. Tap Colour a second time to switch to Letter mode (see Colours and letters). Digit places a value; Corner and Centre add pencil marks. Corner marks always sit in fixed slots: <b>1–5 along the top</b>, <b>6–9 along the bottom</b>; empty slots stay empty. Placing a digit clears that digit's marks from the same row, column, box, cage and thermo.</p><p>With cells selected, <b>double-tap Centre</b> while Centre is already on to move every corner mark into the centre marks (a single undo). A tap when Centre is not already on just switches mode. With nothing selected, the number keys <b>highlight</b> that number. Tap the key again to clear.</p>`},
  {id:'look',title:'Selection vs highlight',body:`<ul><li><b>Selected</b> cells get a navy outline drawn on the grid lines around the selection, and turn slightly brighter. Every unselected cell also darkens a little.</li><li><b>Highlighted</b> cells (holding the number, or a pencil mark of it — shown as an amber chip) have no border; every other cell darkens a little, and cells where the number can't go darken a bit more.</li><li>A cell that is both keeps the border and isn't darkened.</li><li>A cell that is neither selected nor highlighted gets both darkenings, so the three kinds stay easy to tell apart.</li><li><b>☰ → Visuals</b> opens a pane of sliders (mark darkness and outlines, cage darkness, line strength, placed-digit outlines, and UI contrast) so you can tune how the grid looks. The pane stays below the grid and updates it live.</li></ul>`},
- {id:'colour',title:'Colours',body:`<p>In Colour mode each key has a <b>+</b> half and a <b>−</b> half. + adds a colour (up to 3 per cell); + on a colour already there makes it 2/3 of the cell. − shrinks or removes it.</p><p>Long-press a key, or use ◎ Select colour, to <b>select</b> every cell that is <b>fully</b> that colour; cells with only <b>part</b> of it are <b>highlighted</b>. Double-tap a cell that is one solid colour does the same for its colour.</p>`},
- {id:'sigma',title:'Σ Combos and Total',body:`<p>Σ works on: one cell in a cage (the whole cage), an uncaged box group, 2+ cells all in one cage, row, column or 3×3 box (type their sum; a whole row, column or box is 45), a thermo (ranges), an arrow (circle values and shaft digits), a whisper (each cell's possible digits), a renban (the possible runs), a region-sum line (type the common sum and list each segment's combinations), or the two cells of a kropki dot or an X/V (the possible pairs), or a cell with an odd/even mark (a one-line reminder). Every Σ pane starts with a short description of the mechanic. The Σ button names what it will show (Combos, Ranges, Sums, Digits, Runs, Pairs, Odd, Even). The status line adds up whole cages, known groups and placed digits.</p>`},
+ {id:'colour',title:'Colours and letters',body:`<p>In Colour mode each key has a <b>+</b> half and a <b>−</b> half. + adds a colour (up to <b>4</b> per cell, drawn as pie wedges); + on a colour already there makes it 2/3 of the cell. − shrinks or removes it.</p><p>Long-press a key, or use ◎ Select colour, to <b>select</b> every cell that is <b>fully</b> that colour; cells with only <b>part</b> of it are <b>highlighted</b>. Double-tap a cell that is one solid colour does the same for its colour.</p><p>Tap the <b>Colour</b> button again (while Colour is already selected) to switch to <b>Letter</b> mode; tap it once more to go back. The keys become <b>a b c d e f g ★ ◆</b>. Tap a letter to add or remove it on the selected cells. Letters are drawn in alphabetical order (then the star and diamond) on small deep-magenta tiles, in a row just below the top corner marks, so they don't cover corner mark 1. Use ◎ Select letter, or long-press a key, to select every cell that has that letter. Letters are saved with the puzzle, work with undo, and are cleared when you clear the cell.</p>`},
+ {id:'sigma',title:'Σ Combos and Total',body:`<p>Σ works on: one cell in a cage (the whole cage), an uncaged box group, 2+ cells all in one cage, row, column or 3×3 box (type their sum; a whole row, column or box is 45), a thermo (ranges), an arrow (circle values and shaft digits), a whisper (each cell's possible digits), a renban (the possible runs), a region-sum line (type the common sum and list each segment's combinations), or the two cells of a kropki dot or an X/V (the possible pairs), or a cell with an odd/even mark (a one-line reminder). Every Σ pane starts with a short description of the mechanic. The Σ button names what it will show (Combos, Ranges, Sums, Digits, Runs, Pairs, Odd, Even), and the status line uses the same label when there isn't already a known total. If a selection exactly matches a mechanic (one odd/even cell, both cells of an X/V, a whole cage or line), that mechanic's pane opens; otherwise the usual priority applies.</p>`},
  {id:'test',title:'Test',body:`<p>For puzzles that come with a solution, select cells with centre marks and press <b>Test</b>: a green ✓ means the right digit is among the marks, a red ✕ means it's missing. Wrong placed digits also show red.</p>`},
- {id:'other',title:'Timer, edit, menus',body:`<p>Tap the timer to pause. ✎ opens the editor for cages, thermos, arrows, whispers, renbans, region-sum lines, dots and givens. In the Arrows tab, tap the circle then the shaft cells in order. In the Dots tab, tap the line between two cells to cycle no dot → white → black.</p><p><b>☰</b> has Visuals, Tips, Help and Main menu. <b>Tips</b> shows the puzzle's hints one at a time (Prev/Next); it is greyed out when the puzzle has none. In a puzzle code each hint is a line <code>tip your text</code>, in order. The <b>main menu</b> has Continue (your current unsolved puzzle), Select puzzle (tap one to open; <b>⋯</b> to edit, copy its code, rename, restart or delete) and Add puzzle (paste a code or start a blank one). The app opens straight into your puzzle if it isn't solved yet.</p>`},
+ {id:'other',title:'Timer, edit, menus',body:`<p>Tap the timer to pause. ✎ opens the editor for cages, thermos, arrows, whispers, renbans, region-sum lines, dots, odd/even and givens. In the Arrows tab, tap the circle then the shaft cells in order; with an arrow selected, <b>Add shaft</b> adds another shaft from the same circle (a fork). In the Dots tab, tap the line between two cells to cycle no mark → white → black → X → V → none.</p><p><b>☰</b> has Visuals, Tips, Help and Main menu. <b>Tips</b> shows the puzzle's hints one at a time (Prev/Next); it is greyed out when the puzzle has none. In a puzzle code each hint is a line <code>tip your text</code>, in order. The <b>main menu</b> has Continue (your current unsolved puzzle), Select puzzle (tap one to open; <b>⋯</b> to edit, copy its code, rename, restart or delete) and Add puzzle (paste a code or start a blank one). The app opens straight into your puzzle if it isn't solved yet.</p>`},
 ];
 function showHelp(){
  const sec=h=>`<details class="hs" id="help-${h.id}"><summary>${esc(h.title)}</summary><div class="hb2">${h.body}</div></details>`;

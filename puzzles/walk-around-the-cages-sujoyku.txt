@@ -1,0 +1,32 @@
+SUDOKU v1
+name Walk around the cages
+# Author: sujoyku
+# Source: https://logic-masters.de/Raetselportal/Raetsel/zeigen.php?id=000BLC
+# Source: https://f-puzzles.com/?id=2gqnmrj9
+# Source: https://tinyurl.com/ywafe595
+# Rules: normal sudoku; digits in a cage do not repeat (these cages have no totals); digits on an arrow sum to the digit in the circle; when an arrow forks, each shaft sums to the circle on its own; cells joined by a V sum to 5; cells joined by an X sum to 10; not all Vs and Xs are given; a black dot means a 1:2 ratio; a white dot means consecutive digits; not all dots are given.
+givens .................................................................................
+solution 689437215 231586497 754291368 827364951 963152874 145879623 572948136 416723589 398615742
+cage r2c3 r2c4 r2c5 r3c3 r3c4 r3c5 r4c3 r4c4 r4c5
+cage r3c6 r3c7 r3c8 r4c6 r4c7 r4c8 r5c6 r5c7 r5c8
+cage r6c5 r6c6 r6c7 r7c5 r7c6 r7c7 r8c5 r8c6 r8c7
+cage r5c2 r5c3 r5c4 r6c2 r6c3 r6c4 r7c2 r7c3 r7c4
+arrow r1c6 r1c5 r1c4 | r2c6 r3c6
+arrow r7c4 r6c4 r5c4 | r7c3 r7c2
+arrow r1c2 r2c2 r3c2
+arrow r8c4 r8c3 r8c2
+arrow r9c4 r9c5 r9c6
+kropki w r4c1 r3c1
+kropki w r8c1 r7c1
+kropki b r3c8 r3c7
+kropki b r5c6 r4c6
+kropki b r8c8 r9c8
+xv v r2c3 r3c3
+xv v r5c9 r4c9
+xv v r6c8 r6c9
+xv x r4c3 r4c4
+xv x r4c1 r4c2
+xv x r5c1 r6c1
+tip Each of the four 9-cell cages has no total, so it is just a 1-9 set (digits don't repeat). An arrow with two shafts is a fork: each shaft sums to the circle on its own, not added together. So r1c6 equals both r1c5+r1c4 and r2c6+r3c6, and r7c4 equals both r6c4+r5c4 and r7c3+r7c2. Every shaft in this puzzle is two cells, so each circle is 3-9 (a 1 or 2 cannot be the sum of two positive digits of at most 9).
+tip The forked arrow at r7c4 sits entirely inside the lower-left cage (r5c2, r5c3, r5c4, r6c2, r6c3, r6c4, r7c2, r7c3, r7c4). Those five arrow cells are five different digits, and the two 2-cell shafts each sum to r7c4. A 3 or 4 has at most one pair of different digits that add up to it, so r7c4 is 5-9, and the shafts are two disjoint pairs from the pairs of 1-8 that sum to that circle.
+tip The other fork has its circle at r1c6, one shaft along r1c5-r1c4, and one down r2c6-r3c6; r3c6 is in the upper-right cage. The upper-left cage contains a V at r2c3-r3c3 (so 14 or 23) and an X at r4c3-r4c4 (19, 28, 37 or 46); those four cells are four different digits. Column 1 has a white (consecutive) dot at r3c1-r4c1, an X at r4c1-r4c2, another X at r5c1-r6c1, and a second white dot at r7c1-r8c1.

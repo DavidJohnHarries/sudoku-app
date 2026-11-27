@@ -22,7 +22,7 @@ header{display:flex;align-items:center;gap:6px;height:50px}
    v47: ink sits above arrows, renbans, region-sum lines, thermos and whispers, so the white
    digit halo cuts every constraint line the same way. Thermo/whisper multiply still applies
    under the ink (bulbs stay grey; the halo is the ink stroke). */
-#grid .mn,#grid .cn,#grid .val{visibility:hidden}
+#grid .mn,#grid .cn,#grid .lets,#grid .val{visibility:hidden}
 #grid,#renbans,#rsl,#arrows,#parity,#ink,#thermo,#whispers,#lines,#selsvg,#dots,#sums{position:absolute;inset:0}
 #renbans,#arrows,#rsl,#parity,#thermo,#whispers{z-index:1}
 #ink{z-index:2;display:grid;grid-template-columns:repeat(9,1fr);grid-template-rows:repeat(9,1fr);pointer-events:none}
@@ -291,3 +291,12 @@ header{display:flex;align-items:center;gap:6px;height:50px}
 
 .mech{font-size:15px;margin:6px 0 4px;color:#1f2937;line-height:1.35}
 #parity{pointer-events:none;mix-blend-mode:multiply}
+
+/* v49: letter marks sit in one row just below corner slots 1–5, white on deep magenta. */
+.lets{position:absolute;top:calc(6% + 25cqh);left:6%;right:6%;display:flex;justify-content:center;align-items:center;gap:2cqh;pointer-events:none;z-index:3;line-height:1}
+.lets span{display:inline-flex;align-items:center;justify-content:center;min-width:18cqh;height:22cqh;padding:0 3cqh;border-radius:4cqh;background:#9d174d;color:#fff;font-weight:700;font-size:16cqh;line-height:1}
+.lets.n1 span,.lets.n2 span{font-size:18cqh;height:24cqh;min-width:20cqh}
+.lets.n5 span,.lets.n6 span{font-size:13cqh;height:18cqh;min-width:15cqh;padding:0 1.5cqh}
+.lets.n7 span,.lets.n8 span,.lets.n9 span{font-size:11cqh;height:16cqh;min-width:13cqh;padding:0 1cqh;gap:1cqh}
+.pad.lmode button{font-size:0}
+.pad .lg{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:700;color:#1f2937;pointer-events:none;z-index:3}
