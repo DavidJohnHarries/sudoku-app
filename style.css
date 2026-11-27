@@ -292,11 +292,18 @@ header{display:flex;align-items:center;gap:6px;height:50px}
 .mech{font-size:15px;margin:6px 0 4px;color:#1f2937;line-height:1.35}
 #parity{pointer-events:none;mix-blend-mode:multiply}
 
-/* v49: letter marks sit in one row just below corner slots 1–5, white on deep magenta. */
-.lets{position:absolute;top:calc(6% + 25cqh);left:6%;right:6%;display:flex;justify-content:center;align-items:center;gap:2cqh;pointer-events:none;z-index:3;line-height:1}
-.lets span{display:inline-flex;align-items:center;justify-content:center;min-width:18cqh;height:22cqh;padding:0 3cqh;border-radius:4cqh;background:#9d174d;color:#fff;font-weight:700;font-size:16cqh;line-height:1}
-.lets.n1 span,.lets.n2 span{font-size:18cqh;height:24cqh;min-width:20cqh}
-.lets.n5 span,.lets.n6 span{font-size:13cqh;height:18cqh;min-width:15cqh;padding:0 1.5cqh}
-.lets.n7 span,.lets.n8 span,.lets.n9 span{font-size:11cqh;height:16cqh;min-width:13cqh;padding:0 1cqh;gap:1cqh}
+/* v50: up to 4 letters in the four diagonal gaps between centre and corner marks.
+   Centres at 13%/32.5% (and the three mirrors) — closer to the corners than a strict
+   30% diagonal, so an 11cqh tile clears corner slots 1–5 / 6–9 and a 4- or 5-digit
+   centre string. On a placed digit the same tiles sit under the digit and its white
+   halo and peek out in the corners. */
+.lets{position:absolute;inset:0;pointer-events:none;z-index:2;line-height:1}
+.lets span{position:absolute;display:flex;align-items:center;justify-content:center;width:11cqh;height:11cqh;border-radius:2.5cqh;background:#9d174d;color:#fff;font-weight:700;font-size:8.5cqh;line-height:1;transform:translate(-50%,-50%)}
+.lets span.tl{top:32.5%;left:13%}
+.lets span.tr{top:32.5%;left:87%}
+.lets span.bl{top:67.5%;left:13%}
+.lets span.br{top:67.5%;left:87%}
+.cell .cn,.cell .mn{z-index:3}
+.cell .val{z-index:4}
 .pad.lmode button{font-size:0}
 .pad .lg{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:700;color:#1f2937;pointer-events:none;z-index:3}

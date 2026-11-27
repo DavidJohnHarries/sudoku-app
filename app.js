@@ -6,7 +6,7 @@ const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[c]);
 const RC=i=>`r${Math.floor(i/9)+1}c${i%9+1}`;
 const COLOURS=['#fca5a5','#fdba74','#fde047','#86efac','#5eead4','#93c5fd','#c4b5fd','#f9a8d4','#cbd5e1'];
-const MAXCOL=4;
+const MAXCOL=4,MAXLET=4;
 const LETTERS=['a','b','c','d','e','f','g','★','◆'];
 // Feature flags / hooks for later variants (thermometers, arrows, kropki...): add a parser section + a draw layer.
 const FEATURES={calculator:true,thermo:true,kropki:true,arrows:true,whispers:true,renban:true,rsl:true,xv:true,parity:true,letters:true};
@@ -31,7 +31,7 @@ function parseColourToks(toks){
 }
 function fmtColour(o){o=normCol(o);return o.c.map(d=>o.b===d?d+'*':String(d)).join(' ')}
 function normLetters(s){const seen=new Set(),out=[];for(const ch of String(s||'')){if(LETTERS.includes(ch)&&!seen.has(ch)){seen.add(ch);out.push(ch)}}
- out.sort((a,b)=>LETTERS.indexOf(a)-LETTERS.indexOf(b));return out.join('')}
+ out.sort((a,b)=>LETTERS.indexOf(a)-LETTERS.indexOf(b));if(out.length>MAXLET)out.length=MAXLET;return out.join('')}
 function fmtLetters(s){return normLetters(s).split('').join(' ')}
 const SAMPLE=`SUDOKU v1
 name Sample killer
@@ -513,6 +513,10 @@ function computeConflicts(){bad=new Set();cageBad=new Set();thermoBad=new Set();
  parityBad=new Set();
  (P.parity||[]).forEach((m,i)=>{const v=valAt(i);if(!m||!v)return;if((m==='o'&&v%2===0)||(m==='e'&&v%2===1)){parityBad.add(i);bad.add(i)}})}
 function noteMark(d,weak){return numSel&&+d===numSel?(weak===true?`<span class="nh2">${d}</span>`:`<span class="nh">${d}</span>`):`<span>${d}</span>`}
+function lettersHTML(i){
+ const lets=normLetters((P.lt||[])[i]);if(!lets)return '';
+ const slots=['tl','tr','bl','br'];
+ return `<div class="lets n${lets.length}${valAt(i)?' onval':''}">${[...lets].map((ch,k)=>`<span class="${slots[k]}">${ch}</span>`).join('')}</div>`}
 function marksHTML(i){
  if(valAt(i))return '';
  let h='';
@@ -521,10 +525,8 @@ function marksHTML(i){
   const slot=d=>have.has(String(d))?noteMark(String(d),w):'<span class="cne"></span>';
   h+=`<div class="cn${anc!==undefined?' a':''}"><div class="cn-top">${[1,2,3,4,5].map(slot).join('')}</div><div class="cn-bot">${[6,7,8,9].map(slot).join('')}</div></div>`}
  if(P.mn[i])h+=`<span class="mn m${P.mn[i].length}">${[...P.mn[i]].map(x=>noteMark(x)).join('')}</span>`; // v29: pass only the digit — .map(noteMark) was feeding the index as `weak`
- const lets=normLetters((P.lt||[])[i]);
- if(lets)h+=`<div class="lets n${lets.length}">${[...lets].map(ch=>`<span>${ch}</span>`).join('')}</div>`;
  return h}
-function inkHTML(i){const v=valAt(i);return v?`<span class="val">${v}</span>`:marksHTML(i)}
+function inkHTML(i){const v=valAt(i);return (v?`<span class="val">${v}</span>`:marksHTML(i))+lettersHTML(i)}
 function sumHTML(i){
  const anc=cagesOf[i].find(k=>P.cages[k].cells[0]===i);
  return anc===undefined||P.cages[anc].sum==null?'':`<span class="sum${cageBad.has(anc)?' bad':''}">${P.cages[anc].sum}</span>`}
@@ -533,7 +535,7 @@ function cellHTML(i){
  if(normCol(P.col[i]).c.length)h+=`<div class="bg" style="background:${pie(P.col[i])}"></div>`;
  if(v)h+=`<span class="val">${v}</span>`;
  else h+=marksHTML(i);
- return h}
+ return h+lettersHTML(i)}
 let cellCache=Array(81).fill(null),sumCache=Array(81).fill(null);
 const solWrong=i=>!!(P.sol&&P.v[i]&&P.sol[i]&&P.v[i]!==P.sol[i]);
 function renderCells(){computeConflicts();for(let i=0;i<81;i++){const h=cellHTML(i);if(cellCache[i]!==h){cells[i].innerHTML=h;cellCache[i]=h}cells[i].classList.toggle('given',!!P.givens[i]);cells[i].classList.toggle('bad',bad.has(i)||solWrong(i));const sh=sumHTML(i);if(sumCache[i]!==sh){sumCells[i].innerHTML=sh;sumCache[i]=sh}}}
@@ -853,10 +855,15 @@ function pressLetter(ch,el){
  if(!sel.size){if(el)nudge(el);return}
  if(!LETTERS.includes(ch))return;
  act(()=>{
-  const t=[...sel].filter(i=>!valAt(i));if(!t.length){if(el)nudge(el);return}
+  const t=[...sel];
   const all=t.every(i=>normLetters((P.lt||[])[i]).includes(ch));
   P.lt=P.lt&&P.lt.length===81?P.lt:Array(81).fill('');
-  for(const i of t){const s=new Set(normLetters(P.lt[i]));all?s.delete(ch):s.add(ch);P.lt[i]=normLetters([...s].join(''))}
+  let full=0;
+  for(const i of t){const s=new Set(normLetters(P.lt[i]));
+   if(all)s.delete(ch);
+   else if(!s.has(ch)){if(s.size>=MAXLET){full++;continue}s.add(ch)}
+   P.lt[i]=normLetters([...s].join(''))}
+  if(full)toast(`Max ${MAXLET} letters per cell`);
  })
 }
 function erase(){const cs=editable();if(mode==='k'){clearColours();return}if(mode==='l'){clearLetters();return}
@@ -1425,7 +1432,7 @@ const HELP_CONTROLS=[
  {id:'select',title:'Selecting cells',body:`<ul><li><b>Tap</b> a cell to select just that cell (and clear any other selected cells). Tap it again (after a short pause) to deselect.</li><li><b>Double-tap</b> selects the whole top-priority mechanic covering that cell (cage, then thermo, arrow, whisper, renban, region-sum line, then the box). Each further double-tap cycles to the next mechanic, then back to the first.</li><li>If the cell is not in a cage, the uncaged cells of its box are in the cycle too, just before the whole box.</li><li>A single tap is instant — it is not delayed to see whether a double-tap is coming.</li><li><b>Drag</b> to select several cells, or turn on <b>Multi</b> to add/remove cells with taps (in Multi, double-tap still adds or removes a group, as before).</li><li>While <b>Multi</b> is on, the number highlight is <b>locked</b>: selecting cells won't change it. To change it, clear the selection (tap the status line) and tap a number key; tap the same key to turn it off.</li><li>Tap the status line to clear the selection.</li></ul>`},
  {id:'modes',title:'Digit, Corner, Centre, Colour',body:`<p>Pick a mode, then a number. Tap Colour a second time to switch to Letter mode (see Colours and letters). Digit places a value; Corner and Centre add pencil marks. Corner marks always sit in fixed slots: <b>1–5 along the top</b>, <b>6–9 along the bottom</b>; empty slots stay empty. Placing a digit clears that digit's marks from the same row, column, box, cage and thermo.</p><p>With cells selected, <b>double-tap Centre</b> while Centre is already on to move every corner mark into the centre marks (a single undo). A tap when Centre is not already on just switches mode. With nothing selected, the number keys <b>highlight</b> that number. Tap the key again to clear.</p>`},
  {id:'look',title:'Selection vs highlight',body:`<ul><li><b>Selected</b> cells get a navy outline drawn on the grid lines around the selection, and turn slightly brighter. Every unselected cell also darkens a little.</li><li><b>Highlighted</b> cells (holding the number, or a pencil mark of it — shown as an amber chip) have no border; every other cell darkens a little, and cells where the number can't go darken a bit more.</li><li>A cell that is both keeps the border and isn't darkened.</li><li>A cell that is neither selected nor highlighted gets both darkenings, so the three kinds stay easy to tell apart.</li><li><b>☰ → Visuals</b> opens a pane of sliders (mark darkness and outlines, cage darkness, line strength, placed-digit outlines, and UI contrast) so you can tune how the grid looks. The pane stays below the grid and updates it live.</li></ul>`},
- {id:'colour',title:'Colours and letters',body:`<p>In Colour mode each key has a <b>+</b> half and a <b>−</b> half. + adds a colour (up to <b>4</b> per cell, drawn as pie wedges); + on a colour already there makes it 2/3 of the cell. − shrinks or removes it.</p><p>Long-press a key, or use ◎ Select colour, to <b>select</b> every cell that is <b>fully</b> that colour; cells with only <b>part</b> of it are <b>highlighted</b>. Double-tap a cell that is one solid colour does the same for its colour.</p><p>Tap the <b>Colour</b> button again (while Colour is already selected) to switch to <b>Letter</b> mode; tap it once more to go back. The keys become <b>a b c d e f g ★ ◆</b>. Tap a letter to add or remove it on the selected cells. Letters are drawn in alphabetical order (then the star and diamond) on small deep-magenta tiles, in a row just below the top corner marks, so they don't cover corner mark 1. Use ◎ Select letter, or long-press a key, to select every cell that has that letter. Letters are saved with the puzzle, work with undo, and are cleared when you clear the cell.</p>`},
+ {id:'colour',title:'Colours and letters',body:`<p>In Colour mode each key has a <b>+</b> half and a <b>−</b> half. + adds a colour (up to <b>4</b> per cell, drawn as pie wedges); + on a colour already there makes it 2/3 of the cell. − shrinks or removes it.</p><p>Long-press a key, or use ◎ Select colour, to <b>select</b> every cell that is <b>fully</b> that colour; cells with only <b>part</b> of it are <b>highlighted</b>. Double-tap a cell that is one solid colour does the same for its colour.</p><p>Tap the <b>Colour</b> button again (while Colour is already selected) to switch to <b>Letter</b> mode; tap it once more to go back. The keys become <b>a b c d e f g ★ ◆</b>. Tap a letter to add or remove it on the selected cells (up to <b>4</b> per cell, the same cap as colours). Letters are drawn in alphabetical order (then the star and diamond) on small deep-magenta tiles, in the four diagonal gaps between the centre marks and the corners: first top-left, then top-right, bottom-left, bottom-right. Use ◎ Select letter, or long-press a key, to select every cell that has that letter. Letters are saved with the puzzle, work with undo, and are cleared when you clear the cell. They stay visible if you place a digit, sitting behind the digit's white halo.</p>`},
  {id:'sigma',title:'Σ Combos and Total',body:`<p>Σ works on: one cell in a cage (the whole cage), an uncaged box group, 2+ cells all in one cage, row, column or 3×3 box (type their sum; a whole row, column or box is 45), a thermo (ranges), an arrow (circle values and shaft digits), a whisper (each cell's possible digits), a renban (the possible runs), a region-sum line (type the common sum and list each segment's combinations), or the two cells of a kropki dot or an X/V (the possible pairs), or a cell with an odd/even mark (a one-line reminder). Every Σ pane starts with a short description of the mechanic. The Σ button names what it will show (Combos, Ranges, Sums, Digits, Runs, Pairs, Odd, Even), and the status line uses the same label when there isn't already a known total. If a selection exactly matches a mechanic (one odd/even cell, both cells of an X/V, a whole cage or line), that mechanic's pane opens; otherwise the usual priority applies.</p>`},
  {id:'test',title:'Test',body:`<p>For puzzles that come with a solution, select cells with centre marks and press <b>Test</b>: a green ✓ means the right digit is among the marks, a red ✕ means it's missing. Wrong placed digits also show red.</p>`},
  {id:'other',title:'Timer, edit, menus',body:`<p>Tap the timer to pause. ✎ opens the editor for cages, thermos, arrows, whispers, renbans, region-sum lines, dots, odd/even and givens. In the Arrows tab, tap the circle then the shaft cells in order; with an arrow selected, <b>Add shaft</b> adds another shaft from the same circle (a fork). In the Dots tab, tap the line between two cells to cycle no mark → white → black → X → V → none.</p><p><b>☰</b> has Visuals, Tips, Help and Main menu. <b>Tips</b> shows the puzzle's hints one at a time (Prev/Next); it is greyed out when the puzzle has none. In a puzzle code each hint is a line <code>tip your text</code>, in order. The <b>main menu</b> has Continue (your current unsolved puzzle), Select puzzle (tap one to open; <b>⋯</b> to edit, copy its code, rename, restart or delete) and Add puzzle (paste a code or start a blank one). The app opens straight into your puzzle if it isn't solved yet.</p>`},
